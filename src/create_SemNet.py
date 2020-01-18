@@ -70,7 +70,7 @@ if __name__ == "__main__":
     LOG.info("Start building semantic network for Quantum Physics")
     LOG.info("Reading astrophysics data.")
     in_dir = Path("data/raw/")
-    all_papers, (start_year, end_year) = records_to_lists(in_dir, 1000)
+    all_papers, (start_year, end_year) = records_to_lists(in_dir)
 
     LOG.info("Start creating initial semantic network")
 
@@ -78,7 +78,8 @@ if __name__ == "__main__":
     network_T_full, nn_full, all_KW_full = create_network(all_papers, keyword_loc)
     LOG.info("Finished creating first instance of semantic network")
 
-    network_T, nn, all_KW = collaps_network(network_T_full, nn_full, all_KW_full)
+    synonym_list = Path('data/keywords_syns.txt')
+    network_T, nn, all_KW = collaps_network(network_T_full, nn_full, all_KW_full, synonym_list)
 
     LOG.info(
         "Finished collapsing network (synonyms, empty KWs, ...). Start creating ancient networks."

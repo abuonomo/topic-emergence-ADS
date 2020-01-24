@@ -1,4 +1,7 @@
 data/*
+add_semnet_path.sh
+*.prof
+runs/*
 .idea/*
 notebook/*
 references/*

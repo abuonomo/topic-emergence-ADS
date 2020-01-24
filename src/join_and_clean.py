@@ -8,20 +8,21 @@ import RAKE
 from spacy.lang.en.stop_words import STOP_WORDS
 from sqlalchemy import create_engine
 from typing import List
-import operator
+import numpy as np
 
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
 
 
-def load_records_to_dataframe(data_dir: Path) -> pd.DataFrame:
+def load_records_to_dataframe(data_dir: Path, limit=None) -> pd.DataFrame:
     """
     Load records from directory to dataframe.
 
     Args:
         data_dir: a directory with a records from ADS. 
-        Each records file is a json with keys "year", "docs", "numFound".
+            Each records file is a json with keys "year", "docs", "numFound".
+        limit: limit amount of records per year for testing purposes
 
     Returns:
         a pandas dataframe of all records from the directory
@@ -29,16 +30,22 @@ def load_records_to_dataframe(data_dir: Path) -> pd.DataFrame:
     records = []
     LOG.info(f"Loading from directory: {data_dir}")
     pbar = tqdm(list(data_dir.iterdir()))
+    if limit is not None:
+        LOG.info(f"Limiting to {limit} records per year for testing.")
     for p in pbar:
         pbar.set_description(p.stem)
         with open(p, "r") as f0:
             r = json.load(f0)
-        docs = pd.DataFrame(r["docs"])
+        if limit is not None:
+            docs = pd.DataFrame(r["docs"][0:limit])
+        else:
+            docs = pd.DataFrame(r["docs"])
         docs["year"] = r["year"]
         records.append(docs)
     LOG.info("Concatenating dataframes.")
     df = pd.concat(records, sort=False)
     df = df.reset_index(drop=True)
+    df['title'] = df['title'].apply(lambda x: x[0] if type(x) == list else x)
     LOG.info(f"Loaded dataframe with shape: {df.shape}")
     return df
 
@@ -47,9 +54,15 @@ def get_keywords_from_text(text: pd.Series) -> List[str]:
     LOG.info(f"Extracting keywords from {text.shape[0]} documents.")
     tqdm.pandas()
     rake = RAKE.Rake(list(STOP_WORDS))
-    rake_kwds = text.progress_apply(lambda x: rake.run(x, minFrequency=1, minCharacters=3))
-    # TODO: determine parameters for this function
-    # Maybe make heuristic which depends upon the number of docs in corpus
+
+    def f(x):
+        if type(x) == str:
+            val = rake.run(x, minFrequency=1, minCharacters=3)
+        else:
+            val = np.nan
+        return val
+
+    rake_kwds = text.progress_apply(f)
     return rake_kwds
 
 
@@ -59,20 +72,12 @@ def write_records_to_db(df):
     df.to_sql("ADS_records", con=engine, index=False)
 
 
-def main(in_records_dir, out_keywords, record_limit=None):
-    df = load_records_to_dataframe(in_records_dir)
-    if record_limit is not None:
-        LOG.info(f"Limit to {record_limit} records for testing.")
-        df = df.iloc[0:record_limit]
-    title = df["title"].apply(lambda x: x[0] if type(x) == list else "")
-    abstract = df["abstract"].astype(str)
-    text = abstract + title
-    rake_kwds = get_keywords_from_text(text)
-    LOG.info(f"Writing {len(rake_kwds)} keywords to {out_keywords}.")
-    with open(out_keywords, "w") as f0:
-        for r in tqdm(rake_kwds):
-            f0.write(json.dumps(r))
-            f0.write("\n")
+def main(in_records_dir, out_records, record_limit=None):
+    df = load_records_to_dataframe(in_records_dir, limit=record_limit)
+    text = df['title'] + ' || ' + df['abstract']
+    df['rake_kwds'] = get_keywords_from_text(text)
+    LOG.info(f"Writing {len(df)} keywords to {out_records}.")
+    df.to_json(out_records, orient='records', lines=True)
 
 
 if __name__ == "__main__":

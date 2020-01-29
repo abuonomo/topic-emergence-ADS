@@ -153,21 +153,11 @@ def plot_slop_complex(se_df, out_viz):
         tooltips=tooltips,
         x_axis_label='slope',
         y_axis_label='complexity',
-        # x_axis_type="log"
-        # y_axis_type="log",
     )
-    # p2 = figure(
-    #     title="keyword slopes versus count",
-    #     x_range=p1.x_range,
-    #     tools=tools,
-    #     tooltips=tooltips,
-    # )
     p1.circle("slope", "complexity", size="log_count", source=source, alpha=0.2)
-    # p2.scatter("slope", "count", source=source, alpha=0.2)
     LOG.info("Using labels...")
     LOG.info(f"{se_df.columns}")
     p = p1
-    # p = gridplot([[p1, p2]], toolbar_location="below")
     show(p)
 
     x = se_df["slope"].values

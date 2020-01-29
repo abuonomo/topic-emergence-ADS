@@ -11,13 +11,15 @@ from src.analyze_keyword_time_series import (
     filter_kwds,
     dtw_to_tboard,
 )
+from src.create_keyword_and_syn_lists import flatten_to_keywords
 from src.dtw_time_analysis import dtw_kwds
 
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
 
-EXP_DIR = Path("data/kwd_analysis_full_perc2")
+# EXP_DIR = Path("data/kwd_analysis_full_perc2")
+EXP_DIR = Path("data/kwd_analysis_perc")
 VIZ_DIR = Path("reports/viz")
 
 
@@ -59,6 +61,18 @@ def plot_slope():
     infile = EXP_DIR / "slope_complex.csv"
     se_df = pd.read_csv(infile, index_col=0)
     plot_slop_complex(se_df, VIZ_DIR / "slope_complex_count.html")
+
+
+@cli.command()
+def docs_to_keywords_df():
+    """
+    Get dataframe of keyword frequencies over the years
+    """
+    infile = Path("data/rake_kwds_small.jsonl")
+    LOG.info(f"Reading keywords from {infile}.")
+    df = pd.read_json(infile, orient="records", lines=True)
+    outfile = EXP_DIR / "all_keywords.jsonl"
+    flatten_to_keywords(df, outfile)
 
 
 @cli.command()

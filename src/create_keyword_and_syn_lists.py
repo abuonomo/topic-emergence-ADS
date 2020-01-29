@@ -1,17 +1,15 @@
 import argparse
-import json
 import logging
 from pathlib import Path
 
-from dtw import dtw
 import numpy as np
 import pandas as pd
 import spacy
+from dtw import dtw
 from nltk.stem import PorterStemmer
+from scipy.spatial.distance import euclidean
+from sklearn.preprocessing import LabelBinarizer, MinMaxScaler
 from tqdm import tqdm
-from scipy.spatial.distance import euclidean, pdist, squareform
-from sklearn.preprocessing import LabelBinarizer, StandardScaler, MinMaxScaler
-import matplotlib.pyplot as plt
 
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
@@ -68,14 +66,17 @@ def stem_kwds(df):
 
 
 def get_stem_aggs(df):
+    LOG.info("Aggregating by stems")
     df = df.copy()
     years = np.sort(df["year"].unique())
     year_count_dict = {c: "sum" for c in years}
     df = df.groupby("stem").agg(
-        {**{"rake_score": "mean", "doc_id": "count"}, **year_count_dict}
+        {
+            **{"rake_score": "mean", "doc_id": ["count", list], "keyword": list},
+            **year_count_dict,
+        }
     )
-    cols = ["rake_score_mean", "doc_id_count"] + [f"{s}_sum" for s in years]
-    df.columns = cols
+    df.columns = [f"{c}_{v}" for c, v in df.columns.values]
     return df
 
 
@@ -125,23 +126,40 @@ def dynamic_time_warping_sim(u, v):
     return d
 
 
-def main(infile: Path, out_dir: Path):
-    assert not out_dir.exists(), LOG.exception(f"{out_dir} already exists.")
-    out_dir.mkdir()
-
-    LOG.info(f"Reading keywords from {infile}.")
-    df = pd.read_json(infile, orient="records", lines=True)
-    df = df[df["database"].apply(lambda x: "astronomy" in x)].copy()
+def flatten_to_keywords(df, outfile):
+    allowed_db = "astronomy"
+    LOG.info(f"Limiting to documents in database {allowed_db}")
+    df = df[df["database"].apply(lambda x: allowed_db in x)].copy()
     kwd_df = (
         df.pipe(get_kwd_occurences)
         .pipe(binarize_years)
         .pipe(stem_kwds)
         .pipe(get_stem_aggs)
     )
-    LOG.info('Writing out all keywords.')
-    kwd_df.reset_index().to_json(
-        out_dir / "all_keywords.jsonl", orient="records", lines=True
-    )
+    LOG.info("Writing out all keywords.")
+    kwd_df.reset_index().to_json(outfile, orient="records", lines=True)
+    return kwd_df
+
+
+def main(infile: Path, out_dir: Path):
+    assert not out_dir.exists(), LOG.exception(f"{out_dir} already exists.")
+    out_dir.mkdir()
+
+    # LOG.info(f"Reading keywords from {infile}.")
+    # df = pd.read_json(infile, orient="records", lines=True)
+    # df = df[df["database"].apply(lambda x: "astronomy" in x)].copy()
+    # kwd_df = (
+    #     df.pipe(get_kwd_occurences)
+    #     .pipe(binarize_years)
+    #     .pipe(stem_kwds)
+    #     .pipe(get_stem_aggs)
+    # )
+    # LOG.info("Writing out all keywords.")
+    # kwd_df.reset_index().to_json(
+    #     out_dir / "all_keywords.jsonl", orient="records", lines=True
+    # )
+    outfile = out_dir / "all_keywords.jsonl"
+    kwd_df = flatten_to_keywords(infile, outfile)
 
     # threshold = np.ceil(len(rake_kwds) / 200.0)  # TODO: determine this number
     threshold = 50

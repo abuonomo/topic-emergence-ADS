@@ -1,28 +1,21 @@
 import argparse
 import logging
-from bokeh.plotting import figure, output_file, show, ColumnDataSource, DEFAULT_TOOLS
-from bokeh.models import HoverTool, LabelSet
-from bokeh.layouts import gridplot
-import matplotlib.pyplot as plt
-import mpld3
-import pandas as pd
 from pathlib import Path
+
 import ipyvolume as ipv
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from bokeh.plotting import figure, output_file, show, ColumnDataSource, DEFAULT_TOOLS
+from scipy.spatial.distance import cdist
+from scipy.stats import linregress
+from sklearn.cluster import KMeans
 from tensorboardX import SummaryWriter
 from tensorboardX.utils import figure_to_image
-from scipy.spatial.distance import cdist
-from sklearn.decomposition import PCA
-from sklearn.neighbors import NearestNeighbors
-from tsfresh import extract_features
+from tqdm import tqdm
 from tsfresh.feature_extraction import feature_calculators as fc
 from tslearn.clustering import TimeSeriesKMeans
 from tslearn.utils import to_time_series_dataset
-from sklearn.cluster import KMeans
-import numpy as np
-from tqdm import tqdm
-from scipy.stats import linregress
-from collections import OrderedDict
-
 
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
@@ -81,39 +74,8 @@ def test_kmeans_clusters(X):
     plt.show()
 
 
-def ts_to_tboard(normed_kwd_years):
-    """Use tslearn to cluster timeseries"""
-    ts_normed = to_time_series_dataset(normed_kwd_years.values)
-    metric = "euclidean"
-    LOG.info(f"Performing kmeans with metric {metric}.")
-    km = TimeSeriesKMeans(n_clusters=6, metric=metric)
-    km.fit(ts_normed)
-
-    lim = 1000
+def to_tboard(dtw_df, kmeans, images, lim):
     writer = SummaryWriter()
-    images = get_fig_images(normed_kwd_years[0:lim])
-    meta = list(zip(normed_kwd_years.index.tolist(), [str(l) for l in km.labels_]))
-    LOG.info("Writing to tensorboard.")
-    writer.add_embedding(
-        normed_kwd_years.values[0:lim],
-        metadata=meta[0:lim],
-        label_img=images[0:lim],
-        metadata_header=["keyword", "cluster"],
-    )
-    writer.close()
-
-
-def dtw_to_tboard(normed_kwd_years, dtw_df):
-    """Use pre-computed dynamic time warp values and calculate kmeans."""
-    # TODO: Used elbow to determine, but not being placed programmatically
-    c = 6
-    LOG.info(f"Performing kmeans with {c} clusters.")
-    kmeans = KMeans(n_clusters=c)
-    kmeans.fit(dtw_df.values)
-
-    lim = 1000
-    writer = SummaryWriter()
-    images = get_fig_images(normed_kwd_years[0:lim])
     meta = list(zip(dtw_df.index.tolist(), [str(l) for l in kmeans.labels_]))
     LOG.info("Writing to tensorboard.")
     writer.add_embedding(
@@ -123,6 +85,32 @@ def dtw_to_tboard(normed_kwd_years, dtw_df):
         metadata_header=["keyword", "cluster"],
     )
     writer.close()
+    LOG.info('Use "tensorboard --logdir runs" command to see visualization.')
+
+
+def ts_to_tboard(normed_kwd_years):
+    """Use tslearn to cluster timeseries"""
+    ts_normed = to_time_series_dataset(normed_kwd_years.values)
+    metric = "euclidean"
+    LOG.info(f"Performing kmeans with metric {metric}.")
+    km = TimeSeriesKMeans(n_clusters=6, metric=metric)
+    km.fit(ts_normed)
+
+    lim = 1000
+    to_tboard(normed_kwd_years)
+    images = get_fig_images(normed_kwd_years[0:lim])
+    to_tboard(normed_kwd_years, km, images, lim)
+
+
+def dtw_to_tboard(normed_kwd_years, dtw_df, c=6, lim=1000):
+    """Use pre-computed dynamic time warp values and calculate kmeans."""
+    # TODO: Used elbow to determine, but not being placed programmatically
+    LOG.info(f"Performing kmeans with {c} clusters.")
+    kmeans = KMeans(n_clusters=c)
+    kmeans.fit(dtw_df.values)
+
+    images = get_fig_images(normed_kwd_years[0:lim])
+    to_tboard(dtw_df, kmeans, images, lim)
 
 
 def get_slopes(df):
@@ -151,8 +139,8 @@ def plot_slop_complex(se_df, out_viz):
         title="keyword slopes versus complexity",
         tools=tools,
         tooltips=tooltips,
-        x_axis_label='slope',
-        y_axis_label='complexity',
+        x_axis_label="slope",
+        y_axis_label="complexity",
     )
     p1.circle("slope", "complexity", size="log_count", source=source, alpha=0.2)
     LOG.info("Using labels...")
@@ -191,56 +179,12 @@ def slope_count_complexity(lim_kwd_df, out_csv):
     se_df["complexity"] = only_years.apply(lambda x: fc.cid_ce(x, False), axis=1)
     se_df["keyword"] = lim_kwd_df["stem"]
     se_df["count"] = lim_kwd_df["doc_id_count"]
-    LOG.info(f'Writing slope complexity data to {out_csv}')
+    LOG.info(f"Writing slope complexity data to {out_csv}")
     se_df.to_csv(out_csv)
 
 
 def main(in_dir: Path):
-    # dtw_loc = in_dir / "dynamic_time_warp_distances.csv"
-    # LOG.info(f"Reading dynamic time warps from {dtw_loc}.")
-    # dtw_df = pd.read_csv(in_dir / "dynamic_time_warp_distances.csv", index_col=0)
-
-    norm_loc = in_dir / "lim_normed_keyword_stems.jsonl"
-    LOG.info(f"Reading normalized keywords years from {norm_loc}.")
-    normed_kwd_years = pd.read_csv(norm_loc, index_col=0)
-    lim = 1000
-    writer = SummaryWriter()
-    slopes_and_err = get_slopes(normed_kwd_years)
-    se_df = slopes_and_err.apply(pd.Series)
-    se_df.columns = ["slope", "intercept", "r_value", "p_value", "std_err"]
-    slopes = se_df["slope"]
-    se_df["complexity"] = normed_kwd_years.apply(lambda x: fc.cid_ce(x, False), axis=1)
-    se_df.reset_index()
-    # fig, ax = plt.subplots()
-    # ax.plot(slopes, changes, 'o', alpha=0.2)
-    # ax.set_xlabel("Linear Regression Slopes")
-    # ax.set_ylabel("Complexity")
-    # ax.set_title("Keyword Slope Versus Complexity")
-    # fig.show()
-    # labels = slopes.index.to_list()
-    # tooltip = mpld3.plugins.PointLabelTooltip(ax, labels=labels)
-    # mpld3.plugins.connect(fig, tooltip)
-    # mpld3.save_html(fig, 'tmp.html')
-    sm_df = pd.DataFrame([slopes, changes]).T
-    meta = list(
-        zip(
-            normed_kwd_years.index.tolist(),
-            [str(l) for l in np.arange(0, normed_kwd_years.shape[0])],
-        )
-    )
-    sm_df.columns = ["slope", "complexity"]
-    ind_ord = slopes.sort_values(ascending=False).index
-    images = get_fig_images(normed_kwd_years.loc[ind_ord][0:lim])
-    z = zip(normed_kwd_years.loc[ind_ord].index[0:lim], images[0:lim])
-    writer.add_embedding(
-        sm_df.values[0:lim],
-        metadata=meta[0:lim],
-        label_img=images[0:lim],
-        metadata_header=["keyword", "cluster"],
-    )
-    [writer.add_image(n, i) for n, i in z]
-    writer.close()
-    LOG.info("Done.")
+    pass
 
 
 if __name__ == "__main__":

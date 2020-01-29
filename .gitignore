@@ -1,4 +1,6 @@
 data/*
+reports/*
+scratch/*
 add_semnet_path.sh
 *.prof
 runs/*

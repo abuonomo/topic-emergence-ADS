@@ -1,9 +1,24 @@
 
-keywords-dataframes:
+## Join all years and and use rake to extract keywords.
+data/rake_kwds.jsonl:
+	python src/join_and_clean.py \
+		data/raw \
+		data/rake_kwds.jsonl
+
+
+## Get keyword frequencies over time and normalize
+data/kwd_analysis_full: data/rake_kwds.jsonl
 	python src/create_keyword_and_syn_lists.py \
 		data/rake_kwds.jsonl \
 		data/kwd_analysis_full
 
+
+DTW = data/kwd_analysis_full/dynamic_time_warp_distances.csv
+NORMED = data/kwd_analysis_full/lim_normed_keyword_stems.jsonl
+$(DTW): $(NORMED)
+	python src/dtw_time_analysis.py data/kwd_analysis_full
+## make pairwise dynamic time warp
+warp: $(DTW)
 
 #################################################################################
 # Self Documenting Commands                                                     #

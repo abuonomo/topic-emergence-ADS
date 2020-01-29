@@ -10,7 +10,7 @@ import spacy
 from nltk.stem import PorterStemmer
 from tqdm import tqdm
 from scipy.spatial.distance import euclidean, pdist, squareform
-from sklearn.preprocessing import LabelBinarizer, StandardScaler
+from sklearn.preprocessing import LabelBinarizer, StandardScaler, MinMaxScaler
 import matplotlib.pyplot as plt
 
 logging.basicConfig(level=logging.INFO)
@@ -81,7 +81,8 @@ def get_stem_aggs(df):
 
 def normalize(df, year_counts):
     df = df.copy()
-    scaler = StandardScaler()
+    year_counts = year_counts[year_counts.index.sort_values()]
+    scaler = MinMaxScaler()
     # Normalize columns by total count of year,
     # don't favor year with overall greater publication, do it by portion of total
     for year in year_counts.index:
@@ -91,25 +92,56 @@ def normalize(df, year_counts):
     return df
 
 
+def normalize_by_perc_change(df, year_counts):
+    df = df.copy()
+    # Normalize columns by total count of year,
+    # don't favor year with overall greater publication, do it by portion of total
+    year_counts = year_counts[year_counts.index.sort_values()]
+    for year in year_counts.index:
+        df[f"{year}_sum"] = df[f"{year}_sum"] / year_counts[year]
+    sum_cols = [f"{year}_sum" for year in year_counts.index]
+    df.loc[:, sum_cols] = perc_change_from_baseline(df.loc[:, sum_cols].values)
+    return df
+
+
+def perc_change_from_baseline(x):
+    def f(x):
+        nzs = np.nonzero(x)[0]
+        if len(nzs) is 0:
+            val = np.nan
+        else:
+            val = x[nzs[0]]
+        vals = np.tile(val, len(x))
+        return vals
+
+    baseline = np.apply_along_axis(f, 1, x)
+    perc_vals = (x - baseline) / baseline
+    return perc_vals
+
+
 def dynamic_time_warping_sim(u, v):
     d, _, _, _ = dtw(u, v, dist=euclidean, w=5)
-    # Above selection are somewhat arbitrary. Should determine more rigorously.
+    # Above selections are somewhat arbitrary. Should determine more rigorously.
     return d
 
 
 def main(infile: Path, out_dir: Path):
-    assert not out_dir.exists(), LOG.exception(f'{out_dir} already exists.')
+    assert not out_dir.exists(), LOG.exception(f"{out_dir} already exists.")
     out_dir.mkdir()
 
     LOG.info(f"Reading keywords from {infile}.")
     df = pd.read_json(infile, orient="records", lines=True)
+    df = df[df["database"].apply(lambda x: "astronomy" in x)].copy()
     kwd_df = (
         df.pipe(get_kwd_occurences)
         .pipe(binarize_years)
         .pipe(stem_kwds)
         .pipe(get_stem_aggs)
     )
-    kwd_df.to_json(out_dir / "all_keywords.jsonl", orient="records", lines=True)
+    LOG.info('Writing out all keywords.')
+    kwd_df.reset_index().to_json(
+        out_dir / "all_keywords.jsonl", orient="records", lines=True
+    )
 
     # threshold = np.ceil(len(rake_kwds) / 200.0)  # TODO: determine this number
     threshold = 50
@@ -123,7 +155,8 @@ def main(infile: Path, out_dir: Path):
         .iloc[0:hard_limit]
     )
     year_counts = df["year"].value_counts()
-    lim_kwd_norm_df = lim_kwd_df.pipe(normalize, year_counts)
+    # lim_kwd_norm_df = lim_kwd_df.pipe(normalize, year_counts)
+    lim_kwd_norm_df = lim_kwd_df.pipe(normalize_by_perc_change, year_counts)
     sum_cols = [f"{year}_sum" for year in np.sort(year_counts.index)]
     normed_kwd_years = lim_kwd_norm_df[sum_cols]
     norm_loc = out_dir / "lim_normed_keyword_stems.jsonl"
@@ -136,15 +169,6 @@ def main(infile: Path, out_dir: Path):
         for kwd in tqdm(normed_kwd_years.index):
             f0.write(kwd)
             f0.write("\n")
-
-    LOG.info("Computing dynamic time warping between keywords.")
-    dtw_dists = pdist(normed_kwd_years, dynamic_time_warping_sim)
-    dtw_df = pd.DataFrame(squareform(dtw_dists))
-    dtw_df.columns = normed_kwd_years.index
-    dtw_df.index = normed_kwd_years.index
-    dtw_loc = out_dir / "dynamic_time_warp_distances.csv"
-    LOG.info(f"Outputting dynamic time warps to {dtw_loc}.")
-    dtw_df.to_csv(dtw_loc)
 
     stem_groups = lim_kwd_df.groupby("stem").groups
     lim_sg = {s: g for s, g in stem_groups.items() if len(g) > 1}

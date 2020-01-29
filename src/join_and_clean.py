@@ -29,9 +29,9 @@ def load_records_to_dataframe(data_dir: Path, limit=None) -> pd.DataFrame:
     """
     records = []
     LOG.info(f"Loading from directory: {data_dir}")
-    pbar = tqdm(list(data_dir.iterdir()))
     if limit is not None:
         LOG.info(f"Limiting to {limit} records per year for testing.")
+    pbar = tqdm(list(data_dir.iterdir()))
     for p in pbar:
         pbar.set_description(p.stem)
         with open(p, "r") as f0:

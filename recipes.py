@@ -27,6 +27,19 @@ def cli():
 
 
 @cli.command()
+def experiment():
+    """
+    Run all commands in experiment.
+    """
+    get_filtered_kwds()
+    dtw()
+    slope_complexity()
+    plot_slope()
+    dtw_viz()
+    plot_times()
+
+
+@cli.command()
 def slope_complexity():
     """
     Perform linear regression and get complexity for all keywords

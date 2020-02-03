@@ -2,11 +2,12 @@ import argparse
 import logging
 from pathlib import Path
 
+import bokeh.io
 import ipyvolume as ipv
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from bokeh.plotting import figure, output_file, show, ColumnDataSource, DEFAULT_TOOLS
+from bokeh.plotting import figure, output_file, ColumnDataSource, DEFAULT_TOOLS
 from scipy.spatial.distance import cdist
 from scipy.stats import linregress
 from sklearn.cluster import KMeans
@@ -37,6 +38,8 @@ def plot_time(v, show=False, lnr=False, size=(2, 2)):
             color="black",
             linewidth=2,
         )
+    plt.xlabel("year")
+    plt.ylabel("frequency")
     plt.title(v.name)
     fig = plt.gcf()
     if show:
@@ -125,7 +128,7 @@ def get_slopes(df):
     return slopes
 
 
-def plot_slop_complex(se_df, out_viz):
+def plot_slop_complex(se_df, viz_dir, x_measure="slope", y_measure="complexity"):
     output_file("slope_complex.html")
     se_df["log_count"] = np.log(se_df["count"])
     source = ColumnDataSource(se_df)
@@ -139,14 +142,16 @@ def plot_slop_complex(se_df, out_viz):
         title="keyword slopes versus complexity",
         tools=tools,
         tooltips=tooltips,
-        x_axis_label="slope",
-        y_axis_label="complexity",
+        x_axis_label=x_measure,
+        y_axis_label=y_measure,
     )
-    p1.circle("slope", "complexity", size="log_count", source=source, alpha=0.2)
+    p1.circle(x_measure, y_measure, size="log_count", source=source, alpha=0.2)
     LOG.info("Using labels...")
     LOG.info(f"{se_df.columns}")
     p = p1
-    show(p)
+    out_bok = viz_dir / "slope_complex.html"
+    LOG.info(f"Writing bokeh viz to {out_bok}")
+    bokeh.io.save(p, viz_dir / "slope_complex.html")
 
     x = se_df["slope"].values
     y = se_df["complexity"].values
@@ -155,7 +160,9 @@ def plot_slop_complex(se_df, out_viz):
     ipv.xlabel("slope")
     ipv.ylabel("complexity")
     ipv.zlabel("count")
-    ipv.save(out_viz)
+    out_vol_viz = viz_dir / "slope_complex_count.html"
+    LOG.info(f"Writing volume viz to {out_vol_viz}")
+    ipv.save(out_vol_viz)
 
 
 def filter_kwds(kwd_df, out_loc, threshold=50, score_thresh=1.3, hard_limit=10_000):
@@ -166,17 +173,22 @@ def filter_kwds(kwd_df, out_loc, threshold=50, score_thresh=1.3, hard_limit=10_0
         .sort_values("rake_score_mean", ascending=False)
         .iloc[0:hard_limit]
     )
-    LOG.info(f"Writing to {out_loc}.")
-    lim_kwd_df.to_csv(out_loc)
+    LOG.info(f"Writing dataframe with size {lim_kwd_df.shape[0]} to {out_loc}.")
+    lim_kwd_df.to_json(out_loc, orient="records", lines=True)
     return lim_kwd_df
 
 
 def slope_count_complexity(lim_kwd_df, out_csv):
-    only_years = lim_kwd_df.iloc[:, 3:]
+    only_years = lim_kwd_df.iloc[:, 5:]
     slopes_and_err = get_slopes(only_years)
     se_df = slopes_and_err.apply(pd.Series)
     se_df.columns = ["slope", "intercept", "r_value", "p_value", "std_err"]
     se_df["complexity"] = only_years.apply(lambda x: fc.cid_ce(x, False), axis=1)
+    se_df["mean_change"] = only_years.apply(lambda x: fc.mean_change(x), axis=1)
+    se_df["number_cwt_peaks"] = only_years.apply(
+        lambda x: fc.number_cwt_peaks(x, 3), axis=1
+    )
+    # TODO: mean change per year, other tsfresh metrics
     se_df["keyword"] = lim_kwd_df["stem"]
     se_df["count"] = lim_kwd_df["doc_id_count"]
     LOG.info(f"Writing slope complexity data to {out_csv}")

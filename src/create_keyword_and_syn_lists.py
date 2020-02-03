@@ -2,6 +2,8 @@ import argparse
 import logging
 from pathlib import Path
 
+import dask
+import dask.bag as db
 import numpy as np
 import pandas as pd
 import spacy
@@ -30,17 +32,48 @@ def write_syn_file(out_syn_file, lim_sg):
                 f0.write("\n")
 
 
-def get_kwd_occurences(df):
+def get_kwd_occurences(df, min_tresh=5):
     LOG.info("Flattening along document rake_kwds.")
     df = df.copy()
     df = df.applymap(lambda x: np.nan if x is None else x)
     kwd_inds = df["rake_kwds"].apply(lambda x: type(x) is list)
     rake_kwds = df["rake_kwds"][kwd_inds]
     all_kwds = [(i, k[0], k[1]) for i, r in zip(rake_kwds.index, rake_kwds) for k in r]
+
     kwd_df = pd.DataFrame(all_kwds)
     kwd_df.columns = ["doc_id", "keyword", "rake_score"]
     kwd_df["year"] = df.loc[kwd_df["doc_id"], "year"].tolist()
-    return kwd_df
+    ta = df["title"] + "||" + df["abstract"]  # pass this from join func
+
+    tqdm.pandas()
+    kwds = (
+        kwd_df.groupby("keyword")
+        .agg({"keyword": "count"})
+        .query(f"keyword > {min_tresh}")
+        .index
+    )
+
+    # Go back and string match the keywords against all titles and abstracts.
+    # Do this because RAKE gives us candidate keywords but does not assure us of their
+    # locations. Only says keyword is present if it passes through RAKE.
+    def f(x):
+        doc_ids = kwd_df.query(f"keyword == \"{x}\"").doc_id
+        l = df.loc[ta.str.contains(x, na=False, case=False, regex=False), :].copy()
+        l = l.drop(doc_ids)
+        l['keyword'] = x
+        l = l.reset_index()
+        l = l.rename(columns={'index': 'doc_id'})
+        l['rake_score'] = np.nan
+        l = l.loc[:, ['doc_id', 'keyword', 'rake_score', 'year']]
+        records = l.to_dict(orient='records')
+        return records
+
+    LOG.info("Going back through dataset to find keyword doc_id locations.")
+    more_inds = [f(k) for k in tqdm(kwds)]
+    expl_more = [r for s in more_inds for r in s]
+    ex_df = pd.DataFrame(expl_more)
+    c_df = pd.concat([ex_df, kwd_df]).sort_values('doc_id').reset_index(drop=True)
+    return c_df
 
 
 def binarize_years(df):
@@ -126,17 +159,17 @@ def dynamic_time_warping_sim(u, v):
     return d
 
 
-def flatten_to_keywords(df, outfile):
+def flatten_to_keywords(df, outfile, min_thresh=5):
     allowed_db = "astronomy"
     LOG.info(f"Limiting to documents in database {allowed_db}")
     df = df[df["database"].apply(lambda x: allowed_db in x)].copy()
     kwd_df = (
-        df.pipe(get_kwd_occurences)
+        df.pipe(get_kwd_occurences, min_thresh)
         .pipe(binarize_years)
         .pipe(stem_kwds)
         .pipe(get_stem_aggs)
     )
-    LOG.info("Writing out all keywords.")
+    LOG.info(f"Writing out all keywords to {outfile}.")
     kwd_df.reset_index().to_json(outfile, orient="records", lines=True)
     return kwd_df
 

@@ -1,6 +1,7 @@
 data/*
 models/*
 reports/*
+!reports/viz/.gitkeep
 scratch/*
 add_semnet_path.sh
 *.prof
@@ -9,4 +10,5 @@ runs/*
 notebook/*
 references/*
 venv/*
+!.gitkeep
 __pycache__/

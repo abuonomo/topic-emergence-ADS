@@ -44,8 +44,8 @@ def get_kwd_occurences(df, min_tresh=5):
     kwd_df.columns = ["doc_id", "keyword", "rake_score"]
     kwd_df["year"] = df.loc[kwd_df["doc_id"], "year"].tolist()
     ta = df["title"] + "||" + df["abstract"]  # pass this from join func
+    ta = ta[ta.apply(lambda x: type(x) == str)]
 
-    tqdm.pandas()
     kwds = (
         kwd_df.groupby("keyword")
         .agg({"keyword": "count"})
@@ -56,23 +56,22 @@ def get_kwd_occurences(df, min_tresh=5):
     # Go back and string match the keywords against all titles and abstracts.
     # Do this because RAKE gives us candidate keywords but does not assure us of their
     # locations. Only says keyword is present if it passes through RAKE.
-    def f(x):
-        doc_ids = kwd_df.query(f"keyword == \"{x}\"").doc_id
-        l = df.loc[ta.str.contains(x, na=False, case=False, regex=False), :].copy()
-        l = l.drop(doc_ids)
-        l['keyword'] = x
-        l = l.reset_index()
-        l = l.rename(columns={'index': 'doc_id'})
-        l['rake_score'] = np.nan
-        l = l.loc[:, ['doc_id', 'keyword', 'rake_score', 'year']]
-        records = l.to_dict(orient='records')
-        return records
-
+    tqdm.pandas()
     LOG.info("Going back through dataset to find keyword doc_id locations.")
-    more_inds = [f(k) for k in tqdm(kwds)]
-    expl_more = [r for s in more_inds for r in s]
-    ex_df = pd.DataFrame(expl_more)
-    c_df = pd.concat([ex_df, kwd_df]).sort_values('doc_id').reset_index(drop=True)
+    doc_to_kwds = ta.progress_apply(lambda x: [k for k in kwds if k in x])
+    dke = doc_to_kwds.explode().reset_index()
+    dke.columns = ["doc_id", "keyword"]
+    LOG.info("Filling years column.")
+    doc_to_year = kwd_df.groupby("doc_id").agg({"year": lambda x: x[0]})
+    dke["rake_score"] = np.nan
+    dke["keyword"] = dke["keyword"].astype(str)
+    dke["year"] = doc_to_year.loc[dke["doc_id"], "year"].tolist()
+    overlap_inds = pd.merge(dke.reset_index(), kwd_df, on=["doc_id", "keyword"])[
+        "index"
+    ]
+    sdke = dke[~dke.index.isin(overlap_inds)]
+    c_df = pd.concat([sdke, kwd_df]).sort_values("doc_id").reset_index(drop=True)
+
     return c_df
 
 
@@ -105,7 +104,11 @@ def get_stem_aggs(df):
     year_count_dict = {c: "sum" for c in years}
     df = df.groupby("stem").agg(
         {
-            **{"rake_score": "mean", "doc_id": ["count", list], "keyword": list},
+            **{
+                "rake_score": "mean",
+                "doc_id": ["count", list],
+                "keyword": lambda x: list(set(x)),
+            },
             **year_count_dict,
         }
     )
@@ -113,26 +116,26 @@ def get_stem_aggs(df):
     return df
 
 
-def normalize(df, year_counts):
-    df = df.copy()
-    year_counts = year_counts[year_counts.index.sort_values()]
-    scaler = MinMaxScaler()
+def norm_year_counts(df, year_counts):
     # Normalize columns by total count of year,
     # don't favor year with overall greater publication, do it by portion of total
     for year in year_counts.index:
-        df[f"{year}_sum"] = df[f"{year}_sum"] / year_counts[year]
+        df[f"{year}_sum"] = df[f"{year}_sum"] / year_counts.loc[year, "count"]
+    return df
+
+
+def normalize(df, year_counts):
+    df = df.copy()
+    df = norm_year_counts(df, year_counts)
     sum_cols = [f"{year}_sum" for year in year_counts.index]
+    scaler = MinMaxScaler()
     df.loc[:, sum_cols] = scaler.fit_transform(df.loc[:, sum_cols].T).T
     return df
 
 
-def normalize_by_perc_change(df, year_counts):
+def normalize_by_perc(df, year_counts):
     df = df.copy()
-    # Normalize columns by total count of year,
-    # don't favor year with overall greater publication, do it by portion of total
-    year_counts = year_counts[year_counts.index.sort_values()]
-    for year in year_counts.index:
-        df[f"{year}_sum"] = df[f"{year}_sum"] / year_counts[year]
+    df = norm_year_counts(df, year_counts)
     sum_cols = [f"{year}_sum" for year in year_counts.index]
     df.loc[:, sum_cols] = perc_change_from_baseline(df.loc[:, sum_cols].values)
     return df
@@ -149,7 +152,7 @@ def perc_change_from_baseline(x):
         return vals
 
     baseline = np.apply_along_axis(f, 1, x)
-    perc_vals = (x - baseline) / baseline
+    perc_vals = x / baseline
     return perc_vals
 
 
@@ -159,7 +162,7 @@ def dynamic_time_warping_sim(u, v):
     return d
 
 
-def flatten_to_keywords(df, outfile, min_thresh=5):
+def flatten_to_keywords(df, outfile, out_years, min_thresh=5):
     allowed_db = "astronomy"
     LOG.info(f"Limiting to documents in database {allowed_db}")
     df = df[df["database"].apply(lambda x: allowed_db in x)].copy()
@@ -169,6 +172,10 @@ def flatten_to_keywords(df, outfile, min_thresh=5):
         .pipe(stem_kwds)
         .pipe(get_stem_aggs)
     )
+    year_counts = df["year"].value_counts().reset_index()
+    year_counts.columns = ["year", "count"]
+    LOG.info(f"Writing year counts to {out_years}.")
+    year_counts.to_csv(out_years)
     LOG.info(f"Writing out all keywords to {outfile}.")
     kwd_df.reset_index().to_json(outfile, orient="records", lines=True)
     return kwd_df

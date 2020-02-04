@@ -178,7 +178,7 @@ def filter_kwds(kwd_df, out_loc, threshold=50, score_thresh=1.3, hard_limit=10_0
     return lim_kwd_df
 
 
-def slope_count_complexity(lim_kwd_df, out_csv):
+def slope_count_complexity(lim_kwd_df, out_csv, smooth_dis=3):
     only_years = lim_kwd_df.iloc[:, 5:]
     slopes_and_err = get_slopes(only_years)
     se_df = slopes_and_err.apply(pd.Series)
@@ -186,9 +186,8 @@ def slope_count_complexity(lim_kwd_df, out_csv):
     se_df["complexity"] = only_years.apply(lambda x: fc.cid_ce(x, False), axis=1)
     se_df["mean_change"] = only_years.apply(lambda x: fc.mean_change(x), axis=1)
     se_df["number_cwt_peaks"] = only_years.apply(
-        lambda x: fc.number_cwt_peaks(x, 3), axis=1
+        lambda x: fc.number_cwt_peaks(x, smooth_dis), axis=1
     )
-    # TODO: mean change per year, other tsfresh metrics
     se_df["keyword"] = lim_kwd_df["stem"]
     se_df["count"] = lim_kwd_df["doc_id_count"]
     LOG.info(f"Writing slope complexity data to {out_csv}")

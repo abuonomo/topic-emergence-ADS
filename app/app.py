@@ -49,7 +49,8 @@ def get_data():
     ts['year'] = [int(v[0:4]) for v in ts.index]
     ts.columns = ['count', 'year']
     ts = ts.reset_index(drop=True)
-    ts = ts.loc[:, ['year', 'count']]
+    ts['keyword'] = data['keyword']
+    ts = ts.loc[:, ['keyword', 'year', 'count']]
     ts_recs = ts.to_dict(orient="records")
     return jsonify(ts_recs)
 

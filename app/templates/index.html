@@ -6,6 +6,7 @@
       rel="stylesheet"
       href="{{ url_for('static', filename='style/main.css') }}"
     />
+    <link href="https://fonts.googleapis.com/css?family=Montserrat&display=swap" rel="stylesheet">
   </head>
   <body>
     <div id="graphDiv"></div>
@@ -166,12 +167,13 @@
           //   })
           //   .attr("height", function(d) { return height - yScale(d['fatalities'])});
           //
-          // svg.append("text")
-          //   .attr("transform", "translate(100,0)")
-          //   .attr("x", 50)
-          //   .attr("y", 50)
-          //   .attr("font-size", "24px")
-          //   .text("Fatalities for Actors in Europe");
+          g.append("text")
+            .attr("transform", "translate(10,0)")
+            .attr("x", 0)
+            .attr("y", -20)
+            .attr("font-size", "24px")
+            .attr("class", "title")
+            .text(`Keywords ${x_name} vs ${y_name}`);
         }
 
         function brushended() {
@@ -267,6 +269,26 @@
             .attr("cx", function(d) { return xTime(d['year']); })
             .attr("cy", function(d) { return yTime(d['count']); });
 
+          time_g.append("text")
+                  .style("text-anchor", "end")
+                  .attr("x", width)
+                  .attr("y", height - 8)
+                  .text('year');
+
+          time_g.append("text")
+            .attr("transform", "rotate(-90)")
+            .attr("y", 6)
+            .attr("dy", "1em")
+            .style("text-anchor", "end")
+            .text('count');
+
+          time_g.append("text")
+                  .attr("transform", "translate(10,0)")
+                  .attr("x", 0)
+                  .attr("y", -20)
+                  .attr("class", "title")
+                  .attr("font-size", "24px")
+                  .text(`"${data[0]['keyword']}" year vs count`);
         }
 
         function onMouseOver(d, i) {
@@ -305,7 +327,7 @@
               }
           }).then(
             function(d) {
-              console.log(d)
+              console.log(d);
               drawTimeSeries(d)
             }
           )

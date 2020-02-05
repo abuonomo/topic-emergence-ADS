@@ -27,3 +27,7 @@ axis {
 .area {
   fill: lightsteelblue;
 }
+
+.title {
+    font-family: 'Montserrat', sans-serif;
+}

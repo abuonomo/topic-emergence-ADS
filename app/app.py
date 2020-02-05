@@ -1,10 +1,11 @@
 import json
+import logging
 from pathlib import Path
 
-from flask import Flask, render_template, jsonify, request
-import pandas as pd
-import logging
 import joblib
+import numpy as np
+import pandas as pd
+from flask import Flask, render_template, jsonify, request
 
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
@@ -36,6 +37,7 @@ def init():
     LOG.info(f"Reading kmeans model from {app.config['KMEANS_LOC']}")
     app.config['KMEANS'] = joblib.load(app.config['KMEANS_LOC'])
     app.config['SC_DF']['kmeans_cluster'] = app.config['KMEANS'].labels_
+    app.config['SC_DF']['log_count'] = np.log(app.config['SC_DF']['count'])
 
 
 @app.route("/")

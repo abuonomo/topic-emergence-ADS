@@ -50,7 +50,7 @@ p {
 }
 
 .area {
-  fill: lightsteelblue;
+    opacity: 0.5;
 }
 
 .title {

@@ -4,6 +4,7 @@ from pathlib import Path
 from flask import Flask, render_template, jsonify, request
 import pandas as pd
 import logging
+import joblib
 
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
@@ -19,8 +20,10 @@ HARD = 10000
 app.config.update(
     SC_LOC=DATA_DIR / f"slope_complex.csv",
     N_LOC=DATA_DIR / f"all_keywords_threshold_{FREQ}_{SCORE}_{HARD}.jsonl",
+    KMEANS_LOC=DATA_DIR / "kmeans.jbl",
     SC_DF=None,
     N_DF=None,
+    KMEANS=None,
 )
 
 
@@ -30,6 +33,9 @@ def init():
     app.config["SC_DF"] = pd.read_csv(app.config["SC_LOC"], index_col=0)
     LOG.info(f'Reading full keyword time series from {app.config["N_LOC"]}.')
     app.config["N_DF"] = pd.read_json(app.config["N_LOC"], orient="records", lines=True)
+    LOG.info(f"Reading kmeans model from {app.config['KMEANS_LOC']}")
+    app.config['KMEANS'] = joblib.load(app.config['KMEANS_LOC'])
+    app.config['SC_DF']['kmeans_cluster'] = app.config['KMEANS'].labels_
 
 
 @app.route("/")
@@ -49,7 +55,8 @@ def get_data():
     ts.columns = ['count', 'year']
     ts = ts.reset_index(drop=True)
     ts['keyword'] = data['keyword']
-    ts = ts.loc[:, ['keyword', 'year', 'count']]
+    ts['kmeans_cluster'] = data['kmeans_cluster']
+    ts = ts.loc[:, ['keyword', 'kmeans_cluster', 'year', 'count']]
     ts_recs = ts.to_dict(orient="records")
     return jsonify(ts_recs)
 

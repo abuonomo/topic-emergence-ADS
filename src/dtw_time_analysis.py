@@ -6,25 +6,13 @@ from time import time
 import matplotlib.pyplot as plt
 import pandas as pd
 import tslearn.metrics as tsm
-from dtw import dtw
-from fastdtw import fastdtw
-from scipy.spatial.distance import euclidean, pdist, squareform
+from scipy.spatial.distance import pdist, squareform
+from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
 
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
-
-
-def dynamic_time_warping_sim(u, v, w):
-    d, _, _, _ = dtw(u, v, dist=euclidean, w=w)
-    # Above selections are somewhat arbitrary. Should determine more rigorously.
-    return d
-
-
-def fast_sim(u, v, w):
-    d, _ = fastdtw(u, v, radius=w, dist=euclidean)
-    return d
 
 
 def tsdtw(u, v, w):
@@ -54,17 +42,18 @@ def plot_dtw_times(normed_kwd_years, s=25, top=1000, window=1):
     return sizes, times
 
 
-def dtw_kwds(normed_kwd_years, dtw_loc):
+def dtw_kwds(normed_kwd_years):
     LOG.info("Computing dynamic time warping between keywords.")
     window = 1
     LOG.info(f"window: {window}.")
+    scaler = StandardScaler()
+    znormed_kwds = scaler.fit_transform(normed_kwd_years.T).T
     dtw_sim = lambda u, v: tsdtw(u, v, w=window)
-    dtw_dists = pdist(normed_kwd_years, dtw_sim)
+    dtw_dists = pdist(znormed_kwds, dtw_sim)
     dtw_df = pd.DataFrame(squareform(dtw_dists))
     dtw_df.columns = normed_kwd_years.index
     dtw_df.index = normed_kwd_years.index
-    LOG.info(f"Outputting dynamic time warps to {dtw_loc}.")
-    dtw_df.to_csv(dtw_loc)
+    return dtw_df
 
 
 def main(data_dir: Path):

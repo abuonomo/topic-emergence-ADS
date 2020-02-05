@@ -36,7 +36,7 @@ if MODE == "test":
     LOG.info("Testing mode")
     EXP_NAME = "kwd_analysis_perc"
     RECORDS_LOC = Path("data/rake_kwds_small.jsonl")
-    MIN_THRESH = 50
+    MIN_THRESH = 500
     FREQ = 20
     SCORE = 1.5
     HARD = 10_000
@@ -44,7 +44,7 @@ elif MODE == "full":
     LOG.info("Full mode")
     EXP_NAME = "kwd_analysis_full_perc2"
     RECORDS_LOC = Path("data/rake_kwds.jsonl")
-    MIN_THRESH = 80
+    MIN_THRESH = 100
     FREQ = 250
     SCORE = 1.5
     HARD = 10_000
@@ -87,7 +87,11 @@ def docs_to_keywords_df():
     df = pd.read_json(infile, orient="records", lines=True)
     outfile = DATA_DIR / "all_keywords.jsonl"
     out_years = DATA_DIR / "year_counts.csv"
-    flatten_to_keywords(df, outfile, out_years, MIN_THRESH)
+    kwd_df, year_counts = flatten_to_keywords(df, MIN_THRESH)
+    LOG.info(f"Writing out all keywords to {outfile}.")
+    kwd_df.to_json(outfile, orient="records", lines=True)
+    LOG.info(f"Writing year counts to {out_years}.")
+    year_counts.to_csv(out_years)
 
 
 @cli.command()
@@ -128,12 +132,12 @@ def normalize_keyword_freqs():
 @cli.command()
 def slope_complexity():
     """
-    Perform linear regression and get complexity for all keywords
+    Get various measures for keyword time series
     """
-    norm_loc = DATA_DIR / f"all_keywords_norm_threshold_{FREQ}_{SCORE}_{HARD}.csv"
+    norm_loc = DATA_DIR / f"all_keywords_norm_threshold_{FREQ}_{SCORE}_{HARD}.jsonl"
     # TODO: Variable for the path above?
     LOG.info(f"Reading normalized keywords years from {norm_loc}.")
-    normed_kwds_df = pd.read_csv(norm_loc, index_col=0)
+    normed_kwds_df = pd.read_json(norm_loc, orient='records', lines=True)
     slope_count_complexity(normed_kwds_df, DATA_DIR / "slope_complex.csv")
 
 
@@ -145,7 +149,7 @@ def plot_slope():
     infile = DATA_DIR / "slope_complex.csv"
     se_df = pd.read_csv(infile, index_col=0)
     plot_slop_complex(
-        se_df, VIZ_DIR, x_measure="mean_change", y_measure="number_cwt_peaks"
+        se_df, VIZ_DIR, x_measure="mean_change", y_measure="complexity"
     )
 
 
@@ -171,9 +175,11 @@ def dtw():
     norm_loc = DATA_DIR / f"all_keywords_norm_threshold_{FREQ}_{SCORE}_{HARD}.jsonl"
     LOG.info(f"Reading normalized keywords years from {norm_loc}.")
     normed_kwds_df = pd.read_json(norm_loc, orient="records", lines=True)
-    normed_kwd_years = normed_kwds_df.set_index("stem").iloc[:, 2:]
+    normed_kwd_years = normed_kwds_df.set_index("stem").iloc[:, 5:]
     dtw_loc = DATA_DIR / "dynamic_time_warp_distances.csv"
-    dtw_kwds(normed_kwd_years, dtw_loc)
+    dtw_df = dtw_kwds(normed_kwd_years)
+    LOG.info(f"Outputting dynamic time warps to {dtw_loc}.")
+    dtw_df.to_csv(dtw_loc)
 
 
 @cli.command()
@@ -198,7 +204,6 @@ def make_topic_models():
     """
     Create document term matrix, topic model, and write to tensorboard
     """
-
     norm_loc = DATA_DIR / f"all_keywords_norm_threshold_{FREQ}_{SCORE}_{HARD}.jsonl"
     LOG.info(f"Reading normalized keywords years from {norm_loc}.")
     lim_kwds_df = pd.read_json(norm_loc, orient="records", lines=True)

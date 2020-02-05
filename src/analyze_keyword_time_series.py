@@ -120,7 +120,8 @@ def get_slopes(df):
     x = np.arange(0, df.shape[1])
 
     def f(y):
-        l = linregress(x, y)
+        ind = ~y.isna()
+        l = linregress(x[ind], y[ind])
         s = l
         return s
 
@@ -183,13 +184,17 @@ def slope_count_complexity(lim_kwd_df, out_csv, smooth_dis=3):
     slopes_and_err = get_slopes(only_years)
     se_df = slopes_and_err.apply(pd.Series)
     se_df.columns = ["slope", "intercept", "r_value", "p_value", "std_err"]
-    se_df["complexity"] = only_years.apply(lambda x: fc.cid_ce(x, False), axis=1)
-    se_df["mean_change"] = only_years.apply(lambda x: fc.mean_change(x), axis=1)
-    se_df["number_cwt_peaks"] = only_years.apply(
-        lambda x: fc.number_cwt_peaks(x, smooth_dis), axis=1
-    )
+
+    f1 = lambda x: fc.cid_ce(x[~x.isna()], False)
+    f2 = lambda x: fc.mean_change(x[~x.isna()])
+    f3 = lambda x: fc.number_cwt_peaks(x[~x.isna()], smooth_dis)
+
+    se_df["complexity"] = only_years.apply(f1, axis=1)
+    se_df["mean_change"] = only_years.apply(f2, axis=1)
+    se_df["number_cwt_peaks"] = only_years.apply(f3, axis=1)
     se_df["keyword"] = lim_kwd_df["stem"]
     se_df["count"] = lim_kwd_df["doc_id_count"]
+
     LOG.info(f"Writing slope complexity data to {out_csv}")
     se_df.to_csv(out_csv)
 

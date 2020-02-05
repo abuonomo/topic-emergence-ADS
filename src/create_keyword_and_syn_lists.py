@@ -79,7 +79,7 @@ def binarize_years(df):
     LOG.info("Binarizing year columns.")
     df = df.copy()
     lb = LabelBinarizer()
-    year_binary = lb.fit_transform(df["year"])
+    year_binary = lb.fit_transform(df["year"])  # there should not be NAs.
     year_binary_df = pd.DataFrame(year_binary)
     year_binary_df.columns = lb.classes_
     df = pd.concat([df, year_binary_df], axis=1)
@@ -113,6 +113,7 @@ def get_stem_aggs(df):
         }
     )
     df.columns = [f"{c}_{v}" for c, v in df.columns.values]
+    df = df.rename(columns={'keyword_<lambda>': 'keyword_list'})
     return df
 
 
@@ -146,9 +147,13 @@ def perc_change_from_baseline(x):
         nzs = np.nonzero(x)[0]
         if len(nzs) is 0:
             val = np.nan
+            vals = np.tile(np.nan, len(x))
         else:
-            val = x[nzs[0]]
-        vals = np.tile(val, len(x))
+            first_nz_i = nzs[0]
+            val = x[first_nz_i]
+            nvals = np.tile(np.nan, first_nz_i)
+            fvals = np.tile(val, len(x) - first_nz_i)
+            vals = np.concatenate((nvals, fvals))
         return vals
 
     baseline = np.apply_along_axis(f, 1, x)
@@ -162,10 +167,13 @@ def dynamic_time_warping_sim(u, v):
     return d
 
 
-def flatten_to_keywords(df, outfile, out_years, min_thresh=5):
+def flatten_to_keywords(df, min_thresh=5):
     allowed_db = "astronomy"
     LOG.info(f"Limiting to documents in database {allowed_db}")
-    df = df[df["database"].apply(lambda x: allowed_db in x)].copy()
+    df = df[df["database"].apply(lambda x: allowed_db in x)]
+    na_years = df["year"].isna()
+    LOG.info(f'Remove {sum(na_years)} rows with NaN years.')
+    df = df[~na_years]
     kwd_df = (
         df.pipe(get_kwd_occurences, min_thresh)
         .pipe(binarize_years)
@@ -174,11 +182,8 @@ def flatten_to_keywords(df, outfile, out_years, min_thresh=5):
     )
     year_counts = df["year"].value_counts().reset_index()
     year_counts.columns = ["year", "count"]
-    LOG.info(f"Writing year counts to {out_years}.")
-    year_counts.to_csv(out_years)
-    LOG.info(f"Writing out all keywords to {outfile}.")
-    kwd_df.reset_index().to_json(outfile, orient="records", lines=True)
-    return kwd_df
+    kwd_df = kwd_df.reset_index()
+    return kwd_df, year_counts
 
 
 def main(infile: Path, out_dir: Path):

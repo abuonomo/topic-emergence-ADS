@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='style/main.css') }}"
+    />
+  </head>
+  <body>
+    <div id="graphDiv"></div>
+
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+    <script type="text/javascript">
+
+        var data = {{ data.chart_data | safe }};
+        console.log(data);
+
+        var margin = { top: 50, right: 20, bottom: 30, left: 100 };
+        var width = 600 - margin.left - margin.right;
+        var height = 450 - margin.top - margin.bottom;
+
+        var swidth = width + margin.left + margin.right;
+        var sheight = height + margin.top + margin.bottom;
+
+        // Append SVG
+        var svg = d3.select("body")
+            .append("svg")
+            .attr("width", swidth)
+            .attr("height", sheight)
+            .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+        var g = svg.append('g')
+                .style('transform', 'translate(10%, 10%)');
+
+        // Add scales to axis
+        var xScale = d3.scaleLinear().range ([0, width]);
+        var yScale = d3.scaleLinear().range ([height, 0]);
+
+        var xAxis = d3.axisBottom(xScale).ticks(12);
+        var yAxis = d3.axisLeft(yScale).ticks(12 * height / width);
+
+        var scatter = g.append("g")
+           .attr("id", "scatterplot")
+           .attr("clip-path", "url(#clip)");
+
+        var brush = d3.brush().extent([[0, 0], [width, height]]).on("end", brushended),
+            idleTimeout,
+            idleDelay = 350;
+
+         var clip = g.append("defs").append("svg:clipPath")
+            .attr("id", "clip")
+            .append("svg:rect")
+            .attr("width", width)
+            .attr("height", height)
+            .attr("x", 0)
+            .attr("y", 0)
+            .attr("transform", "translate(-20,0)")
+            .attr("width", width+20);
+
+        // Add time series chart
+        var time_svg = d3.select("body")
+          .append("svg")
+          .attr("width", swidth)
+          .attr("height", sheight)
+          .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+        var tg = time_svg.append('g')
+                .style('transform', 'translate(10%, 10%)');
+
+        var parseTime = d3.timeParse("%Y");
+
+        var xTime = d3.scaleTime().range([0, width]);
+        var yTime = d3.scaleLinear().range([height, 0]);
+
+        var time_g = tg.append("g")
+          .attr("id", "time_series");
+
+        var x_name = 'mean_change';
+        var y_name = 'complexity';
+
+        // Input the data
+        function drawGraph(data) {
+          var xExtent = d3.extent(data, function (d) { return d[x_name]; });
+          var yExtent = d3.extent(data, function (d) { return d[y_name]; });
+          xScale.domain(d3.extent(data, function(d) { return d[x_name]; })).nice();
+          yScale.domain(d3.extent(data, function(d) { return d[y_name]; })).nice();
+
+          scatter.append("g")
+                  .attr("class", "brush")
+                  .call(brush);
+
+          scatter.selectAll(".dot")
+            .data(data)
+            .enter().append("circle")
+            .attr("class", "dot")
+            .attr("pointer-events", "all")
+            .on("mouseover", onMouseOver)
+            .on("mouseout", onMouseOut)
+            .on("click", onClick)
+            .attr("r", 4)
+            .attr("cx", function (d) { return xScale(d[x_name]); })
+            .attr("cy", function (d) { return yScale(d[y_name]); })
+            .attr("opacity", 0.5)
+            .style("fill", "#4292c6");
+
+          g.append("g")
+           .attr("class", "x axis")
+           .attr('id', "axis--x")
+           .attr("transform", "translate(0," + height + ")")
+           .call(xAxis);
+
+          g.append("text")
+            .style("text-anchor", "end")
+            .attr("x", width)
+            .attr("y", height - 8)
+            .text(x_name);
+
+          g.append("g")
+            .attr("class", "y axis")
+            .attr('id', "axis--y")
+            .call(yAxis);
+
+          g.append("text")
+            .attr("transform", "rotate(-90)")
+            .attr("y", 6)
+            .attr("dy", "1em")
+            .style("text-anchor", "end")
+            .text(y_name);
+
+          // g.append("g")
+          //   .attr("transform", "translate(0," + height + ")")
+          //   .call(d3.axisBottom(xScale).ticks(12))
+          //   .selectAll("text")
+          //   .attr("y", 5)
+          //   .attr("x", 0)
+          //   .attr("dy", ".35em")
+          //   .attr("transform", "rotate(15)")
+          //   .style("text-anchor", "start");
+
+          // g.append("g")
+          //   .call(d3.axisLeft(yScale).tickFormat(function(d){
+          //     return d;
+          //   }).ticks(12 * height / width))
+          //   .append("text")
+          //   .attr("y", 6)
+          //   .attr("dy", "0.71em")
+          //   .attr("text-anchor", "end")
+          //   .text("value");
+          //
+          // g.selectAll(".bar")
+          //   .data(data)
+          //   .enter().append("rect")
+          //   .attr("class", "bar")
+          //   .on("mouseover", onMouseOver)
+          //   .on("mouseout", onMouseOut)
+          //   .on("click", onClick)
+          //   .attr("x", function(d) { return xScale(d['actor1']); })
+          //   .attr("y", function(d) { return yScale(d['fatalities']); })
+          //   .attr("width", xScale.bandwidth())
+          //   .transition()
+          //   .ease(d3.easeLinear)
+          //   .duration(400)
+          //   .delay(function (d, i) {
+          //     return i * 50;
+          //   })
+          //   .attr("height", function(d) { return height - yScale(d['fatalities'])});
+          //
+          // svg.append("text")
+          //   .attr("transform", "translate(100,0)")
+          //   .attr("x", 50)
+          //   .attr("y", 50)
+          //   .attr("font-size", "24px")
+          //   .text("Fatalities for Actors in Europe");
+        }
+
+        function brushended() {
+
+            var s = d3.event.selection;
+            if (!s) {
+                if (!idleTimeout) return idleTimeout = setTimeout(idled, idleDelay);
+                xScale.domain(d3.extent(data, function (d) { return d[x_name]; })).nice();
+                yScale.domain(d3.extent(data, function (d) { return d[y_name]; })).nice();
+            } else {
+                xScale.domain([s[0][0], s[1][0]].map(xScale.invert, xScale));
+                yScale.domain([s[1][1], s[0][1]].map(yScale.invert, yScale));
+                scatter.select(".brush").call(brush.move, null);
+            }
+            zoom();
+        }
+
+        function idled() {
+            idleTimeout = null;
+        }
+
+        function zoom() {
+
+            var t = scatter.transition().duration(750);
+            svg.select("#axis--x").transition(t).call(xAxis);
+            svg.select("#axis--y").transition(t).call(yAxis);
+            scatter.selectAll("circle").transition(t)
+              .attr("cx", function (d) { return xScale(d[x_name]); })
+              .attr("cy", function (d) { return yScale(d[y_name]); });
+        }
+
+        function drawTimeSeries(data) {
+          data.forEach(function(d) {
+            //console.log(d.date_time)
+            d['year'] = parseTime(d['year']);
+            console.log(d['year']);
+            d['count'] = +d['count'];
+            console.log(d['count']);
+          });
+          xTime.domain(d3.extent(data, function(d) { return d['year']; }));
+          yTime.domain([0, d3.max(data, function(d) { return d['count']; })]);
+
+          d3.selectAll("#time_series > *").remove();
+
+          var line = d3.line()
+            .x(function(d) { return xTime(d['year']); })
+            .y(function(d) { return yTime(d['count']); });
+
+          var area = d3.area()
+            .x(function(d) { return xTime(d['year']); })
+            .y0(height)
+            .y1(function(d) { return yTime(d['count']); });
+
+          time_g.append("g")
+            .attr("transform", "translate(0," + height + ")")
+            .call(d3.axisBottom(xTime).ticks(d3.timeYear.every(1)))
+            .selectAll("text")
+            .attr("y", 10)
+            .attr("x", -10)
+            .attr("dy", ".35em")
+            .attr("transform", "rotate(0)")
+            .style("text-anchor", "start");
+
+          time_g.append("g")
+            .call(d3.axisLeft(yTime).tickFormat(function(d){
+              return d;
+            }).ticks(5))
+            .append("text")
+            .attr("y", 6)
+            .attr("dy", "0.71em")
+            .attr("text-anchor", "end")
+            .text("value");
+
+            // add the area
+          time_g.append("path")
+             .data([data])
+             .attr("class", "area")
+             .attr("d", area);
+
+          // add the valueline path.
+          time_g.append("path")
+              .data([data])
+              .attr("class", "line")
+              .attr("d", line);
+
+          time_g.selectAll('circle')
+            .data(data)
+            .enter().append("circle")
+            //circle radius is increased
+            .attr("r", 4)
+            .style('opacity', 0.5)
+            .style('fill', '#4682B4')
+            .attr("cx", function(d) { return xTime(d['year']); })
+            .attr("cy", function(d) { return yTime(d['count']); });
+
+        }
+
+        function onMouseOver(d, i) {
+          d3.select(this).attr('class', 'highlight');
+
+          scatter.append("text")
+           .attr('class', 'val')
+           .attr('x', function() {
+               return xScale(d[x_name]);
+           })
+           .attr('y', function() {
+               return yScale(d[y_name]) - 15;
+           })
+           .text(function() {
+               return [d['keyword']];  // Value of the text
+           });
+        }
+
+          //mouseout event handler function
+      function onMouseOut(d, i) {
+        // use the text label class to remove label on mouseout
+        d3.select(this).attr('class', 'bar');
+
+        d3.selectAll('.val')
+          .remove()
+      }
+
+      function onClick(d, i) {
+          d3.json('/get-data', {
+              method:"POST",
+              body: JSON.stringify({
+                keyword: d['keyword']
+              }),
+              headers: {
+                "Content-type": "application/json; charset=UTF-8"
+              }
+          }).then(
+            function(d) {
+              console.log(d)
+              drawTimeSeries(d)
+            }
+          )
+      }
+      drawGraph(data);
+    </script>
+  </body>
+</html>

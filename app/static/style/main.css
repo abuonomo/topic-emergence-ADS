@@ -11,6 +11,9 @@ axis {
     font: 10px sans-serif;
 }
 
+.axis_title {
+    font-style: italic;
+}
 .axis path,
 .axis line {
     fill: none;

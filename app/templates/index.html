@@ -112,9 +112,10 @@
            .call(xAxis);
 
           g.append("text")
-            .style("text-anchor", "end")
-            .attr("x", width)
-            .attr("y", height - 8)
+            .attr('class', 'axis_title')
+            .style("text-anchor", "middle")
+            .attr('class', 'axis_title')
+            .attr("transform", `translate(${width/2}, ${height + 30})`)
             .text(x_name);
 
           g.append("g")
@@ -123,11 +124,14 @@
             .call(yAxis);
 
           g.append("text")
+            .attr('class', 'axis_title')
             .attr("transform", "rotate(-90)")
-            .attr("y", 6)
+            .attr("y", -45)
+            .attr("x",0 - (height / 2))
+            .style("text-anchor", "middle")
             .attr("dy", "1em")
-            .style("text-anchor", "end")
             .text(y_name);
+
           g.append("text")
             .attr("transform", "translate(10,0)")
             .attr("x", 0)
@@ -229,16 +233,18 @@
             .attr("cy", function(d) { return yTime(d['count']); });
 
           time_g.append("text")
-                  .style("text-anchor", "end")
-                  .attr("x", width)
-                  .attr("y", height - 8)
+                  .style("text-anchor", "middle")
+                  .attr('class', 'axis_title')
+                  .attr("transform", `translate(${width/2}, ${height + 30})`)
                   .text('year');
 
           time_g.append("text")
             .attr("transform", "rotate(-90)")
-            .attr("y", 6)
+            .attr('class', 'axis_title')
+            .style("text-anchor", "middle")
+            .attr("y", -45)
+            .attr("x",0 - (height / 2))
             .attr("dy", "1em")
-            .style("text-anchor", "end")
             .text('count');
 
           time_g.append("text")

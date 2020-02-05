@@ -187,10 +187,10 @@ def dtw_viz():
     """
     Cluster keywords by dynamic time warp values and plot in tensorboard.
     """
-    norm_loc = DATA_DIR / f"all_keywords_norm_threshold_{FREQ}_{SCORE}_{HARD}.csv"
+    norm_loc = DATA_DIR / f"all_keywords_norm_threshold_{FREQ}_{SCORE}_{HARD}.jsonl"
     LOG.info(f"Reading normalized keywords years from {norm_loc}.")
     kwds_df = pd.read_json(norm_loc, orient="records", lines=True)
-    kwd_years = kwds_df.set_index("stem").iloc[:, 2:]
+    kwd_years = kwds_df.set_index("stem").iloc[:, 5:]
 
     dtw_loc = DATA_DIR / "dynamic_time_warp_distances.csv"
     LOG.info(f"Reading dynamic time warp distances from {dtw_loc}.")

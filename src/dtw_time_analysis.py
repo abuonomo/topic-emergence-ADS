@@ -25,7 +25,6 @@ def plot_dtw_times(normed_kwd_years, s=25, top=1000, window=1):
     sizes = list(range(0, top, s))
     sizes_pbar = tqdm(sizes)
     tt = None
-    # dtw_sim = lambda u, v: fast_sim(u, v, w=window)
     dtw_sim = lambda u, v: tsdtw(u, v, w=window)
     for i in sizes_pbar:
         sizes_pbar.set_description(f"Size: {i} | {i - s} time: {tt}")
@@ -47,7 +46,7 @@ def dtw_kwds(normed_kwd_years):
     window = 1
     LOG.info(f"window: {window}.")
     scaler = StandardScaler()
-    znormed_kwds = scaler.fit_transform(normed_kwd_years.T).T
+    znormed_kwds = scaler.fit_transform(normed_kwd_years.fillna(0).T).T
     dtw_sim = lambda u, v: tsdtw(u, v, w=window)
     dtw_dists = pdist(znormed_kwds, dtw_sim)
     dtw_df = pd.DataFrame(squareform(dtw_dists))

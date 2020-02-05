@@ -11,6 +11,16 @@ axis {
     font: 10px sans-serif;
 }
 
+.tooltip {
+    background-color: #d8d5e4;
+    width: 120px;
+    height: 50px;
+    padding: 5px;
+    position: absolute;
+    z-index: 1001;
+    box-shadow: 0 1px 2px 0 #656565;
+}
+
 .axis_title {
     font-style: italic;
 }
@@ -19,6 +29,18 @@ axis {
     fill: none;
     stroke: #000;
     shape-rendering: crispEdges;
+}
+
+
+p {
+  font: 10px sans-serif;
+  margin: 0 0 2px 0;
+  padding: 0;
+}
+
+.val {
+    position: absolute;
+    z-index: 1001;
 }
 
 .line {

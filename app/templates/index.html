@@ -322,12 +322,14 @@
                       .style('top', (absoluteMousePos[1] - 40)+'px');
 
                     var kwd = pD['keyword'].replace('<', '&lt;').replace('>', '&gt;');
-                    var first_line = `<p>${x_name}: ` + pD[x_name].toFixed(2) + '</p>';
-                    var second_line = `<p>${y_name}: ` + pD[y_name].toFixed(2) + '</p>';
-                    var third_line = '<p>keyword: ' + kwd + '</p>';
+                    var line1 = '<p><strong>' + kwd + '</strong></p>';
+                    var line2 = `<p>${x_name}: ` + pD[x_name].toFixed(2) + '</p>';
+                    var line3 = `<p>${y_name}: ` + pD[y_name].toFixed(2) + '</p>';
+                    var line4 = `<p>count: ` + pD['count'] + '</p>';
+                    var line5 = `<p>cluster: ` + pD['kmeans_cluster'] + '</p>';
 
 
-                    tooltipDiv.html(first_line + second_line + third_line)
+                    tooltipDiv.html(line1 + line2 + line3 + line4 + line5)
                 })
                 .on('mousemove.tooltip', function(pD, pI){
                     // Move tooltip

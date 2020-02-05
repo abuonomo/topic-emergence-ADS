@@ -4,7 +4,6 @@ from pathlib import Path
 from flask import Flask, render_template, jsonify, request
 import pandas as pd
 import logging
-import arrow
 
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)

@@ -84,8 +84,8 @@
         function drawGraph(data) {
           var xExtent = d3.extent(data, function (d) { return d[x_name]; });
           var yExtent = d3.extent(data, function (d) { return d[y_name]; });
-          xScale.domain(d3.extent(data, function(d) { return d[x_name]; })).nice();
-          yScale.domain(d3.extent(data, function(d) { return d[y_name]; })).nice();
+          xScale.domain(xExtent).nice();
+          yScale.domain(yExtent).nice();
 
           scatter.append("g")
                   .attr("class", "brush")
@@ -128,50 +128,10 @@
             .attr("dy", "1em")
             .style("text-anchor", "end")
             .text(y_name);
-
-          // g.append("g")
-          //   .attr("transform", "translate(0," + height + ")")
-          //   .call(d3.axisBottom(xScale).ticks(12))
-          //   .selectAll("text")
-          //   .attr("y", 5)
-          //   .attr("x", 0)
-          //   .attr("dy", ".35em")
-          //   .attr("transform", "rotate(15)")
-          //   .style("text-anchor", "start");
-
-          // g.append("g")
-          //   .call(d3.axisLeft(yScale).tickFormat(function(d){
-          //     return d;
-          //   }).ticks(12 * height / width))
-          //   .append("text")
-          //   .attr("y", 6)
-          //   .attr("dy", "0.71em")
-          //   .attr("text-anchor", "end")
-          //   .text("value");
-          //
-          // g.selectAll(".bar")
-          //   .data(data)
-          //   .enter().append("rect")
-          //   .attr("class", "bar")
-          //   .on("mouseover", onMouseOver)
-          //   .on("mouseout", onMouseOut)
-          //   .on("click", onClick)
-          //   .attr("x", function(d) { return xScale(d['actor1']); })
-          //   .attr("y", function(d) { return yScale(d['fatalities']); })
-          //   .attr("width", xScale.bandwidth())
-          //   .transition()
-          //   .ease(d3.easeLinear)
-          //   .duration(400)
-          //   .delay(function (d, i) {
-          //     return i * 50;
-          //   })
-          //   .attr("height", function(d) { return height - yScale(d['fatalities'])});
-          //
           g.append("text")
             .attr("transform", "translate(10,0)")
             .attr("x", 0)
             .attr("y", -20)
-            .attr("font-size", "24px")
             .attr("class", "title")
             .text(`Keywords ${x_name} vs ${y_name}`);
         }
@@ -207,7 +167,6 @@
 
         function drawTimeSeries(data) {
           data.forEach(function(d) {
-            //console.log(d.date_time)
             d['year'] = parseTime(d['year']);
             console.log(d['year']);
             d['count'] = +d['count'];
@@ -287,7 +246,6 @@
                   .attr("x", 0)
                   .attr("y", -20)
                   .attr("class", "title")
-                  .attr("font-size", "24px")
                   .text(`"${data[0]['keyword']}" year vs count`);
         }
 

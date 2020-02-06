@@ -14,9 +14,14 @@
     <script src="https://d3js.org/d3.v5.min.js"></script>
     <script type="text/javascript">
 
-        var data = {{ data.chart_data | safe }};
-        console.log(data);
-        var cValue = function(d) { return d['kmeans_cluster'];};
+        var x_name = 'mean_change';
+        var y_name = 'complexity';
+        var size_val = "log_count";
+        var size_n = "count";
+        var color_n = 'kmeans_cluster';
+
+        var data = {{ data.chart_data | safe }}; // TODO: don't use Jinja for data loading?
+        var cValue = function(d) { return d[color_n];};
         var color = d3.scaleOrdinal(d3.schemeCategory10);
 
         var margin = { top: 50, right: 20, bottom: 30, left: 100 };
@@ -79,8 +84,7 @@
         var time_g = tg.append("g")
           .attr("id", "time_series");
 
-        var x_name = 'mean_change';
-        var y_name = 'complexity';
+
 
         // Input the data
         function drawGraph(data) {
@@ -101,7 +105,7 @@
                   .attr("clip-path", "url(#clip)")
             .call(d3.helper.tooltip())
             .on("click", onClick)
-            .attr("r", function (d) { return d['log_count']; })
+            .attr("r", function (d) { return d[size_val]; })
             .attr("cx", function (d) { return xScale(d[x_name]); })
             .attr("cy", function (d) { return yScale(d[y_name]); })
             .attr("opacity", 0.5)
@@ -212,7 +216,7 @@
             .attr("text-anchor", "end")
             .text("value");
 
-          var tmp_col = color(data[0]['kmeans_cluster']); // All the same so get first
+          var tmp_col = color(data[0][color_n]); // All the same so get first
             // add the area
           time_g.append("path")
              .data([data])
@@ -289,7 +293,7 @@
           d3.json('/get-data', {
               method:"POST",
               body: JSON.stringify({
-                keyword: d['keyword'], kmeans_cluster: d['kmeans_cluster']
+                keyword: d['keyword'], kmeans_cluster: d[color_n]
               }),
               headers: {
                 "Content-type": "application/json; charset=UTF-8"
@@ -325,8 +329,8 @@
                     var line1 = '<p><strong>' + kwd + '</strong></p>';
                     var line2 = `<p>${x_name}: ` + pD[x_name].toFixed(2) + '</p>';
                     var line3 = `<p>${y_name}: ` + pD[y_name].toFixed(2) + '</p>';
-                    var line4 = `<p>count: ` + pD['count'] + '</p>';
-                    var line5 = `<p>cluster: ` + pD['kmeans_cluster'] + '</p>';
+                    var line4 = `<p>count: ` + pD[size_n] + '</p>';
+                    var line5 = `<p>cluster: ` + pD[color_n] + '</p>';
 
 
                     tooltipDiv.html(line1 + line2 + line3 + line4 + line5)

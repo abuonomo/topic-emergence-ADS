@@ -10,19 +10,53 @@
   </head>
   <body>
     <div id="graphDiv"></div>
+    <select id="selectButtonX"></select>
+    <select id="selectButtonY"></select>
+    <button type="button" id="enterButton">Transform</button>
 
     <script src="https://d3js.org/d3.v5.min.js"></script>
     <script type="text/javascript">
 
-        var x_name = 'mean_change';
-        var y_name = 'complexity';
-        var size_val = "log_count";
+        var x_name = 'manifold_x';
+        var y_name = 'manifold_y';
+        var size_val = "scaled_counts";
         var size_n = "count";
         var color_n = 'kmeans_cluster';
 
         var data = {{ data.chart_data | safe }}; // TODO: don't use Jinja for data loading?
         var cValue = function(d) { return d[color_n];};
         var color = d3.scaleOrdinal(d3.schemeCategory10);
+        var options = Object.keys(data[0]);
+
+        d3.select("#selectButtonX")
+          .selectAll('myOptions')
+          .data(options)
+          .enter()
+          .append('option')
+          .text(function (d) { return d; }) // text showed in the menu
+          .attr("value", function (d) { return d; }); // corresponding value returned by the button
+
+        d3.select("#selectButtonY")
+          .selectAll('myOptions')
+          .data(options)
+          .enter()
+          .append('option')
+          .text(function (d) { return d; }) // text showed in the menu
+          .attr("value", function (d) { return d; }); // corresponding value returned by the button
+
+        // When the button is changed, run the updateChart function
+        d3.select("#enterButton").on("click", function(d) {
+          // recover the option that has been chosen
+          var selectedX = d3.select("#selectButtonX").property("value");
+          var selectedY = d3.select("#selectButtonY").property("value");
+          // run the updateChart function with this selected option
+          update(selectedX, selectedY)
+        });
+
+        function update(selectedX, selectedY) {
+          console.log(selectedX);
+          console.log(selectedY);
+        }
 
         var margin = { top: 50, right: 20, bottom: 30, left: 100 };
         var width = 600 - margin.left - margin.right;
@@ -37,6 +71,12 @@
             .attr("width", swidth)
             .attr("height", sheight)
             .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+        // var man_svg = d3.select("body")
+        //   .append("svg")
+        //   .attr("width", swidth)
+        //   .attr("height", sheight)
+        //   .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
         var g = svg.append('g')
                 .style('transform', 'translate(10%, 10%)');
@@ -83,10 +123,8 @@
         var time_g = tg.append("g")
           .attr("id", "time_series");
 
-
-
         // Input the data
-        function drawGraph(data) {
+        function drawGraph(data, svg, x_name, y_name) {
           var xExtent = d3.extent(data, function (d) { return d[x_name]; });
           var yExtent = d3.extent(data, function (d) { return d[y_name]; });
           xScale.domain(xExtent).nice();
@@ -363,7 +401,8 @@
 
             return tooltip;
         };
-      drawGraph(data);
+      drawGraph(data, svg, x_name, y_name);
+      // drawGraph(data, man_svg, 'manifold_x', 'manifold_y');
     </script>
   </body>
 </html>

@@ -6,6 +6,7 @@ import joblib
 import numpy as np
 import pandas as pd
 from flask import Flask, render_template, jsonify, request
+from sklearn.preprocessing import MinMaxScaler
 
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
@@ -14,7 +15,7 @@ LOG.setLevel(logging.INFO)
 app = Flask(__name__)
 
 DATA_DIR = Path("data")
-FREQ = 20
+FREQ = 250  # Test FREQ = 20
 SCORE = 1.5
 HARD = 10000
 
@@ -39,7 +40,10 @@ def init():
     app.config['KMEANS'] = joblib.load(app.config['KMEANS_LOC'])
     manifold_data = joblib.load(app.config["MAN_LOC"])
     app.config['SC_DF']['kmeans_cluster'] = app.config['KMEANS'].labels_
-    app.config['SC_DF']['log_count'] = np.log(app.config['SC_DF']['count'])
+    log_count = np.log(app.config['SC_DF']['count'])
+
+    scaler = MinMaxScaler(feature_range=(3, 10))
+    app.config['SC_DF']['scaled_counts'] = scaler.fit_transform(log_count.values.reshape(-1, 1))
     app.config["SC_DF"]['manifold_x'] = manifold_data[:, 0]
     app.config["SC_DF"]['manifold_y'] = manifold_data[:, 1]
 

@@ -56,6 +56,14 @@ def index():
     return render_template("index.html", data=data)
 
 
+@app.route("/data", methods=['GET'])
+def data():
+    chart_data = app.config["SC_DF"].to_dict(orient="records")
+    chart_data = json.dumps(chart_data, indent=2)
+    data = {"chart_data": chart_data}
+    return jsonify(data)
+
+
 @app.route("/get-data", methods=["GET", "POST"])
 def get_data():
     data = request.json

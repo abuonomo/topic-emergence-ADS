@@ -22,6 +22,7 @@ app.config.update(
     SC_LOC=DATA_DIR / f"slope_complex.csv",
     N_LOC=DATA_DIR / f"all_keywords_threshold_{FREQ}_{SCORE}_{HARD}.jsonl",
     KMEANS_LOC=DATA_DIR / "kmeans.jbl",
+    MAN_LOC=DATA_DIR / "dtw_manifold_proj.jbl",
     SC_DF=None,
     N_DF=None,
     KMEANS=None,
@@ -36,8 +37,11 @@ def init():
     app.config["N_DF"] = pd.read_json(app.config["N_LOC"], orient="records", lines=True)
     LOG.info(f"Reading kmeans model from {app.config['KMEANS_LOC']}")
     app.config['KMEANS'] = joblib.load(app.config['KMEANS_LOC'])
+    manifold_data = joblib.load(app.config["MAN_LOC"])
     app.config['SC_DF']['kmeans_cluster'] = app.config['KMEANS'].labels_
     app.config['SC_DF']['log_count'] = np.log(app.config['SC_DF']['count'])
+    app.config["SC_DF"]['manifold_x'] = manifold_data[:, 0]
+    app.config["SC_DF"]['manifold_y'] = manifold_data[:, 1]
 
 
 @app.route("/")

@@ -14,15 +14,212 @@
     <script src="https://d3js.org/d3.v5.min.js"></script>
     <script type="text/javascript">
 
-        var x_name = 'mean_change';
-        var y_name = 'complexity';
-        var size_val = "log_count";
-        var size_n = "count";
-        var color_n = 'kmeans_cluster';
+        function MeasureScatter(opts) {
+          this.data = opts.data;
+          this.element = opts.element;
+          this.x_name = opts.x_name;
+          this.y_name = opts.y_name;
+          this.size_val = opts.size_val;
+          this.size_n = opts.size_n;
+          this.color_n = opts.color_n;
+          this.color = opts.color;
+          this.xScale = null;
+          this.yScale = null;
+          this.scatter = null;
+          this.brush = null;
+          this.xAxis = null;
+          this.yAxis = null;
 
-        var data = {{ data.chart_data | safe }}; // TODO: don't use Jinja for data loading?
-        var cValue = function(d) { return d[color_n];};
-        var color = d3.scaleOrdinal(d3.schemeCategory10);
+          this.draw = function() {
+
+            var x_name = this.x_name;
+            var y_name = this.y_name;
+            var svg = this.element;
+            var scatter = this.scatter;
+
+            var _this = this;
+            svg = this.element;
+
+            let g = this.element.append('g')
+                    .style('transform', 'translate(10%, 10%)');
+
+            // Add scales to axis
+            x_name = this.x_name;
+            y_name = this.y_name;
+            var xScale = d3.scaleLinear().range ([0, width]);
+            var yScale = d3.scaleLinear().range ([height, 0]);
+
+            var xAxis = d3.axisBottom(xScale).ticks(12);
+            var yAxis = d3.axisLeft(yScale).ticks(12 * height / width);
+
+            var scatter = g.append("g")
+                    .attr("id", "scatterplot")
+                    .attr("clip-path", "url(#clip)");
+            this.scatter = scatter;
+            var brush = d3.brush().extent([[0, 0], [width, height]]).on("end", brushended);
+            // TODO: fix variable passing above, this in brushended is referring to the d3.brush object
+            var idleTimeout;
+            var idleDelay = 350;
+
+            var clip = g.append("defs").append("svg:clipPath")
+                    .attr("id", "clip")
+                    .append("svg:rect")
+                    .attr("width", width)
+                    .attr("height", height)
+                    .attr("x", 0)
+                    .attr("y", 0)
+                    .attr("transform", "translate(-20,0)")
+                    .attr("width", width+20);
+
+            let xExtent = d3.extent(this.data, d => d[this.x_name]);
+            let yExtent = d3.extent(this.data, d => d[this.y_name]);
+            xScale.domain(xExtent).nice();
+            yScale.domain(yExtent).nice();
+            this.xScale = xScale;
+            this.yScale = yScale;
+
+            scatter.append("g")
+                    .attr("class", "brush")
+                    .call(brush);
+
+            scatter.selectAll(".dot")
+                    .data(this.data)
+                    .enter().append("circle")
+                    .attr("class", "dot")
+                    .attr("pointer-events", "all")
+                    .attr("clip-path", "url(#clip)")
+                    .call(this.tooltip())
+                    .on("click", onClick)
+                    .attr("r", d => d[this.size_val] )
+                    .attr("cx", d => xScale(d[this.x_name]))
+                    .attr("cy", d => yScale(d[this.y_name]))
+                    .attr("opacity", 0.5)
+                    .style("fill", d => this.color(cValue(d)));
+
+            g.append("g")
+                    .attr("class", "x axis")
+                    .attr('id', "axis--x")
+                    .attr("transform", "translate(0," + height + ")")
+                    .call(xAxis);
+
+            g.append("text")
+                    .attr('class', 'axis_title')
+                    .style("text-anchor", "middle")
+                    .attr('class', 'axis_title')
+                    .attr("transform", `translate(${width/2}, ${height + 30})`)
+                    .text(this.x_name);
+
+            g.append("g")
+                    .attr("class", "y axis")
+                    .attr('id', "axis--y")
+                    .call(yAxis);
+
+            g.append("text")
+                    .attr('class', 'axis_title')
+                    .attr("transform", "rotate(-90)")
+                    .attr("y", -45)
+                    .attr("x",0 - (height / 2))
+                    .style("text-anchor", "middle")
+                    .attr("dy", "1em")
+                    .text(this.y_name);
+
+            g.append("text")
+                    .attr("transform", "translate(10,0)")
+                    .attr("x", 0)
+                    .attr("y", -20)
+                    .attr("class", "title")
+                    .text(`Keywords ${this.x_name} vs ${this.y_name}`);
+
+
+          };
+
+          this.tooltip = function() {
+            var tooltipDiv;
+            var _this = this;
+            var bodyNode = d3.select('body').node();
+
+            function tooltip(selection){
+
+              selection.on('mouseover.tooltip', function(pD, pI){
+                // Clean up lost tooltips
+                d3.select('body').selectAll('div.tooltip').remove();
+                // Append tooltip
+                tooltipDiv = d3.select('body')
+                        .append('div')
+                        .attr('class', 'tooltip');
+                var absoluteMousePos = d3.mouse(bodyNode);
+                tooltipDiv
+                        .style('left', (absoluteMousePos[0] + 10)+'px')
+                        .style('top', (absoluteMousePos[1] - 40)+'px');
+
+                var kwd = pD['keyword'].replace('<', '&lt;').replace('>', '&gt;');
+                var line1 = '<p><strong>' + kwd + '</strong></p>';
+                var line2 = `<p>${_this.x_name}: ` + pD[_this.x_name].toFixed(2) + '</p>';
+                var line3 = `<p>${_this.y_name}: ` + pD[_this.y_name].toFixed(2) + '</p>';
+                var line4 = `<p>${_this.size_n}: ` + pD[_this.size_n] + '</p>';
+                var line5 = `<p>${_this.color_n}: ` + pD[_this.color_n] + '</p>';
+
+
+                tooltipDiv.html(line1 + line2 + line3 + line4 + line5)
+              })
+                      .on('mousemove.tooltip', function(pD, pI){
+                        // Move tooltip
+                        var absoluteMousePos = d3.mouse(bodyNode);
+                        tooltipDiv.style({
+                          left: (absoluteMousePos[0] + 10)+'px',
+                          top: (absoluteMousePos[1] - 40)+'px'
+                        });
+                      })
+                      .on('mouseout.tooltip', function(pD, pI){
+                        // Remove tooltip
+                        tooltipDiv.remove();
+                      });
+            }
+
+            tooltip.attr = function(_x){
+              if (!arguments.length) return attrs;
+              attrs = _x;
+              return this;
+            };
+
+            tooltip.style = function(_x){
+              if (!arguments.length) return styles;
+              styles = _x;
+              return this;
+            };
+
+            return tooltip;
+          };
+
+          brushended = function() {
+            var s = d3.event.selection;
+            if (!s) {
+              if (!idleTimeout) return idleTimeout = setTimeout(idled, idleDelay);
+              xScale.domain(d3.extent(data, d => d[x_name])).nice();
+              yScale.domain(d3.extent(data, d => d[y_name])).nice();
+            } else {
+              xScale.domain([s[0][0], s[1][0]].map(xScale.invert, xScale));
+              yScale.domain([s[1][1], s[0][1]].map(yScale.invert, yScale));
+              scatter.select(".brush").call(brush.move, null);
+            }
+            zoom();
+          };
+
+          idled = function() {
+            idleTimeout = null;
+          };
+
+          zoom = function() {
+            var t = scatter.transition().duration(750);
+            svg.select("#axis--x").transition(t).call(xAxis);
+            svg.select("#axis--y").transition(t).call(yAxis);
+            scatter.selectAll("circle").transition(t)
+                    .attr("cx", d => xScale(d[x_name]))
+                    .attr("cy", d => yScale(d[y_name]));
+          };
+
+
+        }
 
         var margin = { top: 50, right: 20, bottom: 30, left: 100 };
         var width = 600 - margin.left - margin.right;
@@ -31,6 +228,16 @@
         var swidth = width + margin.left + margin.right;
         var sheight = height + margin.top + margin.bottom;
 
+        var data = {{ data.chart_data | safe }}; // TODO: don't use Jinja for data loading?
+        var color_n = 'kmeans_cluster';
+        var cValue = function(d) { return d[color_n];};
+        var color = d3.scaleOrdinal(d3.schemeCategory10);
+
+        // var x_name = 'mean_change';
+        // var y_name = 'complexity';
+        // var size_val = "log_count";
+        // var size_n = "count";
+
         // Append SVG
         var svg = d3.select("body")
             .append("svg")
@@ -38,33 +245,11 @@
             .attr("height", sheight)
             .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
-        var g = svg.append('g')
-                .style('transform', 'translate(10%, 10%)');
-
-        // Add scales to axis
-        var xScale = d3.scaleLinear().range ([0, width]);
-        var yScale = d3.scaleLinear().range ([height, 0]);
-
-        var xAxis = d3.axisBottom(xScale).ticks(12);
-        var yAxis = d3.axisLeft(yScale).ticks(12 * height / width);
-
-        var scatter = g.append("g")
-           .attr("id", "scatterplot")
-           .attr("clip-path", "url(#clip)");
-
-        var brush = d3.brush().extent([[0, 0], [width, height]]).on("end", brushended),
-            idleTimeout,
-            idleDelay = 350;
-
-         var clip = g.append("defs").append("svg:clipPath")
-            .attr("id", "clip")
-            .append("svg:rect")
-            .attr("width", width)
-            .attr("height", height)
-            .attr("x", 0)
-            .attr("y", 0)
-            .attr("transform", "translate(-20,0)")
-            .attr("width", width+20);
+        var manifold_svg = d3.select("body")
+                .append("svg")
+                .attr("width", swidth)
+                .attr("height", sheight)
+                .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
         // Add time series chart
         var time_svg = d3.select("body")
@@ -85,95 +270,35 @@
           .attr("id", "time_series");
 
 
-
         // Input the data
-        function drawGraph(data) {
-          var xExtent = d3.extent(data, function (d) { return d[x_name]; });
-          var yExtent = d3.extent(data, function (d) { return d[y_name]; });
-          xScale.domain(xExtent).nice();
-          yScale.domain(yExtent).nice();
+        opts = {
+          'data': data,
+          'element': svg,
+          'x_name': 'mean_change',
+          'y_name': 'complexity',
+          'size_val': 'log_count',
+          'size_n': 'count',
+          'color_n': color_n,
+          'color': color,
+        };
 
-          scatter.append("g")
-                  .attr("class", "brush")
-                  .call(brush);
+        let ms = new MeasureScatter(opts);
 
-          scatter.selectAll(".dot")
-            .data(data)
-            .enter().append("circle")
-            .attr("class", "dot")
-            .attr("pointer-events", "all")
-                  .attr("clip-path", "url(#clip)")
-            .call(d3.helper.tooltip())
-            .on("click", onClick)
-            .attr("r", function (d) { return d[size_val]; })
-            .attr("cx", function (d) { return xScale(d[x_name]); })
-            .attr("cy", function (d) { return yScale(d[y_name]); })
-            .attr("opacity", 0.5)
-            .style("fill", function(d) { return color(cValue(d));});
+        man_opts = {
+          'data': data,
+          'element': manifold_svg,
+          'x_name': 'manifold_x',
+          'y_name': 'manifold_y',
+          'size_val': 'log_count',
+          'size_n': 'count',
+          'color_n': color_n,
+          'color': color,
+        };
 
-          g.append("g")
-           .attr("class", "x axis")
-           .attr('id', "axis--x")
-           .attr("transform", "translate(0," + height + ")")
-           .call(xAxis);
+        let manifold = new MeasureScatter(man_opts);
 
-          g.append("text")
-            .attr('class', 'axis_title')
-            .style("text-anchor", "middle")
-            .attr('class', 'axis_title')
-            .attr("transform", `translate(${width/2}, ${height + 30})`)
-            .text(x_name);
-
-          g.append("g")
-            .attr("class", "y axis")
-            .attr('id', "axis--y")
-            .call(yAxis);
-
-          g.append("text")
-            .attr('class', 'axis_title')
-            .attr("transform", "rotate(-90)")
-            .attr("y", -45)
-            .attr("x",0 - (height / 2))
-            .style("text-anchor", "middle")
-            .attr("dy", "1em")
-            .text(y_name);
-
-          g.append("text")
-            .attr("transform", "translate(10,0)")
-            .attr("x", 0)
-            .attr("y", -20)
-            .attr("class", "title")
-            .text(`Keywords ${x_name} vs ${y_name}`);
-        }
-
-        function brushended() {
-
-            var s = d3.event.selection;
-            if (!s) {
-                if (!idleTimeout) return idleTimeout = setTimeout(idled, idleDelay);
-                xScale.domain(d3.extent(data, function (d) { return d[x_name]; })).nice();
-                yScale.domain(d3.extent(data, function (d) { return d[y_name]; })).nice();
-            } else {
-                xScale.domain([s[0][0], s[1][0]].map(xScale.invert, xScale));
-                yScale.domain([s[1][1], s[0][1]].map(yScale.invert, yScale));
-                scatter.select(".brush").call(brush.move, null);
-            }
-            zoom();
-        }
-
-        function idled() {
-            idleTimeout = null;
-        }
-
-        function zoom() {
-
-            var t = scatter.transition().duration(750);
-            svg.select("#axis--x").transition(t).call(xAxis);
-            svg.select("#axis--y").transition(t).call(yAxis);
-            scatter.selectAll("circle").transition(t)
-              .attr("cx", function (d) { return xScale(d[x_name]); })
-              .attr("cy", function (d) { return yScale(d[y_name]); });
-        }
+        ms.draw();
+        manifold.draw();
 
         function drawTimeSeries(data) {
           data.forEach(function(d) {
@@ -306,65 +431,7 @@
           )
       }
 
-      d3.helper = {};
-      d3.helper.tooltip = function(){
-          var tooltipDiv;
-          var bodyNode = d3.select('body').node();
-
-          function tooltip(selection){
-
-              selection.on('mouseover.tooltip', function(pD, pI){
-                    // Clean up lost tooltips
-                    d3.select('body').selectAll('div.tooltip').remove();
-                    // Append tooltip
-                    tooltipDiv = d3.select('body')
-                                   .append('div')
-                                   .attr('class', 'tooltip');
-                    var absoluteMousePos = d3.mouse(bodyNode);
-                    tooltipDiv
-                      .style('left', (absoluteMousePos[0] + 10)+'px')
-                      .style('top', (absoluteMousePos[1] - 40)+'px');
-
-                    var kwd = pD['keyword'].replace('<', '&lt;').replace('>', '&gt;');
-                    var line1 = '<p><strong>' + kwd + '</strong></p>';
-                    var line2 = `<p>${x_name}: ` + pD[x_name].toFixed(2) + '</p>';
-                    var line3 = `<p>${y_name}: ` + pD[y_name].toFixed(2) + '</p>';
-                    var line4 = `<p>count: ` + pD[size_n] + '</p>';
-                    var line5 = `<p>cluster: ` + pD[color_n] + '</p>';
-
-
-                    tooltipDiv.html(line1 + line2 + line3 + line4 + line5)
-                })
-                .on('mousemove.tooltip', function(pD, pI){
-                    // Move tooltip
-                    var absoluteMousePos = d3.mouse(bodyNode);
-                    tooltipDiv.style({
-                        left: (absoluteMousePos[0] + 10)+'px',
-                        top: (absoluteMousePos[1] - 40)+'px'
-                    });
-                })
-                .on('mouseout.tooltip', function(pD, pI){
-                    // Remove tooltip
-                    tooltipDiv.remove();
-                });
-
-            }
-
-            tooltip.attr = function(_x){
-                if (!arguments.length) return attrs;
-                attrs = _x;
-                return this;
-            };
-
-            tooltip.style = function(_x){
-                if (!arguments.length) return styles;
-                styles = _x;
-                return this;
-            };
-
-            return tooltip;
-        };
-      drawGraph(data);
+      // drawGraph(data);
     </script>
   </body>
 </html>

@@ -484,15 +484,8 @@
         return my;
       }
 
-      var xName = 'manifold_x';
-      var yName = 'manifold_y';
-      var sizeVal = "scaled_counts";
-      var size_n = "count";
-      var colorName = 'kmeans_cluster';
-
-      var color = d3.scaleOrdinal(d3.schemeCategory10);
+      // TODO: re-include option for changing x and y vals. Transition update to data?
       // var options = Object.keys(data[0]);
-
       // d3.select("#selectButtonX")
       // .selectAll('myOptions')
       // .data(options)
@@ -540,8 +533,12 @@
       .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
       // Add time series chart
-      var timeChart = timeSeriesChart().height(height).width(width).color(color);
+      var timeChart = timeSeriesChart()
+      .height(height)
+      .width(width)
+      .color(color);
 
+      // add slope comp chart
       var chart0 = scatterChart()
       .height(height)
       .width(width)
@@ -551,6 +548,7 @@
       .timeChart(timeChart)
       .color(color);
 
+      // add manifold chart
       var chart1 = scatterChart()
       .height(height)
       .width(width)

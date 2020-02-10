@@ -526,6 +526,13 @@
         .attr("height", sheight)
         .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
+      var man_svg = d3.select("body")
+      .attr('id', 'scatterPlot')
+      .append("svg")
+      .attr("width", swidth)
+      .attr("height", sheight)
+      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
       var timeSvg = d3.select("body")
       .append("svg")
       .attr("width", swidth)
@@ -544,12 +551,25 @@
       .timeChart(timeChart)
       .color(color);
 
+      var chart1 = scatterChart()
+      .height(height)
+      .width(width)
+      .xName('manifold_x')
+      .yName('manifold_y')
+      .timeSvg(timeSvg)
+      .timeChart(timeChart)
+      .color(color);
+
       d3.json("/get-scatter-data")
         .then(function(data) {
         svg
           .datum(data)
           .call(chart0);
+        man_svg
+          .datum(data)
+          .call(chart1);
         });
+
     </script>
   </body>
 </html>

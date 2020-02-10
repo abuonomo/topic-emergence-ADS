@@ -195,8 +195,10 @@
           }).then(
             function(data) {
               console.log(data);
-              timeSvg.selectAll("*").remove();
-              timeSvg.datum(data).call(timeChart);
+              // timeSvg.selectAll("*").remove();
+              // timeSvg.datum(data).call(timeChart);
+              // Assume initial call already happened
+              timeChart.data(data);
             }
           )
         }
@@ -331,34 +333,28 @@
 
       function timeSeriesChart() {
 
+        var data = [];
         var height = 400;
         var width = 800;
 
         var xName = 'year';
         var yName = 'count';
         var colorName = 'kmeans_cluster';
-        var cValue = function(d) { return d[colorName];};
+        var cValue = function(d) { return d[colorName];}; // Won't change with colorName;
         var color = d3.scaleOrdinal(d3.schemeCategory10);
 
         var parseTime = d3.timeParse("%Y");
         var xTime = d3.scaleTime();
         var yTime = d3.scaleLinear();
+        var formatData;
 
         function my(selection) {
-          selection.each(function(data, i) {
+          selection.each(function() {
             svg = d3.select(this);
-
-            data.forEach(function(d) {
-              d[xName] = parseTime(d[xName]);
-              console.log(d[xName]);
-              d[yName] = +d[yName];
-              console.log(d[yName]);
-            });
+            const t = svg.transition().duration(750);
 
             xTime.range([0, width]);
             yTime.range([height, 0]);
-            xTime.domain(d3.extent(data, function(d) { return d[xName]; }));
-            yTime.domain([0, d3.max(data, function(d) { return d[yName]; })]);
 
             var tg = svg.append('g')
             .style('transform', 'translate(10%, 10%)');
@@ -395,30 +391,58 @@
             .attr("text-anchor", "end")
             .text("value");
 
-            var tmpColor = color(cValue(data[0])); // All the same so get first
-            // add the area
-            g.append("path")
-            .data([data])
-            .attr("class", "area")
-            .attr("d", area)
-            .style("fill", tmpColor);
+            updateData = function() {
+              formatData = function(d) {
+                d[xName] = parseTime(d[xName]);
+                console.log(d[xName]);
+                d[yName] = +d[yName];
+                console.log(d[yName]);
+              };
+              data.forEach(formatData);
 
-            // add the valueline path.
-            g.append("path")
-            .data([data])
-            .attr("class", "line")
-            .attr("d", line)
-            .style("stroke", tmpColor);
+              xTime.domain(d3.extent(data, function(d) { return d[xName]; }));
+              yTime.domain([0, d3.max(data, function(d) { return d[yName]; })]);
 
-            g.selectAll('circle')
-            .data(data)
-            .enter().append("circle")
-            //circle radius is increased
-            .attr("r", 4)
-            .style('opacity', 0.5)
-            .style('fill', tmpColor)
-            .attr("cx", function(d) { return xTime(d[xName]); })
-            .attr("cy", function(d) { return yTime(d[yName]); });
+              var tmpColor = color(cValue(data[0])); // All the same so get first
+              // add the area
+              g.append("path")
+              .data([data])
+              .attr("class", "area")
+              .attr("d", area)
+              .style("fill", tmpColor);
+
+              // add the valueline path.
+              g.append("path")
+              .data([data])
+              .attr("class", "line")
+              .attr("d", line)
+              .style("stroke", tmpColor);
+
+              g.selectAll('circle')
+              .data(data)
+              .join(
+                enter => enter.append("circle")
+                  .attr("r", 4)
+                  .style('opacity', 0.5)
+                  .style('fill', tmpColor)
+                  .attr("cx", function(d) { return xTime(d[xName]); })
+                  .attr("cy", function(d) { return yTime(d[yName]); }),
+                update => update
+                  .call(update => update.transition(t)
+                    .attr("cx", function(d) { return xTime(d[xName]); })
+                    .attr("cy", function(d) { return yTime(d[yName]); })
+                  ),
+              );
+
+              g.append("text")
+              .attr("transform", "translate(10,0)")
+              .attr("x", 0)
+              .attr("y", -20)
+              .attr("class", "title")
+              .text(`"${data[0]['keyword']}" year vs count`);
+            };
+
+            updateData();
 
             g.append("text")
             .style("text-anchor", "middle")
@@ -435,16 +459,17 @@
             .attr("dy", "1em")
             .text(yName);
 
-            g.append("text")
-            .attr("transform", "translate(10,0)")
-            .attr("x", 0)
-            .attr("y", -20)
-            .attr("class", "title")
-            .text(`"${data[0]['keyword']}" year vs count`);
           })
         }
 
         // getter-setters
+        my.data = function (value) {
+          if (arguments.length === 0) return data;
+          data = value;
+          if (typeof updateData === 'function') updateData();
+          return my;
+        };
+
         my.height = function (value) {
           if (arguments.length === 0) return height;
           height = value;
@@ -512,14 +537,14 @@
       var color = d3.scaleOrdinal(d3.schemeCategory10);
 
       // Append SVG
-      var svg = d3.select("body")
+      var scatterSvg = d3.select("body")
         .attr('id', 'scatterPlot')
         .append("svg")
         .attr("width", swidth)
         .attr("height", sheight)
         .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
-      var man_svg = d3.select("body")
+      var manSvg = d3.select("body")
       .attr('id', 'scatterPlot')
       .append("svg")
       .attr("width", swidth)
@@ -528,6 +553,7 @@
 
       var timeSvg = d3.select("body")
       .append("svg")
+      .attr('id', 'timeSvg')
       .attr("width", swidth)
       .attr("height", sheight)
       .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
@@ -560,13 +586,21 @@
 
       d3.json("/get-scatter-data")
         .then(function(data) {
-        svg
+        scatterSvg
           .datum(data)
           .call(chart0);
-        man_svg
+        manSvg
           .datum(data)
           .call(chart1);
         });
+
+      d3.json('/get-all-time-data')
+        .then(
+          function(data) {
+            console.log(data);
+            timeSvg.call(timeChart.data(data));
+          }
+      )
 
     </script>
   </body>

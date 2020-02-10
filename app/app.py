@@ -61,18 +61,30 @@ def get_scatter_data():
     return jsonify(chart_data)
 
 
+def _trans_time(ts, kwd, clus):
+    ts['year'] = [int(v[0:4]) for v in ts.index]
+    ts.columns = ['count', 'year']
+    ts = ts.reset_index(drop=True)
+    ts['keyword'] = kwd
+    ts['kmeans_cluster'] = clus
+    ts = ts.loc[:, ['keyword', 'kmeans_cluster', 'year', 'count']]
+    ts_recs = ts.to_dict(orient="records")
+    return ts_recs
+
+
 @app.route("/get-time-data", methods=["GET", "POST"])
 def get_time_data():
     data = request.json
     ts = app.config['N_DF'].query(f'stem == \"{data["keyword"]}\"').iloc[:, 5:]
     ts = ts.T
-    ts['year'] = [int(v[0:4]) for v in ts.index]
-    ts.columns = ['count', 'year']
-    ts = ts.reset_index(drop=True)
-    ts['keyword'] = data['keyword']
-    ts['kmeans_cluster'] = data['kmeans_cluster']
-    ts = ts.loc[:, ['keyword', 'kmeans_cluster', 'year', 'count']]
-    ts_recs = ts.to_dict(orient="records")
+    ts_recs = _trans_time(ts, data['keyword'], data['kmeans_cluster'])
+    return jsonify(ts_recs)
+
+
+@app.route("/get-all-time-data", methods=["GET", "POST"])
+def get_all_time_data():
+    ts = pd.DataFrame(app.config['N_DF'].iloc[:, 5:].sum())
+    ts_recs = _trans_time(ts, 'all', 0)
     return jsonify(ts_recs)
 
 

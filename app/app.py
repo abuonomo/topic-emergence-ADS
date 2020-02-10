@@ -52,20 +52,17 @@ def init():
 def index():
     chart_data = app.config["SC_DF"].to_dict(orient="records")
     chart_data = json.dumps(chart_data, indent=2)
-    data = {"chart_data": chart_data}
-    return render_template("index.html", data=data)
+    return render_template("index.html", data=chart_data)
 
 
-@app.route("/data", methods=['GET'])
-def data():
+@app.route("/get-scatter-data", methods=['GET'])
+def get_scatter_data():
     chart_data = app.config["SC_DF"].to_dict(orient="records")
-    chart_data = json.dumps(chart_data, indent=2)
-    data = {"chart_data": chart_data}
-    return jsonify(data)
+    return jsonify(chart_data)
 
 
-@app.route("/get-data", methods=["GET", "POST"])
-def get_data():
+@app.route("/get-time-data", methods=["GET", "POST"])
+def get_time_data():
     data = request.json
     ts = app.config['N_DF'].query(f'stem == \"{data["keyword"]}\"').iloc[:, 5:]
     ts = ts.T

@@ -47,7 +47,6 @@
         var yValue = function(d) { return d[yName]; };
         var cValue = function(d) { return d[colorName];};
 
-
         var xScale = d3.scaleLinear();
         var yScale = d3.scaleLinear();
         var xAxis;
@@ -58,8 +57,8 @@
         var brush;
         var svg;
         var scatter;
-        var fullXExtent;
-        var fullYExtent;
+        var xExtent;
+        var yExtent;
         var idleTimeout;
         var idleDelay = 350;
         var timeSvg;
@@ -67,7 +66,6 @@
 
         function my(selection) {
           selection.each(function (data, i) {
-
             svg = d3.select(this);
 
             var g = svg.append('g')
@@ -86,25 +84,52 @@
             .attr("y", 0)
             .attr("transform", "translate(0,-10)");
 
+            var xAxisEl = g.append("g")
+            .attr("class", "x axis")
+            .attr('id', "axis--x")
+            .attr("transform", "translate(0," + height + ")");
+
+            var yAxisEl = g.append("g")
+            .attr("class", "y axis")
+            .attr('id', "axis--y");
+
+            var xAxisTitleEl = g.append("text")
+            .attr('class', 'axis_title')
+            .style("text-anchor", "middle")
+            .attr('class', 'axis_title')
+            .attr("transform", `translate(${width/2}, ${height + 30})`);
+
+            var yAxisTitleEl = g.append("text")
+            .attr('class', 'axis_title')
+            .attr("transform", "rotate(-90)")
+            .attr("y", -45)
+            .attr("x",0 - (height / 2))
+            .style("text-anchor", "middle")
+            .attr("dy", "1em");
+
+            g.append("text")
+            .attr("transform", "translate(10,0)")
+            .attr("x", 0)
+            .attr("y", -20)
+            .attr("class", "title")
+            .text(`Keywords ${xName} vs ${yName}`);
+
             brush = d3.brush().extent([[0, 0], [width, height]]).on("end", brushended);
-
-            fullXExtent = d3.extent(data, function (d) { return d[xName]; });
-            fullYExtent = d3.extent(data, function (d) { return d[yName]; });
-
-            xScale.range([0, width]);
-            yScale.range([height, 0]);
-
-            xAxis = d3.axisBottom(xScale).ticks(12);
-            yAxis = d3.axisLeft(yScale).ticks(12 * height / width);
-
-            var xExtent = d3.extent(data, function (d) { return d[xName]; });
-            var yExtent = d3.extent(data, function (d) { return d[yName]; });
-            xScale.domain(xExtent).nice();
-            yScale.domain(yExtent).nice();
-
             scatter.append("g")
             .attr("class", "brush")
             .call(brush);
+
+            xScale.range([0, width]);
+            yScale.range([height, 0]);
+            xAxis = d3.axisBottom(xScale).ticks(12);
+            yAxis = d3.axisLeft(yScale).ticks(12 * height / width);
+
+            // data dependent
+            xExtent = d3.extent(data, function (d) { return d[xName]; });
+            yExtent = d3.extent(data, function (d) { return d[yName]; });
+
+            xScale.domain(xExtent).nice();
+            yScale.domain(yExtent).nice();
 
             scatter.selectAll(".dot")
             .data(data)
@@ -120,39 +145,18 @@
             .attr("opacity", 0.5)
             .style("fill", function(d) { return color(cValue(d));});
 
-            g.append("g")
-            .attr("class", "x axis")
-            .attr('id', "axis--x")
-            .attr("transform", "translate(0," + height + ")")
+            xAxisEl
             .call(xAxis);
 
-            g.append("text")
-            .attr('class', 'axis_title')
-            .style("text-anchor", "middle")
-            .attr('class', 'axis_title')
-            .attr("transform", `translate(${width/2}, ${height + 30})`)
+            xAxisTitleEl
             .text(xName);
 
-            g.append("g")
-            .attr("class", "y axis")
-            .attr('id', "axis--y")
+            yAxisEl
             .call(yAxis);
 
-            g.append("text")
-            .attr('class', 'axis_title')
-            .attr("transform", "rotate(-90)")
-            .attr("y", -45)
-            .attr("x",0 - (height / 2))
-            .style("text-anchor", "middle")
-            .attr("dy", "1em")
+            yAxisTitleEl
             .text(yName);
 
-            g.append("text")
-            .attr("transform", "translate(10,0)")
-            .attr("x", 0)
-            .attr("y", -20)
-            .attr("class", "title")
-            .text(`Keywords ${xName} vs ${yName}`);
           });
         }
 
@@ -160,8 +164,8 @@
           var s = d3.event.selection;
           if (!s) {
             if (!idleTimeout) return idleTimeout = setTimeout(idled, idleDelay);
-            xScale.domain(fullXExtent).nice();
-            yScale.domain(fullYExtent).nice();
+            xScale.domain(xExtent).nice();
+            yScale.domain(yExtent).nice();
           } else {
             xScale.domain([s[0][0], s[1][0]].map(xScale.invert, xScale));
             yScale.domain([s[1][1], s[0][1]].map(yScale.invert, yScale));
@@ -262,6 +266,13 @@
         }
 
         // getter-setters
+        my.data = function (value) {
+          if (arguments.length === 0) return data;
+          data = value;
+          if (typeof updateData === 'function') updateData();
+          return my;
+        };
+
         my.height = function (value) {
           if (arguments.length === 0) return height;
           height = value;

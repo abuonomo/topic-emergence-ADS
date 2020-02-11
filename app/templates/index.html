@@ -362,6 +362,9 @@
             var g = tg.append("g")
             .attr("id", "timeSeries");
 
+            var yAxisEl = g.append("g")
+                            .attr('id', 'yAxis');
+
             updateData = function() {
               formatData = function(d) {
                 d[xName] = parseTime(d[xName]);
@@ -394,36 +397,44 @@
               .attr("transform", "rotate(0)")
               .style("text-anchor", "start");
 
-              g.append("g")
-              .call(d3.axisLeft(yTime).tickFormat(function(d){
+              yAxis = d3.axisLeft(yTime).tickFormat(function(d){
                 return d;
-              }).ticks(5))
-              .join("text")
-              .attr("y", 6)
-              .attr("dy", "0.71em")
-              .attr("text-anchor", "end")
-              .text("value");
+              }).ticks(5);
+
+              yAxisEl
+              .transition(t)
+              .call(yAxis);
 
               var tmpColor = color(cValue(data[0])); // All the same so get first
 
               g.selectAll(".area")
               .data([data])
               .join(
-                enter => enter.append('path')
+                  enter => enter.append('path')
+                  .attr("d", area)
+                  .style("stroke", tmpColor),
+                  update => update
+                  .call(update => update.transition(t)
+                          .attr('d', area)
+                          .style('fill', tmpColor)
+                  )
               )
-              .attr("class", "area")
-              .attr("d", area)
-              .style("fill", tmpColor);
+              .attr("class", "area");
 
               // add the valueline path.
               g.selectAll(".line")
               .data([data])
               .join(
                 enter => enter.append('path')
+                  .attr("d", line)
+                  .style("stroke", tmpColor),
+                update => update
+                  .call(update => update.transition(t)
+                    .attr('d', line)
+                    .style('stroke', tmpColor)
+                  )
               )
-              .attr("class", "line")
-              .attr("d", line)
-              .style("stroke", tmpColor);
+              .attr("class", "line");
 
               g.selectAll('circle')
               .data(data)
@@ -452,7 +463,6 @@
               .attr("x", 0)
               .attr("y", -20)
               .attr("class", "title");
-              // .text(`"${data[0]['keyword']}" year vs count`);
             };
 
             updateData();

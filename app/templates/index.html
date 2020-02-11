@@ -9,22 +9,16 @@
     <link href="https://fonts.googleapis.com/css?family=Montserrat&display=swap" rel="stylesheet">
   </head>
   <body>
-    <div id="graphDiv"></div>
-<!--    <select id="selectButtonX"></select>-->
-<!--    <select id="selectButtonY"></select>-->
-<!--    <button type="button" id="enterButton">Transform</button>-->
+    <div id="options">
+      <select id="selectButtonX"></select>
+      <select id="selectButtonY"></select>
+      <button type="button" id="enterButton">Transform</button>
+    </div>
+    <br>
 
     <script src="https://d3js.org/d3.v5.min.js"></script>
     <script type="text/javascript">
       // When the button is changed, run the updateChart function
-      d3.select("#enterButton").on("click", function(d) {
-        // recover the option that has been chosen
-        var selectedX = d3.select("#selectButtonX").property("value");
-        var selectedY = d3.select("#selectButtonY").property("value");
-        // run the updateChart function with this selected option
-        update(selectedX, selectedY)
-      });
-
       function update(selectedX, selectedY) {
         console.log(selectedX);
         console.log(selectedY);
@@ -198,9 +192,6 @@
           }).then(
             function(data) {
               console.log(data);
-              // timeSvg.selectAll("*").remove();
-              // timeSvg.datum(data).call(timeChart);
-              // Assume initial call already happened
               timeChart.data(data);
             }
           )
@@ -545,24 +536,6 @@
         return my;
       }
 
-      // TODO: re-include option for changing x and y vals. Transition update to data?
-      // var options = Object.keys(data[0]);
-      // d3.select("#selectButtonX")
-      // .selectAll('myOptions')
-      // .data(options)
-      // .enter()
-      // .append('option')
-      // .text(function (d) { return d; }) // text showed in the menu
-      // .attr("value", function (d) { return d; }); // corresponding value returned by the button
-      //
-      // d3.select("#selectButtonY")
-      // .selectAll('myOptions')
-      // .data(options)
-      // .enter()
-      // .append('option')
-      // .text(function (d) { return d; }) // text showed in the menu
-      // .attr("value", function (d) { return d; }); // corresponding value returned by the button
-
       var margin = { top: 50, right: 20, bottom: 30, left: 100 };
       var width = 600 - margin.left - margin.right;
       var height = 450 - margin.top - margin.bottom;
@@ -622,12 +595,38 @@
 
       d3.json("/get-scatter-data")
         .then(function(data) {
-        scatterSvg
-          .datum(data)
-          .call(chart0);
-        manSvg
-          .datum(data)
-          .call(chart1);
+          scatterSvg
+            .datum(data)
+            .call(chart0);
+          manSvg
+            .datum(data)
+            .call(chart1);
+          var options = Object.keys(data[0]);
+          d3.select("#selectButtonX")
+          .selectAll('myOptions')
+          .data(options)
+          .enter()
+          .append('option')
+          .text(function (d) { return d; }) // text showed in the menu
+          .attr("value", function (d) { return d; }); // corresponding value returned by the button
+
+          d3.select("#selectButtonY")
+          .selectAll('myOptions')
+          .data(options)
+          .enter()
+          .append('option')
+          .text(function (d) { return d; }) // text showed in the menu
+          .attr("value", function (d) { return d; }); // corresponding value returned by the button
+
+          d3.select("#enterButton").on("click", function(d) {
+            // recover the option that has been chosen
+            var selectedX = d3.select("#selectButtonX").property("value");
+            var selectedY = d3.select("#selectButtonY").property("value");
+            scatterSvg.selectAll('*').remove();
+            scatterSvg
+            .datum(data)
+            .call(chart0.xName(selectedX).yName(selectedY));
+          });
         });
 
       d3.json('/get-all-time-data')

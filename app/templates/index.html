@@ -362,8 +362,11 @@
             var g = tg.append("g")
             .attr("id", "timeSeries");
 
+            var xAxisEl = g.append("g")
+              .attr('id', 'xAxis');
+
             var yAxisEl = g.append("g")
-                            .attr('id', 'yAxis');
+              .attr('id', 'yAxis');
 
             updateData = function() {
               formatData = function(d) {
@@ -386,7 +389,7 @@
               .y0(height)
               .y1(function(d) { return yTime(d[yName]); });
 
-              g.append("g")
+              xAxisEl
               .attr("transform", "translate(0," + height + ")")
               .call(d3.axisBottom(xTime).ticks(d3.timeYear.every(1)))
               .selectAll("text")
@@ -577,14 +580,14 @@
       var timeSvg = d3.select("body")
       .append("svg")
       .attr('id', 'timeSvg')
-      .attr("width", swidth)
+      .attr("width", swidth*2)
       .attr("height", sheight)
       .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
       // Add time series chart
       var timeChart = timeSeriesChart()
       .height(height)
-      .width(width)
+      .width(width*2)
       .color(color);
 
       // add slope comp chart

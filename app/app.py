@@ -22,10 +22,12 @@ HARD = 10000
 app.config.update(
     SC_LOC=DATA_DIR / f"slope_complex.csv",
     N_LOC=DATA_DIR / f"all_keywords_threshold_{FREQ}_{SCORE}_{HARD}.jsonl",
+    YC_LOC=DATA_DIR / "year_counts.csv",
     KMEANS_LOC=DATA_DIR / "kmeans.jbl",
     MAN_LOC=DATA_DIR / "dtw_manifold_proj.jbl",
     SC_DF=None,
     N_DF=None,
+    YEAR_COUNTS=None,
     KMEANS=None,
     LOAD_COLS=[
         "stem",
@@ -34,16 +36,6 @@ app.config.update(
         "kmeans_cluster",
         "manifold_x",
         "manifold_y",
-        # "value__mean_change",
-        # "value__cid_ce__normalize_True",
-        # "value__cid_ce__normalize_False",
-        # "value__number_cwt_peaks__n_1",
-        # "value__number_cwt_peaks__n_5",
-        # "value__abs_energy",
-        # "value__absolute_sum_of_changes",
-        # "value__c3__lag_1",
-        # "value__c3__lag_2",
-        # "value__c3__lag_3",
     ],
 )
 
@@ -52,11 +44,16 @@ app.config.update(
 def init():
     LOG.info(f'Reading derived time series measure from {app.config["SC_LOC"]}.')
     app.config["SC_DF"] = pd.read_csv(app.config["SC_LOC"], index_col=0)
+
     LOG.info(f'Reading full stem time series from {app.config["N_LOC"]}.')
     app.config["N_DF"] = pd.read_json(app.config["N_LOC"], orient="records", lines=True)
+
     LOG.info(f"Reading kmeans model from {app.config['KMEANS_LOC']}")
     app.config["KMEANS"] = joblib.load(app.config["KMEANS_LOC"])
+
     manifold_data = joblib.load(app.config["MAN_LOC"])
+    app.config['YEAR_COUNTS'] = pd.read_csv(app.config['YC_LOC'], index_col=0)
+
     app.config["SC_DF"]["kmeans_cluster"] = app.config["KMEANS"].labels_
     log_count = np.log(app.config["SC_DF"]["count"])
 
@@ -88,7 +85,14 @@ def _trans_time(ts, kwd, clus):
     ts = ts.reset_index(drop=True)
     ts["stem"] = kwd
     ts["kmeans_cluster"] = clus
-    ts = ts.loc[:, ["stem", "kmeans_cluster", "year", "count"]]
+
+    def f(x):
+        total = app.config['YEAR_COUNTS'].query(f'year == {x["year"]}').iloc[0]['count']
+        norm_val = x['count'] / total
+        return norm_val
+
+    ts['norm_count'] = ts.apply(f, axis=1)
+    ts = ts.loc[:, ["stem", "kmeans_cluster", "year", "count", "norm_count"]]
     ts_recs = ts.to_dict(orient="records")
     return ts_recs
 
@@ -105,7 +109,11 @@ def get_time_data():
 @app.route("/get-all-time-data", methods=["GET", "POST"])
 def get_all_time_data():
     ts = pd.DataFrame(app.config["N_DF"].iloc[:, 5:].sum())
-    ts_recs = _trans_time(ts, "all", 0)
+    tmp_df = app.config['YEAR_COUNTS'].copy().sort_values('year')
+    ind = tmp_df['year'].apply(lambda x: f'{x}_sum')
+    tmp_df['index'] = ind
+    tmp_df = tmp_df.set_index('index').drop(columns=['year'])
+    ts_recs = _trans_time(tmp_df, "all", 0)
     return jsonify(ts_recs)
 
 

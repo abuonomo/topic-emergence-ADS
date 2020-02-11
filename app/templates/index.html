@@ -13,6 +13,7 @@
       <select id="selectButtonX"></select>
       <select id="selectButtonY"></select>
       <button type="button" id="enterButton">Transform</button>
+      <button type="button" id="toggleNorm">Toggle Time Series Normalize</button>
     </div>
     <br>
 
@@ -369,15 +370,19 @@
             var yAxisEl = g.append("g")
               .attr('id', 'yAxis');
 
-            updateData = function() {
-              formatData = function(d) {
-                d[xName] = parseTime(d[xName]);
-                console.log(d[xName]);
-                d[yName] = +d[yName];
-                console.log(d[yName]);
-              };
-              data.forEach(formatData);
+            formatData = function(d) {
+              d[xName] = parseTime(d[xName]);
+              console.log(d[xName]);
+              d[yName] = +d[yName];
+              console.log(d[yName]);
+            };
 
+            updateData = function() {
+              data.forEach(formatData);
+              _updateData();
+            };
+
+            _updateData = function() {
               xTime.domain(d3.extent(data, function(d) { return d[xName]; }));
               yTime.domain([0, d3.max(data, function(d) { return d[yName]; })]);
 
@@ -518,6 +523,7 @@
         my.yName = function (value) {
           if (arguments.length === 0) return yName;
           yName = value;
+          if (typeof _updateData === 'function') _updateData();
           return my;
         };
 
@@ -660,6 +666,15 @@
             timeSvg.call(timeChart.data(data));
           }
       );
+
+      d3.select('#toggleNorm').on('click', function(d) {
+        tc = chart0.timeChart();
+        if (tc.yName() === 'count') {
+          tc.yName('norm_count')
+        } else {
+          tc.yName('count')
+        }
+      })
 
     </script>
   </body>

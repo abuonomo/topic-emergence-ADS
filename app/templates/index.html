@@ -30,9 +30,9 @@
         var height = 300;
         var width = 500;
 
-        var xName = 'mean_change';
-        var yName = 'complexity';
-        var labelName = 'keyword';
+        var xName = 'value__mean_change';
+        var yName = 'value__cid_ce__normalize_True';
+        var labelName = 'stem';
         var colorName = 'kmeans_cluster';
         var sizeVal = "scaled_counts";
         var sizeName = 'count';
@@ -184,7 +184,7 @@
           d3.json('/get-time-data', {
             method:"POST",
             body: JSON.stringify({
-              keyword: d[labelName], kmeans_cluster: d[colorName]
+              stem: d[labelName], kmeans_cluster: d[colorName]
             }),
             headers: {
               "Content-type": "application/json; charset=UTF-8"
@@ -215,7 +215,7 @@
               .style('left', (absoluteMousePos[0] + 10)+'px')
               .style('top', (absoluteMousePos[1] - 40)+'px');
 
-              var kwd = pD['keyword'].replace('<', '&lt;').replace('>', '&gt;');
+              var kwd = pD['stem'].replace('<', '&lt;').replace('>', '&gt;');
               var line1 = '<p><strong>' + kwd + '</strong></p>';
               var line2 = `<p>${xName}: ` + pD[xName].toFixed(2) + '</p>';
               var line3 = `<p>${yName}: ` + pD[yName].toFixed(2) + '</p>';
@@ -458,7 +458,7 @@
               );
 
               g.selectAll('.title')
-              .data([data[0]['keyword']])
+              .data([data[0]['stem']])
               .join(
                 enter => enter.append('text').text(function (d) {return `\"${d}\" year versus count`}),
                 update => update.text(function (d) {return `\"${d}\" year versus count`}),
@@ -564,12 +564,12 @@
       .append("svg")
       .attr('id', 'timeSvg')
       .attr("width", swidth*2)
-      .attr("height", sheight)
+      .attr("height", sheight*.8)
       .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
       // Add time series chart
       var timeChart = timeSeriesChart()
-      .height(height)
+      .height(height*0.8)
       .width(width*2)
       .color(color);
 
@@ -577,8 +577,8 @@
       var chart0 = scatterChart()
       .height(height)
       .width(width)
-      .xName('mean_change')
-      .yName('complexity')
+      .xName('value__mean_change')
+      .yName('value__cid_ce__normalize_True')
       .timeSvg(timeSvg)
       .timeChart(timeChart)
       .color(color);
@@ -593,7 +593,15 @@
       .timeChart(timeChart)
       .color(color);
 
-      d3.json("/get-scatter-data")
+      d3.json("/get-scatter-data", {
+            method:"POST",
+            body: JSON.stringify({
+              x: 'value__mean_change', y: 'value__cid_ce__normalize_True'
+            }),
+            headers: {
+              "Content-type": "application/json; charset=UTF-8"
+            }
+          })
         .then(function(data) {
           scatterSvg
             .datum(data)
@@ -601,33 +609,49 @@
           manSvg
             .datum(data)
             .call(chart1);
-          var options = Object.keys(data[0]);
-          d3.select("#selectButtonX")
-          .selectAll('myOptions')
-          .data(options)
-          .enter()
-          .append('option')
-          .text(function (d) { return d; }) // text showed in the menu
-          .attr("value", function (d) { return d; }); // corresponding value returned by the button
-
-          d3.select("#selectButtonY")
-          .selectAll('myOptions')
-          .data(options)
-          .enter()
-          .append('option')
-          .text(function (d) { return d; }) // text showed in the menu
-          .attr("value", function (d) { return d; }); // corresponding value returned by the button
-
-          d3.select("#enterButton").on("click", function(d) {
-            // recover the option that has been chosen
-            var selectedX = d3.select("#selectButtonX").property("value");
-            var selectedY = d3.select("#selectButtonY").property("value");
-            scatterSvg.selectAll('*').remove();
-            scatterSvg
-            .datum(data)
-            .call(chart0.xName(selectedX).yName(selectedY));
           });
-        });
+
+      d3.json('/get-all-options')
+        .then(
+          function(options) {
+            d3.select("#selectButtonX")
+            .selectAll('myOptions')
+            .data(options)
+            .enter()
+            .append('option')
+            .text(function (d) { return d; }) // text showed in the menu
+            .attr("value", function (d) { return d; }); // corresponding value returned by the button
+
+            d3.select("#selectButtonY")
+            .selectAll('myOptions')
+            .data(options)
+            .enter()
+            .append('option')
+            .text(function (d) { return d; }) // text showed in the menu
+            .attr("value", function (d) { return d; }); // corresponding value returned by the button
+
+            d3.select("#enterButton").on("click", function(d) {
+              // recover the option that has been chosen
+              var selectedX = d3.select("#selectButtonX").property("value");
+              var selectedY = d3.select("#selectButtonY").property("value");
+              scatterSvg.selectAll('*').remove();
+              d3.json("/get-scatter-data", {
+                method:"POST",
+                body: JSON.stringify({
+                  x: selectedX, y: selectedY
+                }),
+                headers: {
+                  "Content-type": "application/json; charset=UTF-8"
+                }
+              })
+                .then(function(data) {
+                  scatterSvg
+                    .datum(data)
+                    .call(chart0.xName(selectedX).yName(selectedY));
+                  });
+              }
+            )}
+        );
 
       d3.json('/get-all-time-data')
         .then(
@@ -635,7 +659,7 @@
             console.log(data);
             timeSvg.call(timeChart.data(data));
           }
-      )
+      );
 
     </script>
   </body>

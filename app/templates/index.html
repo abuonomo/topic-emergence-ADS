@@ -442,12 +442,17 @@
                   ),
               );
 
-              g.append("text")
+              g.selectAll('.title')
+              .data([data[0]['keyword']])
+              .join(
+                enter => enter.append('text').text(function (d) {return `\"${d}\" year versus count`}),
+                update => update.text(function (d) {return `\"${d}\" year versus count`}),
+              )
               .attr("transform", "translate(10,0)")
               .attr("x", 0)
               .attr("y", -20)
-              .attr("class", "title")
-              .text(`"${data[0]['keyword']}" year vs count`);
+              .attr("class", "title");
+              // .text(`"${data[0]['keyword']}" year vs count`);
             };
 
             updateData();

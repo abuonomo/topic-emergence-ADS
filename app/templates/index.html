@@ -22,7 +22,7 @@
           <button id="maxSkew">First max location vs skewness</button>
         </div>
       </div>
-      <div id="plots" style="margin-left: 100px;"></div>
+      <div id="plots" style="margin-left: 100px; height: 100%"></div>
     </div>
     <br>
 
@@ -551,7 +551,7 @@
         return my;
       }
 
-      var margin = { top: 50, right: 20, bottom: 30, left: 20 };
+      var margin = { top: 0, right: 20, bottom: 100, left: 20 };
       var width = 600 - margin.left - margin.right;
       var height = 450 - margin.top - margin.bottom;
 
@@ -560,19 +560,21 @@
 
       var color = d3.scaleOrdinal(d3.schemeCategory10);
 
+      var svgScaler = 1;
+
       // Append SVG
       var scatterSvg = d3.select('#plots')
         .append("svg")
-        .attr("width", swidth)
-        .attr("height", sheight)
-        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+        .attr("width", swidth * svgScaler)
+        .attr("height", sheight * svgScaler)
+        .attr("transform", "translate(" + (margin.left * svgScaler) + "," + (margin.top  * svgScaler) + ")");
 
       var timeSvg = d3.select("#plots")
       .append("svg")
       .attr('id', 'timeSvg')
-      .attr("width", swidth)
-      .attr("height", sheight)
-      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+      .attr("width", swidth * svgScaler)
+      .attr("height", sheight * svgScaler)
+      .attr("transform", "translate(" + (margin.left * svgScaler) + "," + (margin.top * svgScaler) + ")");
 
       // Add time series chart
       var timeChart = timeSeriesChart()

@@ -29,6 +29,7 @@ axis {
 
 .axis_title {
     font-style: italic;
+    font-size: 14px;
 }
 .axis path,
 .axis line {

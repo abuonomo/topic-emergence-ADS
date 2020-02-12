@@ -1,4 +1,5 @@
 data/*
+*.jsonl
 models/*
 reports/*
 !reports/viz/.gitkeep

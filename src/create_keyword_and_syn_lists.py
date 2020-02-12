@@ -2,8 +2,6 @@ import argparse
 import logging
 from pathlib import Path
 
-import dask
-import dask.bag as db
 import numpy as np
 import pandas as pd
 import spacy
@@ -65,13 +63,22 @@ def get_kwd_occurences(df, min_tresh=5):
     doc_to_year = kwd_df.groupby("doc_id").agg({"year": lambda x: x[0]})
     dke["rake_score"] = np.nan
     dke["keyword"] = dke["keyword"].astype(str)
-    dke["year"] = doc_to_year.loc[dke["doc_id"], "year"].tolist()
+    ys = doc_to_year.loc[dke["doc_id"], "year"].tolist()
+    LOG.info(f"Years with len: {len(ys)}")
+    dke["year"] = ys
+    LOG.info(f"dke with len: {len(dke)}")
     overlap_inds = pd.merge(dke.reset_index(), kwd_df, on=["doc_id", "keyword"])[
         "index"
     ]
     sdke = dke[~dke.index.isin(overlap_inds)]
     c_df = pd.concat([sdke, kwd_df]).sort_values("doc_id").reset_index(drop=True)
-
+    tmp_c_loc = Path('tmp_c_df.jsonl')
+    LOG.info(f'Outputting to {tmp_c_loc}')
+    c_df.to_json(tmp_c_loc, orient='records', lines=True)
+    na_ind = c_df['year'].isna()
+    LOG.info(f"Remove {sum(na_ind)} keywords with NaN years.")
+    c_df = c_df[na_ind]
+    c_df['year'] = c_df['year'].astype(int)
     return c_df
 
 
@@ -89,7 +96,7 @@ def binarize_years(df):
 def stem_kwds(df):
     LOG.info("Creating keyword stems.")
     df = df.copy()
-    unq_kwds = df["keyword"].unique()
+    unq_kwds = df["keyword"].astype(str).unique()
     p = PorterStemmer()
     kwd_to_stem = {kwd: p.stem(kwd) for kwd in tqdm(unq_kwds)}
     tqdm.pandas()
@@ -101,7 +108,7 @@ def get_stem_aggs(df):
     LOG.info("Aggregating by stems")
     df = df.copy()
     years = np.sort(df["year"].unique())
-    year_count_dict = {c: "sum" for c in years}
+    year_count_dict = {c: "sum" for c in years if not np.isnan(c)}
     df = df.groupby("stem").agg(
         {
             **{
@@ -146,7 +153,6 @@ def perc_change_from_baseline(x):
     def f(x):
         nzs = np.nonzero(x)[0]
         if len(nzs) is 0:
-            val = np.nan
             vals = np.tile(np.nan, len(x))
         else:
             first_nz_i = nzs[0]

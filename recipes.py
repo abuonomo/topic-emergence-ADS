@@ -1,23 +1,25 @@
 import logging
 import os
 from pathlib import Path
-import vaex
 
-import joblib
 import click
+import joblib
 import pandas as pd
 from scipy.io import mmwrite
 
 from src.analyze_keyword_time_series import (
     slope_count_complexity,
     plot_slop_complex,
+    plot_gm_bics,
+    plot_kmeans_distortions,
+    dtw_to_manifold,
+    yellow_plot_kmd,
     plot_time,
     filter_kwds,
     dtw_to_tboard,
 )
 from src.create_keyword_and_syn_lists import (
     flatten_to_keywords,
-    normalize,
     normalize_by_perc,
 )
 from src.dtw_time_analysis import dtw_kwds
@@ -183,20 +185,45 @@ def dtw():
 
 
 @cli.command()
+def cluster_tests():
+    """
+    Try various numbers of clusters for Gaussian Mixture and kmeans, produce plots
+    """
+    dtw_loc = DATA_DIR / "dynamic_time_warp_distances.csv"
+    out_bic_plot = VIZ_DIR / "bic.png"
+    out_elbow_plot = VIZ_DIR / "elbow.png"
+
+    LOG.info(f"Reading dynamic time warp distances from {dtw_loc}.")
+    dtw_df = pd.read_csv(dtw_loc, index_col=0)
+    # plot_gm_bics(dtw_df, out_bic_plot, c_min=2, c_max=20)
+    yellow_plot_kmd(dtw_df, out_elbow_plot, c_min=2, c_max=20)
+
+
+@cli.command()
 def dtw_viz():
     """
     Cluster keywords by dynamic time warp values and plot in tensorboard.
     """
-    norm_loc = DATA_DIR / f"all_keywords_norm_threshold_{FREQ}_{SCORE}_{HARD}.jsonl"
+    norm_loc = DATA_DIR / f"all_keywords_threshold_{FREQ}_{SCORE}_{HARD}.jsonl"
+    dtw_loc = DATA_DIR / "dynamic_time_warp_distances.csv"
+    kmeans_loc = MODEL_DIR / "kmeans.jbl"
+    out_man_plot = VIZ_DIR / "manifold.png"
+    out_man_points = MODEL_DIR / "dtw_manifold_proj.jbl"
+
     LOG.info(f"Reading normalized keywords years from {norm_loc}.")
     kwds_df = pd.read_json(norm_loc, orient="records", lines=True)
-    kwd_years = kwds_df.set_index("stem").iloc[:, 5:]
 
-    dtw_loc = DATA_DIR / "dynamic_time_warp_distances.csv"
     LOG.info(f"Reading dynamic time warp distances from {dtw_loc}.")
     dtw_df = pd.read_csv(dtw_loc, index_col=0)
 
-    dtw_to_tboard(kwd_years, dtw_df)
+    kwd_years = kwds_df.set_index("stem").iloc[:, 5:]
+    kmeans = dtw_to_tboard(kwd_years, dtw_df, c=7)  # c taken from elbow viz
+    dtw_man = dtw_to_manifold(dtw_df, out_man_plot)
+
+    LOG.info(f"Writing kmeans model to {kmeans_loc}.")
+    joblib.dump(kmeans, kmeans_loc)
+    LOG.info(f"Writing manifold points to {out_man_points}.")
+    joblib.dump(dtw_man, out_man_points)
 
 
 @cli.command()

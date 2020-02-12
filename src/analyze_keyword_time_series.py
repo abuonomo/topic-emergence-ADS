@@ -11,12 +11,16 @@ from bokeh.plotting import figure, output_file, ColumnDataSource, DEFAULT_TOOLS
 from scipy.spatial.distance import cdist
 from scipy.stats import linregress
 from sklearn.cluster import KMeans
+from sklearn.mixture import GaussianMixture
 from tensorboardX import SummaryWriter
 from tensorboardX.utils import figure_to_image
 from tqdm import tqdm
 from tsfresh.feature_extraction import feature_calculators as fc
+from tsfresh.feature_extraction import extract_features
 from tslearn.clustering import TimeSeriesKMeans
 from tslearn.utils import to_time_series_dataset
+from yellowbrick.cluster import KElbowVisualizer
+from yellowbrick.features import Manifold
 
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
@@ -58,28 +62,9 @@ def get_fig_images(df):
     return image_arr
 
 
-def test_kmeans_clusters(X):
-    distortions = []
-    K = range(1, 20)
-    for k in K:
-        kmeans = KMeans(n_clusters=k).fit(X)
-        kmeans.fit(X)
-        distortions.append(
-            sum(np.min(cdist(X, kmeans.cluster_centers_, "euclidean"), axis=1))
-            / X.shape[0]
-        )
-
-    # Plot the elbow
-    plt.plot(K, distortions, "bx-")
-    plt.xlabel("k")
-    plt.ylabel("Distortion")
-    plt.title("The Elbow Method showing the optimal k")
-    plt.show()
-
-
-def to_tboard(dtw_df, kmeans, images, lim):
+def to_tboard(dtw_df, m, images, lim):
     writer = SummaryWriter()
-    meta = list(zip(dtw_df.index.tolist(), [str(l) for l in kmeans.labels_]))
+    meta = list(zip(dtw_df.index.tolist(), [str(l) for l in m.labels_]))
     LOG.info("Writing to tensorboard.")
     writer.add_embedding(
         dtw_df.values[0:lim],
@@ -105,15 +90,78 @@ def ts_to_tboard(normed_kwd_years):
     to_tboard(normed_kwd_years, km, images, lim)
 
 
+def yellow_plot_kmd(X, out_plot, c_min=2, c_max=20):
+    LOG.info(f"Trying kmeans n_clusters from {c_min} to {c_max}")
+    model = KMeans()
+    visualizer = KElbowVisualizer(model, k=(c_min, c_max))
+    visualizer.fit(X)  # Fit the data to the visualizer
+    LOG.info(f"Writing elbow to {out_plot}.")
+    visualizer.show(out_plot)
+
+
+def plot_kmeans_distortions(X, out_plot, c_min=2, c_max=20):
+    distortions = []
+    K = range(c_min, c_max)
+    LOG.info(f"Trying kmeans n_clusters from {c_min} to {c_max}")
+    for k in tqdm(K):
+        kmeans = KMeans(n_clusters=k).fit(X)
+        kmeans.fit(X)
+        distortions.append(
+            sum(np.min(cdist(X, kmeans.cluster_centers_, "euclidean"), axis=1))
+            / X.shape[0]
+        )
+
+    plt.plot(K, distortions, "bx-")
+    plt.xlabel("k")
+    plt.ylabel("Distortion")
+    plt.title("The Elbow Method showing the optimal k")
+    LOG.info(f"Writing kmeans elbox plot to {out_plot}")
+    plt.savefig(out_plot)
+    plt.clf()
+
+
+def gm_bics(dtw_df, c_min=2, c_max=20):
+    bics = []
+    LOG.info(f"Trying Gaussian Mixture n_clusters from {c_min} to {c_max}")
+    for c in tqdm(range(c_min, c_max)):
+        m = GaussianMixture(n_components=c)
+        m.fit(dtw_df.values)
+        b = m.bic(dtw_df.values)
+        bics.append(b)
+    return bics
+
+
+def plot_gm_bics(dtw_df, out_plot, c_min=2, c_max=20):
+    bics = gm_bics(dtw_df, c_min, c_max)
+    plt.plot(range(c_min, c_max), bics)
+    plt.xlabel("number of clusters")
+    plt.ylabel("Bayesian Information Criteria (BIC)")
+    plt.title("Gaussian Mixture BIC by Number of Cluster")
+    LOG.info(f"Writing BIC plot to {out_plot}")
+    plt.savefig(out_plot)
+    plt.clf()
+
+
+def dtw_to_manifold(dtw_df, out_plot):
+    LOG.info("Computing tsne manifold.")
+    viz = Manifold(manifold="tsne")
+    dtw_man = viz.fit_transform(dtw_df)  # Fit the data to the visualizer
+    LOG.info(f"Writing tsne manifold plot to {out_plot}.")
+    viz.show(out_plot)  # Finalize and render the figure
+    return dtw_man
+
+
 def dtw_to_tboard(normed_kwd_years, dtw_df, c=6, lim=1000):
     """Use pre-computed dynamic time warp values and calculate kmeans."""
     # TODO: Used elbow to determine, but not being placed programmatically
     LOG.info(f"Performing kmeans with {c} clusters.")
-    kmeans = KMeans(n_clusters=c)
-    kmeans.fit(dtw_df.values)
+    m = KMeans(n_clusters=c)
+    # m = GaussianMixture(n_components=c)
+    m.fit(dtw_df.values)
 
     images = get_fig_images(normed_kwd_years[0:lim])
-    to_tboard(dtw_df, kmeans, images, lim)
+    to_tboard(dtw_df, m, images, lim)
+    return m
 
 
 def get_slopes(df):
@@ -179,24 +227,24 @@ def filter_kwds(kwd_df, out_loc, threshold=50, score_thresh=1.3, hard_limit=10_0
     return lim_kwd_df
 
 
-def slope_count_complexity(lim_kwd_df, out_csv, smooth_dis=3):
+def slope_count_complexity(lim_kwd_df, out_csv):
     only_years = lim_kwd_df.iloc[:, 5:]
-    slopes_and_err = get_slopes(only_years)
-    se_df = slopes_and_err.apply(pd.Series)
-    se_df.columns = ["slope", "intercept", "r_value", "p_value", "std_err"]
 
-    f1 = lambda x: fc.cid_ce(x[~x.isna()], False)
     f2 = lambda x: fc.mean_change(x[~x.isna()])
-    f3 = lambda x: fc.number_cwt_peaks(x[~x.isna()], smooth_dis)
+    trans_t = (
+        only_years.reset_index()
+        .melt(id_vars=["index"])
+        .sort_values(["index", "variable"])
+    )
+    trans_t["year"] = trans_t["variable"].apply(lambda x: int(x[0:4]))
+    trans_t = trans_t.drop(columns=["variable"])
+    features = extract_features(trans_t.fillna(0), column_id="index", column_sort="year")
+    features["count"] = lim_kwd_df["doc_id_count"]
+    features["stem"] = lim_kwd_df["stem"]
+    features["mean_change_nan_before_exist"] = only_years.apply(f2, axis=1)
 
-    se_df["complexity"] = only_years.apply(f1, axis=1)
-    se_df["mean_change"] = only_years.apply(f2, axis=1)
-    se_df["number_cwt_peaks"] = only_years.apply(f3, axis=1)
-    se_df["keyword"] = lim_kwd_df["stem"]
-    se_df["count"] = lim_kwd_df["doc_id_count"]
-
-    LOG.info(f"Writing slope complexity data to {out_csv}")
-    se_df.to_csv(out_csv)
+    LOG.info(f"Writing time series features to {out_csv}")
+    features.to_csv(out_csv)
 
 
 def main(in_dir: Path):

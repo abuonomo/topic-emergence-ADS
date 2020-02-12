@@ -77,7 +77,7 @@ def get_kwd_occurences(df, min_tresh=5):
     c_df.to_json(tmp_c_loc, orient='records', lines=True)
     na_ind = c_df['year'].isna()
     LOG.info(f"Remove {sum(na_ind)} keywords with NaN years.")
-    c_df = c_df[na_ind]
+    c_df = c_df[~na_ind]
     c_df['year'] = c_df['year'].astype(int)
     return c_df
 

@@ -202,6 +202,8 @@ def plot_slop_complex(se_df, viz_dir, x_measure="slope", y_measure="complexity")
     LOG.info(f"Writing bokeh viz to {out_bok}")
     bokeh.io.save(p, viz_dir / "slope_complex.html")
 
+    # TODO: this will be broken with new time series feature extract
+    # column names have changed.
     x = se_df["slope"].values
     y = se_df["complexity"].values
     z = se_df["count"].values.astype(np.float)

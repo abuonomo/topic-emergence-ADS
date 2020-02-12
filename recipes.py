@@ -10,10 +10,9 @@ from scipy.io import mmwrite
 from src.analyze_keyword_time_series import (
     slope_count_complexity,
     plot_slop_complex,
-    plot_gm_bics,
-    plot_kmeans_distortions,
     dtw_to_manifold,
     yellow_plot_kmd,
+    plot_gm_bics,
     plot_time,
     filter_kwds,
     dtw_to_tboard,
@@ -33,16 +32,12 @@ logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
 
-MODE = os.environ["MODE"]
-if MODE == "test":
-    LOG.info("Testing mode")
-    EXP_NAME = "kwd_analysis_perc"
-    RECORDS_LOC = Path("data/rake_kwds_small.jsonl")
-    MIN_THRESH = 500
-    FREQ = 20
-    SCORE = 1.5
-    HARD = 10_000
-elif MODE == "full":
+try:
+    MODE = os.environ["MODE"]
+except KeyError:
+    MODE = "test"
+
+if MODE == "full":
     LOG.info("Full mode")
     EXP_NAME = "kwd_analysis_full_perc2"
     RECORDS_LOC = Path("data/rake_kwds.jsonl")
@@ -51,8 +46,13 @@ elif MODE == "full":
     SCORE = 1.5
     HARD = 10_000
 else:
-    LOG.exception("No MODE provided.")
-    exit()
+    LOG.info("Testing mode")
+    EXP_NAME = "kwd_analysis_perc"
+    RECORDS_LOC = Path("data/rake_kwds_small.jsonl")
+    MIN_THRESH = 500
+    FREQ = 20
+    SCORE = 1.5
+    HARD = 10_000
 
 DATA_DIR = Path("data") / EXP_NAME
 VIZ_DIR = Path("reports/viz") / EXP_NAME
@@ -65,30 +65,17 @@ def cli():
 
 
 @cli.command()
-def experiment():
-    """
-    Run all commands in experiment.
-    """
-    docs_to_keywords_df()
-    get_filtered_kwds()
-    dtw()
-    slope_complexity()
-    plot_slope()
-    dtw_viz()
-    plot_times()
-
-
-@cli.command()
-def docs_to_keywords_df():
+@click.option("--infile", type=Path, default=RECORDS_LOC)
+@click.option("--outfile", type=Path, default=DATA_DIR / "all_keywords.jsonl")
+@click.option("--out_years", type=Path, default=DATA_DIR / "year_counts.csv")
+def docs_to_keywords_df(infile, outfile, out_years):
     """
     Get dataframe of keyword frequencies over the years
     """
-    infile = RECORDS_LOC
     # TODO: this file above should go in size folder so only one to be changed with exp
+
     LOG.info(f"Reading keywords from {infile}.")
     df = pd.read_json(infile, orient="records", lines=True)
-    outfile = DATA_DIR / "all_keywords.jsonl"
-    out_years = DATA_DIR / "year_counts.csv"
     kwd_df, year_counts = flatten_to_keywords(df, MIN_THRESH)
     LOG.info(f"Writing out all keywords to {outfile}.")
     kwd_df.to_json(outfile, orient="records", lines=True)
@@ -97,62 +84,84 @@ def docs_to_keywords_df():
 
 
 @cli.command()
-def get_filtered_kwds():
+@click.option("--infile", type=Path, default=DATA_DIR / "all_keywords.jsonl")
+@click.option(
+    "--out_loc",
+    type=Path,
+    default=DATA_DIR / f"all_keywords_threshold_{FREQ}_{SCORE}_{HARD}.jsonl",
+)
+@click.option("--threshold", type=int, default=FREQ)
+@click.option("--score_thresh", type=float, default=SCORE)
+@click.option("--hard_limit", type=int, default=HARD)
+def get_filtered_kwds(infile, out_loc, threshold, score_thresh, hard_limit):
     """
     Filter keywords by total frequency and rake score. Also provide hard limit.
     """
-    infile = DATA_DIR / "all_keywords.jsonl"
     LOG.info(f"Reading from {infile}")
     df = pd.read_json(infile, orient="records", lines=True)
-    out_loc = DATA_DIR / f"all_keywords_threshold_{FREQ}_{SCORE}_{HARD}.jsonl"
-    filter_kwds(df, out_loc, threshold=FREQ, score_thresh=SCORE, hard_limit=HARD)
+    filter_kwds(df, out_loc, threshold, score_thresh, hard_limit)
 
 
 @cli.command()
-def normalize_keyword_freqs():
+@click.option(
+    "--kwds_loc",
+    type=Path,
+    default=DATA_DIR / f"all_keywords_threshold_{FREQ}_{SCORE}_{HARD}.jsonl",
+)
+@click.option(
+    "--in_years", type=Path, default=DATA_DIR / "year_counts.csv",
+)
+@click.option(
+    "--out_norm",
+    type=Path,
+    default=DATA_DIR / f"all_keywords_norm_threshold_{FREQ}_{SCORE}_{HARD}.jsonl",
+)
+def normalize_keyword_freqs(kwds_loc, in_years, out_norm):
     """
     Normalize keyword frequencies by year totals and percent of baselines.
     """
-    kwds_loc = DATA_DIR / f"all_keywords_threshold_{FREQ}_{SCORE}_{HARD}.jsonl"
-    in_years = DATA_DIR / "year_counts.csv"
-    out_norm = DATA_DIR / f"all_keywords_norm_threshold_{FREQ}_{SCORE}_{HARD}.jsonl"
-
     LOG.info(f"Reading normalized keywords years from {kwds_loc}.")
-    normed_kwds_df = pd.read_json(kwds_loc, orient='records', lines=True)
+    normed_kwds_df = pd.read_json(kwds_loc, orient="records", lines=True)
 
     LOG.info(f"Reading year counts from {in_years}.")
     year_counts = pd.read_csv(in_years, index_col=0)
 
-    year_counts = year_counts.sort_values('year')
-    year_counts = year_counts.set_index('year')
+    year_counts = year_counts.sort_values("year")
+    year_counts = year_counts.set_index("year")
     normed_df = normalize_by_perc(normed_kwds_df, year_counts)
 
     LOG.info(f"Writing normalize dataframe to {out_norm}")
-    normed_df.to_json(out_norm, orient='records', lines=True)
+    normed_df.to_json(out_norm, orient="records", lines=True)
 
 
 @cli.command()
-def slope_complexity():
+@click.option(
+    "--norm_loc",
+    type=Path,
+    default=DATA_DIR / f"all_keywords_norm_threshold_{FREQ}_{SCORE}_{HARD}.jsonl",
+)
+@click.option(
+    "--out_df", type=Path, default=DATA_DIR / "slope_complex.csv",
+)
+def slope_complexity(norm_loc, out_df):
     """
     Get various measures for keyword time series
     """
-    norm_loc = DATA_DIR / f"all_keywords_norm_threshold_{FREQ}_{SCORE}_{HARD}.jsonl"
     # TODO: Variable for the path above?
     LOG.info(f"Reading normalized keywords years from {norm_loc}.")
-    normed_kwds_df = pd.read_json(norm_loc, orient='records', lines=True)
-    slope_count_complexity(normed_kwds_df, DATA_DIR / "slope_complex.csv")
+    normed_kwds_df = pd.read_json(norm_loc, orient="records", lines=True)
+    slope_count_complexity(normed_kwds_df, out_df)
 
 
 @cli.command()
-def plot_slope():
+@click.option("--infile", type=Path, default=DATA_DIR / "slope_complex.csv")
+@click.option("--viz_dir", type=Path, default=VIZ_DIR)
+def plot_slope(infile, viz_dir):
     """
     Plot slope and complexity
     """
-    infile = DATA_DIR / "slope_complex.csv"
     se_df = pd.read_csv(infile, index_col=0)
-    plot_slop_complex(
-        se_df, VIZ_DIR, x_measure="mean_change", y_measure="complexity"
-    )
+    plot_slop_complex(se_df, viz_dir, x_measure="mean_change", y_measure="complexity")
 
 
 @cli.command()
@@ -170,46 +179,62 @@ def plot_times():
 
 
 @cli.command()
-def dtw():
+@click.option(
+    "--norm_loc",
+    type=Path,
+    default=DATA_DIR / f"all_keywords_norm_threshold_{FREQ}_{SCORE}_{HARD}.jsonl",
+)
+@click.option(
+    "--dtw_loc", type=Path, default=DATA_DIR / "dynamic_time_warp_distances.csv"
+)
+def dtw(norm_loc, dtw_loc):
     """
     Compute pairwise dynamic time warp between keywords
     """
-    norm_loc = DATA_DIR / f"all_keywords_norm_threshold_{FREQ}_{SCORE}_{HARD}.jsonl"
     LOG.info(f"Reading normalized keywords years from {norm_loc}.")
     normed_kwds_df = pd.read_json(norm_loc, orient="records", lines=True)
     normed_kwd_years = normed_kwds_df.set_index("stem").iloc[:, 5:]
-    dtw_loc = DATA_DIR / "dynamic_time_warp_distances.csv"
     dtw_df = dtw_kwds(normed_kwd_years)
     LOG.info(f"Outputting dynamic time warps to {dtw_loc}.")
     dtw_df.to_csv(dtw_loc)
 
 
 @cli.command()
-def cluster_tests():
+@click.option(
+    "--dtw_loc", type=Path, default=DATA_DIR / "dynamic_time_warp_distances.csv"
+)
+@click.option("--out_elbow_plot", type=Path, default=VIZ_DIR / "elbow.png")
+def cluster_tests(dtw_loc, out_elbow_plot):
     """
-    Try various numbers of clusters for Gaussian Mixture and kmeans, produce plots
+    Try various numbers of clusters for kmeans, produce plots
     """
-    dtw_loc = DATA_DIR / "dynamic_time_warp_distances.csv"
-    out_bic_plot = VIZ_DIR / "bic.png"
-    out_elbow_plot = VIZ_DIR / "elbow.png"
-
     LOG.info(f"Reading dynamic time warp distances from {dtw_loc}.")
     dtw_df = pd.read_csv(dtw_loc, index_col=0)
-    # plot_gm_bics(dtw_df, out_bic_plot, c_min=2, c_max=20)
     yellow_plot_kmd(dtw_df, out_elbow_plot, c_min=2, c_max=20)
 
 
 @cli.command()
-def dtw_viz():
+@click.option(
+    "--norm_loc",
+    type=Path,
+    default=DATA_DIR / f"all_keywords_threshold_{FREQ}_{SCORE}_{HARD}.jsonl",
+)
+@click.option(
+    "--dtw_loc", type=Path, default=DATA_DIR / "dynamic_time_warp_distances.csv",
+)
+@click.option(
+    "--kmeans_loc", type=Path, default=MODEL_DIR / "kmeans.jbl",
+)
+@click.option(
+    "--out_man_plot", type=Path, default=VIZ_DIR / "manifold.png",
+)
+@click.option(
+    "--out_man_points", type=Path, default=MODEL_DIR / "dtw_manifold_proj.jbl",
+)
+def dtw_viz(norm_loc, dtw_loc, kmeans_loc, out_man_plot, out_man_points):
     """
     Cluster keywords by dynamic time warp values and plot in tensorboard.
     """
-    norm_loc = DATA_DIR / f"all_keywords_threshold_{FREQ}_{SCORE}_{HARD}.jsonl"
-    dtw_loc = DATA_DIR / "dynamic_time_warp_distances.csv"
-    kmeans_loc = MODEL_DIR / "kmeans.jbl"
-    out_man_plot = VIZ_DIR / "manifold.png"
-    out_man_points = MODEL_DIR / "dtw_manifold_proj.jbl"
-
     LOG.info(f"Reading normalized keywords years from {norm_loc}.")
     kwds_df = pd.read_json(norm_loc, orient="records", lines=True)
 

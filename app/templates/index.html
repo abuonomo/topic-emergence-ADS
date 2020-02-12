@@ -7,16 +7,19 @@
       href="{{ url_for('static', filename='style/main.css') }}"
     />
     <link href="https://fonts.googleapis.com/css?family=Montserrat&display=swap" rel="stylesheet">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/js/select2.min.js"></script>
   </head>
   <body>
     <div id="options">
-      <select id="selectButtonX"></select>
-      <select id="selectButtonY"></select>
+      <select id="selectButtonX" class="selector"></select>
+      <select id="selectButtonY" class="selector"></select>
       <button type="button" id="enterButton">Transform</button>
       <button type="button" id="toggleNorm">Toggle Time Series Normalize</button>
     </div>
     <div style="width: 100%; overflow: hidden;">
-      <div id="views" style="width: 100px; float: left; margin-top: 100px">
+      <div id="views" style="width: 100px; float: left; margin-top: 50px">
         <div class="btn-group">
           <button id="manifold">manifold</button>
           <button id="maxSkew">First max location vs skewness</button>
@@ -550,8 +553,15 @@
 
         return my;
       }
+      $(document).ready(function() {
+        $('.selector').select2();
+      });
 
-      var margin = { top: 0, right: 20, bottom: 100, left: 20 };
+      $(".selector").select2({
+        width: 'resolve' // need to override the changed default
+      });
+
+      var margin = { top: 0, right: 70, bottom: 100, left: 20 };
       var width = 600 - margin.left - margin.right;
       var height = 450 - margin.top - margin.bottom;
 
@@ -674,7 +684,44 @@
         } else {
           tc.yName('count')
         }
-      })
+      });
+
+      function scatterRequestPlot(d, selectedX, selectedY) {
+        // recover the option that has been chosen
+        // let selectedX = 'manifold_x';
+        // let selectedY = 'manifold_y';
+        scatterSvg.selectAll('*').remove();
+        d3.json("/get-scatter-data", {
+          method:"POST",
+          body: JSON.stringify({
+            x: selectedX, y: selectedY
+          }),
+          headers: {
+            "Content-type": "application/json; charset=UTF-8"
+          }
+        })
+        .then(function(data) {
+          scatterSvg
+          .datum(data)
+          .call(chart0.xName(selectedX).yName(selectedY));
+        });
+      }
+
+      // Saved views
+      d3.select("#manifold").on("click", function (d) {
+          let x = 'manifold_x';
+          let y = 'manifold_y';
+          let val = scatterRequestPlot(d, x, y);
+          return val
+        }
+      );
+
+      d3.select("#maxSkew").on("click", function (d) {
+                let x = 'value__skewness';
+                let y = 'value__first_location_of_maximum';
+                return scatterRequestPlot(d, x, y);
+              }
+      )
 
     </script>
   </body>

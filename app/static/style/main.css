@@ -17,6 +17,14 @@ axis {
     font: 10px sans-serif;
 }
 
+.selector {
+    width: 400px;
+}
+
+li {
+    font-size: 10px;
+}
+
 .tooltip {
     background-color: #d8d5e4;
     width: 120px;
@@ -82,5 +90,5 @@ p {
 
 /* Add a background color on hover */
 .btn-group button:hover {
-  background-color: #3e8e41;
+  background-color: #69a1d0;
 }

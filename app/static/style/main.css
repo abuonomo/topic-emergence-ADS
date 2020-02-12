@@ -63,3 +63,23 @@ p {
     font-family: 'Montserrat', sans-serif;
     font-size: 20px;
 }
+
+.btn-group button {
+    background-color: #4682B4; /* Green background */
+    border: 1px solid #30597a; /* Green border */
+    color: white; /* White text */
+    padding: 0px 0px; /* Some padding */
+    cursor: pointer; /* Pointer/hand icon */
+    font-size: 18px;
+    width: 100%; /* Set a width if needed */
+    display: block; /* Make the buttons appear below each other */
+}
+
+.btn-group button:not(:last-child) {
+  border-bottom: none; /* Prevent double borders */
+}
+
+/* Add a background color on hover */
+.btn-group button:hover {
+  background-color: #3e8e41;
+}

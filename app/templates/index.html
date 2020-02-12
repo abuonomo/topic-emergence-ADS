@@ -15,6 +15,15 @@
       <button type="button" id="enterButton">Transform</button>
       <button type="button" id="toggleNorm">Toggle Time Series Normalize</button>
     </div>
+    <div style="width: 100%; overflow: hidden;">
+      <div id="views" style="width: 100px; float: left; margin-top: 100px">
+        <div class="btn-group">
+          <button id="manifold">manifold</button>
+          <button id="maxSkew">First max location vs skewness</button>
+        </div>
+      </div>
+      <div id="plots" style="margin-left: 100px;"></div>
+    </div>
     <br>
 
     <script src="https://d3js.org/d3.v5.min.js"></script>
@@ -542,7 +551,7 @@
         return my;
       }
 
-      var margin = { top: 50, right: 20, bottom: 30, left: 100 };
+      var margin = { top: 50, right: 20, bottom: 30, left: 20 };
       var width = 600 - margin.left - margin.right;
       var height = 450 - margin.top - margin.bottom;
 
@@ -552,31 +561,23 @@
       var color = d3.scaleOrdinal(d3.schemeCategory10);
 
       // Append SVG
-      var scatterSvg = d3.select("body")
-        .attr('id', 'scatterPlot')
+      var scatterSvg = d3.select('#plots')
         .append("svg")
         .attr("width", swidth)
         .attr("height", sheight)
         .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
-      var manSvg = d3.select("body")
-      .attr('id', 'scatterPlot')
+      var timeSvg = d3.select("#plots")
       .append("svg")
+      .attr('id', 'timeSvg')
       .attr("width", swidth)
       .attr("height", sheight)
       .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
-      var timeSvg = d3.select("body")
-      .append("svg")
-      .attr('id', 'timeSvg')
-      .attr("width", swidth*2)
-      .attr("height", sheight*.8)
-      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
-
       // Add time series chart
       var timeChart = timeSeriesChart()
-      .height(height*0.8)
-      .width(width*2)
+      .height(height)
+      .width(width)
       .color(color);
 
       // add slope comp chart
@@ -612,9 +613,6 @@
           scatterSvg
             .datum(data)
             .call(chart0);
-          manSvg
-            .datum(data)
-            .call(chart1);
           });
 
       d3.json('/get-all-options')

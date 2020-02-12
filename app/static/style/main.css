@@ -18,11 +18,18 @@ axis {
 }
 
 .selector {
-    width: 400px;
+    width: 40%;
+}
+
+#description {
+    font-size: 16px;
+    margin-right: 0%;
+    margin-left: 100px;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 
 li {
-    font-size: 10px;
+    font-size: 12px;
 }
 
 .tooltip {

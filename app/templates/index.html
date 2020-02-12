@@ -12,17 +12,32 @@
     <script src="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/js/select2.min.js"></script>
   </head>
   <body>
-    <div id="options">
-      <select id="selectButtonX" class="selector"></select>
-      <select id="selectButtonY" class="selector"></select>
-      <button type="button" id="enterButton">Transform</button>
-      <button type="button" id="toggleNorm">Toggle Time Series Normalize</button>
+    <div style="width: 100%; overflow: hidden;">
+      <div style="width: 50%; float: left; margin-top: 50px">
+        <p id="description">
+          We calcluated many measures from the the frequencies of keywords in the Astrophysics Data System (ADS).
+          The two dropdowns contain names of values calculated from the keyword time series.
+          A list of these measures can be found <a href="https://tsfresh.readthedocs.io/en/latest/text/list_of_features.html">here</a>.
+          <br><br>
+          On the left, there are a few predefined views which may be useful.
+        </p>
+      </div>
+      <div id='options' style="margin-left: 50px;">
+        <ul style="list-style-type:none">
+          <li>x: <select id="selectButtonX" class="selector"></select></li>
+          <li>y: <select id="selectButtonY" class="selector"></select></li>
+          <li><br></li>
+          <li><button type="button" id="enterButton">Transform</button></li>
+          <li><button type="button" id="toggleNorm">Toggle Time Series Normalize</button></li>
+        </ul>
+      </div>
     </div>
     <div style="width: 100%; overflow: hidden;">
       <div id="views" style="width: 100px; float: left; margin-top: 50px">
         <div class="btn-group">
           <button id="manifold">manifold</button>
           <button id="maxSkew">First max location vs skewness</button>
+          <button id="changeComplex">mean change vs complexity</button>
         </div>
       </div>
       <div id="plots" style="margin-left: 100px; height: 100%"></div>
@@ -119,7 +134,7 @@
             .attr("x", 0)
             .attr("y", -20)
             .attr("class", "title")
-            .text(`Keywords ${xName} vs ${yName}`);
+            .text(`Keywords Time Series Measures`);
 
             brush = d3.brush().extent([[0, 0], [width, height]]).on("end", brushended);
             scatter.append("g")
@@ -561,7 +576,7 @@
         width: 'resolve' // need to override the changed default
       });
 
-      var margin = { top: 0, right: 70, bottom: 100, left: 20 };
+      var margin = { top: 20, right: 70, bottom: 100, left: 20 };
       var width = 600 - margin.left - margin.right;
       var height = 450 - margin.top - margin.bottom;
 
@@ -711,8 +726,7 @@
       d3.select("#manifold").on("click", function (d) {
           let x = 'manifold_x';
           let y = 'manifold_y';
-          let val = scatterRequestPlot(d, x, y);
-          return val
+          return scatterRequestPlot(d, x, y);
         }
       );
 
@@ -721,7 +735,14 @@
                 let y = 'value__first_location_of_maximum';
                 return scatterRequestPlot(d, x, y);
               }
-      )
+      );
+
+      d3.select("#changeComplex").on("click", function (d) {
+                let x = 'value__mean_change';
+                let y = 'value__cid_ce__normalize_False';
+                return scatterRequestPlot(d, x, y);
+              }
+      );
 
     </script>
   </body>

@@ -252,15 +252,30 @@ def dtw_viz(norm_loc, dtw_loc, kmeans_loc, out_man_plot, out_man_points):
 
 
 @cli.command()
-def make_topic_models():
+@click.option(
+    "--norm_loc",
+    type=Path,
+    default=DATA_DIR / f"all_keywords_norm_threshold_{FREQ}_{SCORE}_{HARD}.jsonl",
+)
+@click.option(
+    "--plot_loc", type=Path, default=VIZ_DIR / "coherence.png",
+)
+@click.option(
+    "--mat_loc", type=Path, default=DATA_DIR / "doc_feature_matrix.mm",
+)
+@click.option(
+    "--mlb_loc", type=Path, default=MODEL_DIR / "mlb.jbl",
+)
+@click.option(
+    "--map_loc", type=Path, default=MODEL_DIR / "mat_doc_mapping.csv",
+)
+def make_topic_models(norm_loc, plot_loc, mat_loc, mlb_loc, map_loc):
     """
     Create document term matrix, topic model, and write to tensorboard
     """
-    norm_loc = DATA_DIR / f"all_keywords_norm_threshold_{FREQ}_{SCORE}_{HARD}.jsonl"
     LOG.info(f"Reading normalized keywords years from {norm_loc}.")
     lim_kwds_df = pd.read_json(norm_loc, orient="records", lines=True)
 
-    plot_loc = VIZ_DIR / "coherence.png"
     tmodels_dir = MODEL_DIR / "topic_models"
     X, mlb, mat_id_to_doc_id = feature_and_topic_model(
         lim_kwds_df, plot_loc, tmodels_dir
@@ -268,10 +283,6 @@ def make_topic_models():
 
     LOG.info("Writing matrix, multilabel binarizer, and matrix to doc id mapping.")
     MODEL_DIR.mkdir(exist_ok=True)
-
-    mat_loc = DATA_DIR / "doc_feature_matrix.mm"
-    mlb_loc = MODEL_DIR / "mlb.jbl"
-    map_loc = MODEL_DIR / "mat_doc_mapping.csv"
 
     LOG.info(f"Writing doc feature matrix to  {mat_loc}")
     mmwrite(str(mat_loc), X)
@@ -282,12 +293,13 @@ def make_topic_models():
 
 
 @cli.command()
-def visualize_topic_models():
-    n_topics = 500
-    tmodel_loc = MODEL_DIR / "topic_models" / f"topics_{n_topics}.jbl"
-    mlb_loc = MODEL_DIR / "mlb.jbl"
-    map_loc = MODEL_DIR / "mat_doc_mapping.csv"
-
+@click.option("--tmodel_dir", type=Path, default=MODEL_DIR / "topic_models")
+@click.option("--n", type=int, default=7)
+@click.option("--mlb_loc", type=Path, default=MODEL_DIR / "mlb.jbl")
+@click.option("--map_loc", type=Path, default=MODEL_DIR / "mat_doc_mapping.csv")
+@click.option("--tmodel_viz_loc", type=Path, default=VIZ_DIR / "topic_model_viz.html")
+def visualize_topic_models(tmodel_dir, n, mlb_loc, map_loc, tmodel_viz_loc):
+    tmodel_loc = tmodel_dir / f"topics_{n}.jbl"
     LOG.info(f"Counting document lengths from {RECORDS_LOC}.")
     doc_lens = get_doc_len_from_file(RECORDS_LOC)
     LOG.info(f"Loading topic model from {tmodel_loc}")
@@ -298,7 +310,7 @@ def visualize_topic_models():
     mat_id_to_doc_id = pd.read_csv(map_loc, index_col=0)
 
     mdoc_lens = [doc_lens[i] for i in mat_id_to_doc_id["matrix_row_index"]]
-    topic_model_viz(tmodel, mlb, mdoc_lens, VIZ_DIR / "topic_model_viz.html")
+    topic_model_viz(tmodel, mlb, mdoc_lens, tmodel_viz_loc)
 
 
 if __name__ == "__main__":

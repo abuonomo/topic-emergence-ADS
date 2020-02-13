@@ -76,11 +76,11 @@ def feature_and_topic_model(lim_kwds_df, plot_loc, tmodels_dir, tboard=False):
     X, mlb, mat_doc_id_map = get_feature_matrix(lim_kwds_df)
     labels = mat_doc_id_map['doc_id'].tolist()
     # TODO: add train and test? But its clustering so maybe no?
-    topic_range = list(range(500, 10_000, 500))
+    topic_range = list(range(2, 20, 5))
     coherences = []
     # TODO: instead of appending, directly write to dir of tmodels with n_topics
 
-    LOG.info("Training topic models")
+    LOG.info(f"Training topic models and writing to {tmodels_dir}")
     topic_pbar = tqdm(topic_range)
     for n in topic_pbar:
         topic_pbar.set_description(f"n_topics: {n}")

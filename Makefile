@@ -4,6 +4,7 @@ RECIPES=python recipes.py
 ifeq ($(MODE), full)
 	EXP_NAME=kwd_analysis_full_perc2
     RECORDS_LOC=data/rake_kwds.jsonl
+    LIMIT=0
     MIN_THRESH=100
     FREQ=250
     SCORE=1.5
@@ -11,6 +12,7 @@ ifeq ($(MODE), full)
 else
 	EXP_NAME=kwd_analysis_perc
     RECORDS_LOC=data/rake_kwds_small.jsonl
+    LIMIT=500
     MIN_THRESH=500
     FREQ=20
     SCORE=1.5
@@ -22,18 +24,23 @@ DATA_DIR=data/$(EXP_NAME)
 VIZ_DIR=reports/viz/$(EXP_NAME)
 MODEL_DIR=models/$(EXP_NAME)
 
+.PHONY: join-and-clean docs-to-keywords-df get-filtered-kwds normalize-keyword-freqs \
+		slope-complexity dtw cluster-tests dtw-viz \
+		make-topic-models visualize-topic-models
+all: join-and-clean docs-to-keywords-df get-filtered-kwds normalize-keyword-freqs \
+	 slope-complexity dtw cluster-tests dtw-viz \
+	 make-topic-models visualize-topic-models
+
 ## Join all years and and use rake to extract keywords.
-#data/rake_kwds.jsonl:
-#	python src/join_and_clean.py \
-#		data/raw \
-#		data/rake_kwds.jsonl
+RAW_DIR='data/raw'
+RAW_FILES=$(shell find $(RAW_DIR) -type f -name '*')
+join-and-clean: $(RECORDS_LOC)
+$(RECORDS_LOC): $(RAW_FILES)
+	python src/join_and_clean.py \
+		$(RAW_DIR) \
+		$(RECORDS_LOC) \
+		--limit $(LIMIT)
 
-
-## Get keyword frequencies over time and normalize
-#data/kwd_analysis_full: data/rake_kwds.jsonl
-#	python src/create_keyword_and_syn_lists.py \
-#		data/rake_kwds.jsonl \
-#		data/kwd_analysis_full
 
 ALL_KWDS_LOC=$(DATA_DIR)/all_keywords.jsonl
 YEAR_COUNT_LOC=$(DATA_DIR)/year_counts.csv
@@ -101,19 +108,38 @@ $(MANIF_PLT_LOC) $(MANIF_POINTS_LOC) $(KM_MODEL_LOC): $(NORM_KWDS_LOC) $(DTW_DIS
 		--out_man_plot $(MANIF_PLT_LOC) \
 		--out_man_points $(MANIF_POINTS_LOC)
 
-$(VIZ_DIR)/slope_complex_count.html:
+#========= Topic Modeling =========#
 
-#NORM_LOC=$(DATA_DIR)/all_keywords_norm_threshold_{FREQ}_{SCORE}_{HARD}.jsonl
-NORM_LOC:
+COH_PLT_LOC=$(VIZ_DIR)/coherence.png
+DOC_FEAT_MAT_LOC=$(DATA_DIR)/doc_feature_matrix.mm
+MULT_LAB_BIN_LOC=$(MODEL_DIR)/mlb.jbl
+MAP_LOC=$(MODEL_DIR)/mat_doc_mapping.csv
+## Create document term matrix, topic model, and write to tensorboard
+make-topic-models: $(COH_PLT_LOC) $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC)
+$(COH_PLT_LOC) $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC): $(NORM_KWDS_LOC)
+	$(RECIPES) make-topic-models \
+		--norm_loc $(NORM_KWDS_LOC) \
+		--plot_loc $(COH_PLT_LOC) \
+		--mat_loc $(DOC_FEAT_MAT_LOC) \
+		--mlb_loc $(MULT_LAB_BIN_LOC) \
+		--map_loc $(MAP_LOC)
 
-$(DATA_DIR)/all_keywords_norm_threshold_$(FREQ)_$(SCORE)_$(HARD).jsonl:
 
-#DTW = data/kwd_analysis_full/dynamic_time_warp_distances.csv
-#NORMED = data/kwd_analysis_full/lim_normed_keyword_stems.jsonl
-#$(DTW): $(NORMED)
-#	python src/dtw_time_analysis.py data/kwd_analysis_full
-### make pairwise dynamic time warp
-#warp: $(DTW)
+TMODEL_VIZ_LOC=$(VIZ_DIR)/topic_model_viz.html
+TMODEL_DIR=$(MODEL_DIR)/topic_models
+TMODELS=$(shell find $(TMODEL_DIR) -type f -name '*')
+N_TOPICS=7
+# Above line collects all files in dir for command prerequisite
+## Visualize topic models with pyLDAviz
+visualize-topic-models: $(TMODEL_VIZ_LOC)
+$(TMODEL_VIZ_LOC): $(TMODELS)
+	$(RECIPES) visualize-topic-models \
+		--tmodel_dir $(TMODEL_DIR) \
+		--n $(N_TOPICS) \
+		--mlb_loc $(MULT_LAB_BIN_LOC) \
+		--map_loc $(MAP_LOC) \
+		--tmodel_viz_loc $(TMODEL_VIZ_LOC)
+
 
 #################################################################################
 # Self Documenting Commands                                                     #

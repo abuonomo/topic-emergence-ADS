@@ -86,4 +86,7 @@ if __name__ == "__main__":
     parser.add_argument("o", help="output jsonslines collected keywords", type=Path)
     parser.add_argument("--limit", help="limit size of dataframe for testing", type=int)
     args = parser.parse_args()
+    if args.limit == 0:
+        LOG.debug("Received limit of 0. Setting to None.")
+        args.limit = None
     main(args.i, args.o, args.limit)

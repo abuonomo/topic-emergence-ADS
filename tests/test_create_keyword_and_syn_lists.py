@@ -1,9 +1,10 @@
-import argparse
+import logging
 import random
+from unittest import TestCase
+
 import numpy as np
 import pandas as pd
-import logging
-from unittest import TestCase
+
 import src.create_keyword_and_syn_lists as ks
 
 logging.basicConfig(level=logging.INFO)

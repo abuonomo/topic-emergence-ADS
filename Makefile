@@ -26,7 +26,7 @@ MODEL_DIR=models/$(EXP_NAME)
 
 .PHONY: join-and-clean docs-to-keywords-df get-filtered-kwds normalize-keyword-freqs \
 		slope-complexity dtw cluster-tests dtw-viz \
-		make-topic-models visualize-topic-models
+		make-topic-models visualize-topic-models app
 all: join-and-clean docs-to-keywords-df get-filtered-kwds normalize-keyword-freqs \
 	 slope-complexity dtw cluster-tests dtw-viz \
 	 make-topic-models visualize-topic-models
@@ -107,6 +107,15 @@ $(MANIF_PLT_LOC) $(MANIF_POINTS_LOC) $(KM_MODEL_LOC): $(NORM_KWDS_LOC) $(DTW_DIS
 		--kmeans_loc $(KM_MODEL_LOC) \
 		--out_man_plot $(MANIF_PLT_LOC) \
 		--out_man_points $(MANIF_POINTS_LOC)
+
+## Run app for visualize results
+app: | $(MANIF_POINTS_LOC) $(NORM_KWDS_LOC) $(TS_FEATURES_LOC) $(YEAR_COUNT_LOC)
+	ln -f $(YEAR_COUNT_LOC) app/data
+	ln -f $(FILT_KWDS_LOC) app/data
+	ln -f $(MANIF_POINTS_LOC) app/data
+	ln -f $(KM_MODEL_LOC) app/data
+	ln -f $(TS_FEATURES_LOC) app/data
+	cd app && flask run
 
 #========= Topic Modeling =========#
 

@@ -6,7 +6,6 @@ import bokeh.io
 import ipyvolume as ipv
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 from bokeh.plotting import figure, output_file, ColumnDataSource, DEFAULT_TOOLS
 from scipy.spatial.distance import cdist
 from scipy.stats import linregress
@@ -15,8 +14,8 @@ from sklearn.mixture import GaussianMixture
 from tensorboardX import SummaryWriter
 from tensorboardX.utils import figure_to_image
 from tqdm import tqdm
-from tsfresh.feature_extraction import feature_calculators as fc
 from tsfresh.feature_extraction import extract_features
+from tsfresh.feature_extraction import feature_calculators as fc
 from tslearn.clustering import TimeSeriesKMeans
 from tslearn.utils import to_time_series_dataset
 from yellowbrick.cluster import KElbowVisualizer

@@ -53,10 +53,31 @@ li {
     shape-rendering: crispEdges;
 }
 
+h1 {
+    margin-left: 10%;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 32px;
+    margin-right: 10%;
+    margin-bottom: 0px;
+}
+
+#version {
+    font-family: "Montserrat", sans-serif;
+    color: grey;
+    font-size: 20px;
+
+}
+
+footer {
+    margin-left: 10%;
+    margin-right: 10%;
+    margin-top: 0px;
+    margin-bottom: 0px;
+    font-size: 20px;
+}
 
 p {
-  font: 10px sans-serif;
-  margin: 0 0 2px 0;
+  font: 16px sans-serif;
   padding: 0;
 }
 

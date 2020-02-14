@@ -1,6 +1,7 @@
 import json
 import logging
 from pathlib import Path
+import os
 
 import joblib
 import numpy as np
@@ -13,6 +14,11 @@ LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
 
 app = Flask(__name__)
+
+try:
+    VERSION = os.environ['VERSION']
+except KeyError:
+    VERSION = 'unspecified'
 
 DATA_DIR = Path("data")
 FREQ = 250  # Test FREQ = 20
@@ -68,7 +74,7 @@ def init():
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", version=VERSION)
 
 
 @app.route("/get-scatter-data", methods=["GET", "POST"])

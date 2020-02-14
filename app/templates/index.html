@@ -12,8 +12,9 @@
     <script src="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/js/select2.min.js"></script>
   </head>
   <body>
-    <div style="width: 100%; overflow: hidden;">
-      <div style="width: 50%; float: left; margin-top: 50px">
+    <h1>Topic Emergence Visualizer <span id="version">(version: {{ version }})</span></h1>
+    <div style="width: 100%; overflow: hidden; margin-left: 4%">
+      <div style="width: 50%; float: left; margin-top: 0px; margin-bottom: 0px">
         <p id="description">
           We calcluated many measures from the the frequencies of keywords in the Astrophysics Data System (ADS).
           The two dropdowns contain names of values calculated from the keyword time series.
@@ -22,7 +23,7 @@
           On the left, there are a few predefined views which may be useful.
         </p>
       </div>
-      <div id='options' style="margin-left: 50px;">
+      <div id='options' style="margin-left: 50px; margin-top:0px">
         <ul style="list-style-type:none">
           <li>x: <select id="selectButtonX" class="selector"></select></li>
           <li>y: <select id="selectButtonY" class="selector"></select></li>
@@ -745,5 +746,8 @@
       );
 
     </script>
+  <footer>
+    <p>For questions, contact <a href = "mailto: anthony.r.buonomo@nasa.gov">anthony.r.buonomo@nasa.gov</a> or <a href = "mailto: brian.a.thomas@nasa.gov">brian.a.thomas@nasa.gov</a>.</p>
+  </footer>
   </body>
 </html>

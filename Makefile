@@ -1,17 +1,19 @@
+BUCKET = hq-ocio-ci-bigdata/home/DataSquad/topic-emergence-ADS/
+PROFILE = moderate
 RECIPES=python recipes.py
 
 # Set parameters depending on whether running test or full data
 ifeq ($(MODE), full)
-	EXP_NAME=kwd_analysis_full_perc2
-    RECORDS_LOC=data/rake_kwds.jsonl
+	EXP_NAME=full_02_14_2020
+    RECORDS_LOC=data/$(EXP_NAME)/rake_kwds.jsonl
     LIMIT=0
     MIN_THRESH=100
     FREQ=250
     SCORE=1.5
     HARD=10000
 else
-	EXP_NAME=kwd_analysis_perc
-    RECORDS_LOC=data/rake_kwds_small.jsonl
+	EXP_NAME=test_02_14_2020
+    RECORDS_LOC=data/$(EXP_NAME)/rake_kwds_small.jsonl
     LIMIT=500
     MIN_THRESH=500
     FREQ=20
@@ -31,11 +33,17 @@ all: join-and-clean docs-to-keywords-df get-filtered-kwds normalize-keyword-freq
 	 slope-complexity dtw cluster-tests dtw-viz \
 	 make-topic-models visualize-topic-models
 
+$(DATA_DIR) $(MODEL_DIR) $(VIZ_DIR):
+	mkdir -p $(DATA_DIR) $(MODEL_DIR) $(VIZ_DIR)
+
 RAW_DIR='data/raw'
 RAW_FILES=$(shell find $(RAW_DIR) -type f -name '*')
 ## Join all years and and use rake to extract keywords.
 join-and-clean: $(RECORDS_LOC)
 $(RECORDS_LOC): $(RAW_FILES)
+	mkdir -p $(DATA_DIR); \
+	mkdir -p $(MODEL_DIR); \
+	mkdir -p $(VIZ_DIR); \
 	python src/join_and_clean.py \
 		$(RAW_DIR) \
 		$(RECORDS_LOC) \
@@ -93,7 +101,6 @@ $(ELBOW_PLT_LOC): $(DTW_DISTS_LOC)
 		--dtw_loc $(DTW_DISTS_LOC) \
 		--out_elbow_plot $(ELBOW_PLT_LOC)
 
-
 KM_MODEL_LOC=$(MODEL_DIR)/kmeans.jbl
 MANIF_PLT_LOC=$(VIZ_DIR)/manifold.png
 MANIF_POINTS_LOC=$(MODEL_DIR)/dtw_manifold_proj.jbl
@@ -107,13 +114,18 @@ $(MANIF_PLT_LOC) $(MANIF_POINTS_LOC) $(KM_MODEL_LOC): $(NORM_KWDS_LOC) $(DTW_DIS
 		--out_man_plot $(MANIF_PLT_LOC) \
 		--out_man_points $(MANIF_POINTS_LOC)
 
-## Run app for visualize results
-app: | $(MANIF_POINTS_LOC) $(NORM_KWDS_LOC) $(TS_FEATURES_LOC) $(YEAR_COUNT_LOC)
+APP_DATA_FILES=$(shell find $$(pwd)/app/data/ -type f -name '*')
+## link data files to app's data dir
+link-data-to-app: $(APP_DATA_FILES)
+$(APP_DATA_FILES): $(MANIF_POINTS_LOC) $(NORM_KWDS_LOC) $(TS_FEATURES_LOC) $(YEAR_COUNT_LOC)
 	ln -f $(YEAR_COUNT_LOC) app/data
 	ln -f $(FILT_KWDS_LOC) app/data
 	ln -f $(MANIF_POINTS_LOC) app/data
 	ln -f $(KM_MODEL_LOC) app/data
 	ln -f $(TS_FEATURES_LOC) app/data
+
+## Run app for visualize results
+app: $(APP_DATA_FILES)
 	cd app && flask run
 
 #========= Topic Modeling =========#
@@ -122,19 +134,20 @@ COH_PLT_LOC=$(VIZ_DIR)/coherence.png
 DOC_FEAT_MAT_LOC=$(DATA_DIR)/doc_feature_matrix.mm
 MULT_LAB_BIN_LOC=$(MODEL_DIR)/mlb.jbl
 MAP_LOC=$(MODEL_DIR)/mat_doc_mapping.csv
+TMODEL_DIR=$(MODEL_DIR)/topic_models
 ## Create document term matrix, topic model, and write to tensorboard
 make-topic-models: $(COH_PLT_LOC) $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC)
 $(COH_PLT_LOC) $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC): $(NORM_KWDS_LOC)
+	mkdir -p $(TMODEL_DIR); \
 	$(RECIPES) make-topic-models \
 		--norm_loc $(NORM_KWDS_LOC) \
 		--plot_loc $(COH_PLT_LOC) \
 		--mat_loc $(DOC_FEAT_MAT_LOC) \
 		--mlb_loc $(MULT_LAB_BIN_LOC) \
-		--map_loc $(MAP_LOC)
-
+		--map_loc $(MAP_LOC) \
+		--tmodels_dir $(TMODEL_DIR)
 
 TMODEL_VIZ_LOC=$(VIZ_DIR)/topic_model_viz.html
-TMODEL_DIR=$(MODEL_DIR)/topic_models
 TMODELS=$(shell find $(TMODEL_DIR) -type f -name '*')
 N_TOPICS=7
 # Above line collects all files in dir for command prerequisite
@@ -167,13 +180,25 @@ docker-build-app:
 		--build-arg VERSION=$$VERSION .
 
 ## Run flask app using gunicorn through docker container
-docker-run-app:
+docker-run-app: $(APP_DATA_FILES)
 	export VERSION=$$(python version.py); \
 	cd app; \
 	docker run -it \
 		-p 5001:5000 \
 		-v $$(pwd)/data:/home/data/ \
 		$(IMAGE_NAME):$$VERSION
+
+#===== S3 Bucket Syncing =====#
+
+## sync data from s3 bucket
+sync_models_from_s3:
+	aws s3 sync s3://$(BUCKET)models/$(EXP_NAME) models/$(EXP_NAME) --profile $(PROFILE)
+	aws s3 sync s3://$(BUCKET)data/$(EXP_NAME) data/$(EXP_NAME) --profile $(PROFILE)
+
+## sync data and models to s3 bucket
+sync-models-to-s3:
+	aws s3 sync models/$(EXP_NAME) s3://$(BUCKET)models/$(EXP_NAME) --profile $(PROFILE)
+	aws s3 sync data/$(EXP_NAME) s3://$(BUCKET)data/$(EXP_NAME) --profile $(PROFILE)
 
 #################################################################################
 # Self Documenting Commands                                                     #

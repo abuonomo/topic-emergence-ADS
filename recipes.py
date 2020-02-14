@@ -269,14 +269,16 @@ def dtw_viz(norm_loc, dtw_loc, kmeans_loc, out_man_plot, out_man_points):
 @click.option(
     "--map_loc", type=Path, default=MODEL_DIR / "mat_doc_mapping.csv",
 )
-def make_topic_models(norm_loc, plot_loc, mat_loc, mlb_loc, map_loc):
+@click.option(
+    "--tmodels_dir", type=Path, default=MODEL_DIR / "topic_models",
+)
+def make_topic_models(norm_loc, plot_loc, mat_loc, mlb_loc, map_loc, tmodels_dir):
     """
     Create document term matrix, topic model, and write to tensorboard
     """
     LOG.info(f"Reading normalized keywords years from {norm_loc}.")
     lim_kwds_df = pd.read_json(norm_loc, orient="records", lines=True)
 
-    tmodels_dir = MODEL_DIR / "topic_models"
     X, mlb, mat_id_to_doc_id = feature_and_topic_model(
         lim_kwds_df, plot_loc, tmodels_dir
     )

@@ -20,25 +20,27 @@ def get_feature_matrix(lim_kwds_df):
     doc_to_kwd = (
         lim_kwds_df.explode("doc_id_list").groupby("doc_id_list").agg({"stem": list})
     )
-    mat_id_to_doc_id = doc_to_kwd.reset_index().reset_index().loc[:, ['index', 'doc_id_list']]
-    mat_id_to_doc_id.columns = ['matrix_row_index', 'doc_id']
+    mat_id_to_doc_id = (
+        doc_to_kwd.reset_index().reset_index().loc[:, ["index", "doc_id_list"]]
+    )
+    mat_id_to_doc_id.columns = ["matrix_row_index", "doc_id"]
     mlb = MultiLabelBinarizer(sparse_output=True)
-    X = mlb.fit_transform(doc_to_kwd['stem'])  # inverse for docs x kwds
+    X = mlb.fit_transform(doc_to_kwd["stem"])  # inverse for docs x kwds
     return X, mlb, mat_id_to_doc_id
 
 
 def topic_model_viz(model, mlb, mdoc_lens, viz_loc):
     term_freq = np.array(model.training_data_.sum(axis=0))[0]
     data = {
-        'topic_term_dists': model.components_,
-        'doc_topic_dists': model.embedding_,
-        'vocab': mlb.classes_,
-        'term_frequency': term_freq,
-        'doc_lengths': mdoc_lens,
+        "topic_term_dists": model.components_,
+        "doc_topic_dists": model.embedding_,
+        "vocab": mlb.classes_,
+        "term_frequency": term_freq,
+        "doc_lengths": mdoc_lens,
     }
     LOG.info("Preparing data for pyLDAvis")
     viz_data = pyLDAvis.prepare(**data)
-    LOG.info(f'Writing visualization to {viz_loc}')
+    LOG.info(f"Writing visualization to {viz_loc}")
     pyLDAvis.save_html(viz_data, str(viz_loc))
     return viz_loc
 
@@ -62,11 +64,11 @@ def tmodel_to_tboard(X, model, doc_ids):
 
 
 def plot_coherence(topic_range, coherences, show=False):
-    LOG.info('Plotting coherences.')
+    LOG.info("Plotting coherences.")
     plt.plot(topic_range, coherences)
-    plt.xlabel('n_topics')
-    plt.ylabel('coherence')
-    plt.title('Model Coherence vs Number of Topics')
+    plt.xlabel("n_topics")
+    plt.ylabel("coherence")
+    plt.title("Model Coherence vs Number of Topics")
     if show:
         plt.show()
     return plt.gcf()
@@ -74,7 +76,7 @@ def plot_coherence(topic_range, coherences, show=False):
 
 def feature_and_topic_model(lim_kwds_df, plot_loc, tmodels_dir, tboard=False):
     X, mlb, mat_doc_id_map = get_feature_matrix(lim_kwds_df)
-    labels = mat_doc_id_map['doc_id'].tolist()
+    labels = mat_doc_id_map["doc_id"].tolist()
     # TODO: add train and test? But its clustering so maybe no?
     topic_range = list(range(2, 20, 5))
     coherences = []
@@ -86,7 +88,7 @@ def feature_and_topic_model(lim_kwds_df, plot_loc, tmodels_dir, tboard=False):
         topic_pbar.set_description(f"n_topics: {n}")
         # model = EnsembleTopics(n_components=n, n_jobs=12).fit(X) # TODO: make var?
         model = PLSA(n_components=n).fit(X)
-        joblib.dump(model, tmodels_dir / f'topics_{n}.jbl')
+        joblib.dump(model, tmodels_dir / f"topics_{n}.jbl")
         if tboard:  # will slow things down by A LOT, also does not seem to work yet
             tmodel_to_tboard(X, model, labels)
         coherences.append(model.coherence())
@@ -100,25 +102,25 @@ def feature_and_topic_model(lim_kwds_df, plot_loc, tmodels_dir, tboard=False):
 def get_doc_length(line):
     record = json.loads(line)
     nanlen = lambda x: len(x) if x is not None else 0
-    doc_len = nanlen(record['title']) + nanlen(record['abstract'])
+    doc_len = nanlen(record["title"]) + nanlen(record["abstract"])
     return doc_len
 
 
 def get_doc_len_from_file(infile):
-    with open(infile, 'r') as f0:
+    with open(infile, "r") as f0:
         doc_lens = [get_doc_length(line) for line in tqdm(f0)]
     return doc_lens
 
 
 def main(msg, feature):
-    LOG.info(f'{msg} and feature is {feature}.')
+    LOG.info(f"{msg} and feature is {feature}.")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Say hello')
-    parser.add_argument('i', help='input txt file')
-    parser.add_argument('--feature', dest='feature', action='store_true')
-    parser.add_argument('--no-feature', dest='feature', action='store_false')
+    parser = argparse.ArgumentParser(description="Say hello")
+    parser.add_argument("i", help="input txt file")
+    parser.add_argument("--feature", dest="feature", action="store_true")
+    parser.add_argument("--no-feature", dest="feature", action="store_false")
     parser.set_defaults(feature=True)
     args = parser.parse_args()
     main(args.i, args.feature)

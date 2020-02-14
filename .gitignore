@@ -10,6 +10,6 @@ runs/*
 .idea/*
 notebook/*
 references/*
-venv/*
+venv/
 !.gitkeep
 __pycache__/

@@ -31,16 +31,15 @@ all: join-and-clean docs-to-keywords-df get-filtered-kwds normalize-keyword-freq
 	 slope-complexity dtw cluster-tests dtw-viz \
 	 make-topic-models visualize-topic-models
 
-## Join all years and and use rake to extract keywords.
 RAW_DIR='data/raw'
 RAW_FILES=$(shell find $(RAW_DIR) -type f -name '*')
+## Join all years and and use rake to extract keywords.
 join-and-clean: $(RECORDS_LOC)
 $(RECORDS_LOC): $(RAW_FILES)
 	python src/join_and_clean.py \
 		$(RAW_DIR) \
 		$(RECORDS_LOC) \
 		--limit $(LIMIT)
-
 
 ALL_KWDS_LOC=$(DATA_DIR)/all_keywords.jsonl
 YEAR_COUNT_LOC=$(DATA_DIR)/year_counts.csv
@@ -149,6 +148,32 @@ $(TMODEL_VIZ_LOC): $(TMODELS)
 		--map_loc $(MAP_LOC) \
 		--tmodel_viz_loc $(TMODEL_VIZ_LOC)
 
+#========= Docker =========#
+
+IMAGE_NAME=keyword-emergence-visualizer
+GIT_REMOTE=origin
+## Build flask app docker container
+docker-build-app:
+	export COMMIT=$$(git log -1 --format=%H); \
+	export REPO_URL=$$(git remote get-url $(GIT_REMOTE)); \
+	export REPO_DIR=$$(dirname $$REPO_URL); \
+	export BASE_NAME=$$(basename $$REPO_URL .git); \
+	export GIT_LOC=$$REPO_DIR/$$BASE_NAME/tree/$$COMMIT; \
+	export VERSION=$$(python version.py); \
+	echo $$GIT_LOC; \
+	cd app; \
+	docker build -t $(IMAGE_NAME):$$VERSION \
+		--build-arg GIT_URL=$$GIT_LOC \
+		--build-arg VERSION=$$VERSION .
+
+## Run flask app using gunicorn through docker container
+docker-run-app:
+	export VERSION=$$(python version.py); \
+	cd app; \
+	docker run -it \
+		-p 5001:5000 \
+		-v $$(pwd)/data:/home/data/ \
+		$(IMAGE_NAME):$$VERSION
 
 #################################################################################
 # Self Documenting Commands                                                     #

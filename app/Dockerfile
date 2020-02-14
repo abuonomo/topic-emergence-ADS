@@ -16,6 +16,7 @@ LABEL org.label-schema.schema-version=1.0
 LABEL org.label-schema.url=$GIT_URL
 LABEL org.label-schema.version=$VERSION
 ENV VERSION=$VERSION
+ENV GIT_URL=$GIT_URL
 
 RUN mkdir data
 USER www-data

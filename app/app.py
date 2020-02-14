@@ -17,8 +17,10 @@ app = Flask(__name__)
 
 try:
     VERSION = os.environ['VERSION']
+    GIT_URL = os.environ['GIT_URL']
 except KeyError:
     VERSION = 'unspecified'
+    GIT_URL = 'unspecified'
 
 DATA_DIR = Path("data")
 FREQ = 250  # Test FREQ = 20
@@ -74,7 +76,7 @@ def init():
 
 @app.route("/")
 def index():
-    return render_template("index.html", version=VERSION)
+    return render_template("index.html", version=VERSION, git_url=GIT_URL)
 
 
 @app.route("/get-scatter-data", methods=["GET", "POST"])

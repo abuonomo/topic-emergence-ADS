@@ -2,10 +2,12 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <link
-      rel="stylesheet"
-      href="{{ url_for('static', filename='style/main.css') }}"
-    />
+    <script>
+        var page_url = window.location.protocol + "//" + window.location.host + window.location.pathname;
+    </script>
+    <link id='style' rel="stylesheet" href="static/style/main.css">
+	<script>document.getElementById("style").href = page_url + "static/style/main.css"</script>
+
     <link href="https://fonts.googleapis.com/css?family=Montserrat&display=swap" rel="stylesheet">
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/css/select2.min.css" rel="stylesheet" />
@@ -48,6 +50,12 @@
     <script src="https://d3js.org/d3.v5.min.js"></script>
     <script type="text/javascript">
       // When the button is changed, run the updateChart function
+
+      var getTimeDataRoute = `${page_url}/get-time-data`;
+      var getScatterDataRoute = `${page_url}/get-scatter-data`;
+      var getAllTimeDataRoute = `${page_url}/get-all-time-data`;
+      var getAllOptionsRoute = `${page_url}/get-all-options`;
+
       function update(selectedX, selectedY) {
         console.log(selectedX);
         console.log(selectedY);

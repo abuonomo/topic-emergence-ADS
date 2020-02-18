@@ -118,7 +118,8 @@ $(MANIF_PLT_LOC) $(MANIF_POINTS_LOC) $(KM_MODEL_LOC): $(NORM_KWDS_LOC) $(DTW_DIS
 		--out_man_plot $(MANIF_PLT_LOC) \
 		--out_man_points $(MANIF_POINTS_LOC)
 
-APP_DATA_FILES=$(shell find $$(pwd)/app/data/ -type f -name '*')
+APP_DATA_DIR=$$(pwd)/app/data
+APP_DATA_FILES=$(shell find $(APP_DATA_DIR) -type f -name '*')
 ## link data files to app's data dir
 link-data-to-app: $(APP_DATA_FILES)
 $(APP_DATA_FILES): $(MANIF_POINTS_LOC) $(NORM_KWDS_LOC) $(TS_FEATURES_LOC) $(YEAR_COUNT_LOC)
@@ -205,6 +206,12 @@ sync-to-s3:
 	aws s3 sync models/$(EXP_NAME) s3://$(BUCKET)models/$(EXP_NAME) --profile $(PROFILE)
 	aws s3 sync data/$(EXP_NAME) s3://$(BUCKET)data/$(EXP_NAME) --profile $(PROFILE)
 	aws s3 sync reports/viz/$(EXP_NAME) s3://$(BUCKET)reports/viz/$(EXP_NAME) --profile $(PROFILE)
+
+## sync app data and models from s3 bucket. WARNING: This will overwrite existing files for current experiment.
+sync-app-data-from-s3:
+	for file in $(YEAR_COUNT_LOC) $(FILT_KWDS_LOC) $(MANIF_POINTS_LOC) $(KM_MODEL_LOC) $(TS_FEATURES_LOC); do \
+		aws s3 cp s3://$(BUCKET)$$file $$file --profile $(PROFILE); \
+	done
 
 #################################################################################
 # Self Documenting Commands                                                     #

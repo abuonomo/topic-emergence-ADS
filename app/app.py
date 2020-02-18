@@ -22,14 +22,11 @@ except KeyError:
     VERSION = 'unspecified'
     GIT_URL = 'unspecified'
 
-DATA_DIR = Path("data")
-FREQ = 250  # Test FREQ = 20
-SCORE = 1.5
-HARD = 10000
+DATA_DIR = Path("data")  # TODO: don't hardcode? env variable
 
 app.config.update(
     SC_LOC=DATA_DIR / f"slope_complex.csv",
-    N_LOC=DATA_DIR / f"all_keywords_threshold_{FREQ}_{SCORE}_{HARD}.jsonl",
+    N_LOC=DATA_DIR / f"all_keywords_threshold.jsonl",
     YC_LOC=DATA_DIR / "year_counts.csv",
     KMEANS_LOC=DATA_DIR / "kmeans.jbl",
     MAN_LOC=DATA_DIR / "dtw_manifold_proj.jbl",

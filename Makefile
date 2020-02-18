@@ -124,7 +124,7 @@ APP_DATA_FILES=$(shell find $(APP_DATA_DIR) -type f -name '*')
 link-data-to-app: $(APP_DATA_FILES)
 $(APP_DATA_FILES): $(MANIF_POINTS_LOC) $(NORM_KWDS_LOC) $(TS_FEATURES_LOC) $(YEAR_COUNT_LOC)
 	ln -f $(YEAR_COUNT_LOC) app/data
-	ln -f $(FILT_KWDS_LOC) app/data
+	ln -f $(FILT_KWDS_LOC) app/data/all_keywords_threshold.jsonl
 	ln -f $(MANIF_POINTS_LOC) app/data
 	ln -f $(KM_MODEL_LOC) app/data
 	ln -f $(TS_FEATURES_LOC) app/data

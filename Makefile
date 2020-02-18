@@ -121,8 +121,7 @@ $(MANIF_PLT_LOC) $(MANIF_POINTS_LOC) $(KM_MODEL_LOC): $(NORM_KWDS_LOC) $(DTW_DIS
 APP_DATA_DIR=$$(pwd)/app/data
 APP_DATA_FILES=$(shell find $(APP_DATA_DIR) -type f -name '*')
 ## link data files to app's data dir
-link-data-to-app: $(APP_DATA_FILES)
-$(APP_DATA_FILES): $(MANIF_POINTS_LOC) $(NORM_KWDS_LOC) $(TS_FEATURES_LOC) $(YEAR_COUNT_LOC)
+link-data-to-app:
 	ln -f $(YEAR_COUNT_LOC) app/data
 	ln -f $(FILT_KWDS_LOC) app/data/all_keywords_threshold.jsonl
 	ln -f $(MANIF_POINTS_LOC) app/data
@@ -130,7 +129,7 @@ $(APP_DATA_FILES): $(MANIF_POINTS_LOC) $(NORM_KWDS_LOC) $(TS_FEATURES_LOC) $(YEA
 	ln -f $(TS_FEATURES_LOC) app/data
 
 ## Run app for visualize results
-app: $(APP_DATA_FILES)
+app: | $(APP_DATA_FILES)
 	export APP_DATA_DIR=data && cd app && flask run
 
 #========= Topic Modeling =========#
@@ -185,7 +184,7 @@ docker-build-app:
 		--build-arg VERSION=$$VERSION .
 
 ## Run flask app using gunicorn through docker container
-docker-run-app: $(APP_DATA_FILES)
+docker-run-app: | $(APP_DATA_FILES)
 	export VERSION=$$(python version.py); \
 	cd app; \
 	docker run -it \

@@ -21,7 +21,7 @@ except KeyError:
     VERSION = 'unspecified'
     GIT_URL = 'unspecified'
 
-DATA_DIR = Path(os.environ["APP_DATA_DIR"])  # TODO: don't hardcode? env variable
+DATA_DIR = Path(os.environ["APP_DATA_DIR"])
 
 app.config.update(
     SC_LOC=DATA_DIR / f"slope_complex.csv",

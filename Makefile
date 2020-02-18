@@ -131,7 +131,7 @@ $(APP_DATA_FILES): $(MANIF_POINTS_LOC) $(NORM_KWDS_LOC) $(TS_FEATURES_LOC) $(YEA
 
 ## Run app for visualize results
 app: $(APP_DATA_FILES)
-	cd app && flask run
+	export APP_DATA_DIR=data && cd app && flask run
 
 #========= Topic Modeling =========#
 

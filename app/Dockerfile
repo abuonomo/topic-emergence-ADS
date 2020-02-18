@@ -19,5 +19,6 @@ ENV VERSION=$VERSION
 ENV GIT_URL=$GIT_URL
 
 RUN mkdir data
+ENV APP_DATA_DIR=data
 USER www-data
 CMD gunicorn app:app -b :5000 --timeout 1200

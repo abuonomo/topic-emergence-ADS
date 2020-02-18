@@ -36,6 +36,10 @@ all: join-and-clean docs-to-keywords-df get-filtered-kwds normalize-keyword-freq
 $(DATA_DIR) $(MODEL_DIR) $(VIZ_DIR):
 	mkdir -p $(DATA_DIR) $(MODEL_DIR) $(VIZ_DIR)
 
+## Install packages to current environment with pip (venv recommended)
+install:
+	pip install -r requirements.txt
+
 RAW_DIR='data/raw'
 RAW_FILES=$(shell find $(RAW_DIR) -type f -name '*')
 ## Join all years and and use rake to extract keywords.
@@ -68,7 +72,7 @@ $(FILT_KWDS_LOC): $(ALL_KWDS_LOC)
 		--out_loc $(FILT_KWDS_LOC) \
 		--threshold $(FREQ) --score_thresh=$(SCORE) --hard_limit $(HARD)
 
-NORM_KWDS_LOC=data/all_keywords_norm_threshold_$(FREQ)_$(SCORE)_$(HARD).jsonl
+NORM_KWDS_LOC=$(DATA_DIR)/all_keywords_norm_threshold_$(FREQ)_$(SCORE)_$(HARD).jsonl
 ## Normalize keyword frequencies by year totals and percent of baselines.
 normalize-keyword-freqs: $(NORM_KWDS_LOC)
 $(NORM_KWDS_LOC): $(FILT_KWDS_LOC) $(YEAR_COUNT_LOC)
@@ -191,14 +195,16 @@ docker-run-app: $(APP_DATA_FILES)
 #===== S3 Bucket Syncing =====#
 
 ## sync data from s3 bucket
-sync_models_from_s3:
+sync-from-s3:
 	aws s3 sync s3://$(BUCKET)models/$(EXP_NAME) models/$(EXP_NAME) --profile $(PROFILE)
 	aws s3 sync s3://$(BUCKET)data/$(EXP_NAME) data/$(EXP_NAME) --profile $(PROFILE)
+	aws s3 sync s3://$(BUCKET)reports/viz/$(EXP_NAME) reports/viz/$(EXP_NAME) --profile $(PROFILE)
 
 ## sync data and models to s3 bucket
-sync-models-to-s3:
+sync-to-s3:
 	aws s3 sync models/$(EXP_NAME) s3://$(BUCKET)models/$(EXP_NAME) --profile $(PROFILE)
 	aws s3 sync data/$(EXP_NAME) s3://$(BUCKET)data/$(EXP_NAME) --profile $(PROFILE)
+	aws s3 sync reports/viz/$(EXP_NAME) s3://$(BUCKET)reports/viz/$(EXP_NAME) --profile $(PROFILE)
 
 #################################################################################
 # Self Documenting Commands                                                     #

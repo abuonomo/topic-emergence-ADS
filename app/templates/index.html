@@ -218,7 +218,7 @@
         }
 
         function onClick(d, i) {
-          d3.json('/get-time-data', {
+          d3.json(window.location.pathname + 'get-time-data', {
             method:"POST",
             body: JSON.stringify({
               stem: d[labelName], kmeans_cluster: d[colorName]
@@ -636,7 +636,7 @@
       .timeChart(timeChart)
       .color(color);
 
-      d3.json("/get-scatter-data", {
+      d3.json(window.location.pathname + "get-scatter-data", {
             method:"POST",
             body: JSON.stringify({
               x: 'value__mean_change', y: 'value__cid_ce__normalize_True'
@@ -651,7 +651,7 @@
             .call(chart0);
           });
 
-      d3.json('/get-all-options')
+      d3.json(window.location.pathname + 'get-all-options')
         .then(
           function(options) {
             d3.select("#selectButtonX")
@@ -675,7 +675,7 @@
               var selectedX = d3.select("#selectButtonX").property("value");
               var selectedY = d3.select("#selectButtonY").property("value");
               scatterSvg.selectAll('*').remove();
-              d3.json("/get-scatter-data", {
+              d3.json(window.location.pathname + "get-scatter-data", {
                 method:"POST",
                 body: JSON.stringify({
                   x: selectedX, y: selectedY
@@ -693,7 +693,7 @@
             )}
         );
 
-      d3.json('/get-all-time-data')
+      d3.json(window.location.pathname + 'get-all-time-data')
         .then(
           function(data) {
             console.log(data);
@@ -715,7 +715,7 @@
         // let selectedX = 'manifold_x';
         // let selectedY = 'manifold_y';
         scatterSvg.selectAll('*').remove();
-        d3.json("/get-scatter-data", {
+        d3.json(window.location.pathname + "get-scatter-data", {
           method:"POST",
           body: JSON.stringify({
             x: selectedX, y: selectedY

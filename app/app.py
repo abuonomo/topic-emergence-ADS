@@ -1,7 +1,6 @@
-import json
 import logging
-from pathlib import Path
 import os
+from pathlib import Path
 
 import joblib
 import numpy as np
@@ -73,12 +72,14 @@ def init():
 
 @app.route("/")
 def index():
+    LOG.info('Serving page.')
     return render_template("index.html", version=VERSION, git_url=GIT_URL)
 
 
 @app.route("/get-scatter-data", methods=["GET", "POST"])
 def get_scatter_data():
     in_data = request.json
+    LOG.info(f'Getting scatter data for {in_data}.')
     cols = list(set(app.config["LOAD_COLS"] + [in_data["x"], in_data["y"]]))
     chart_data = app.config["SC_DF"].loc[:, cols].to_dict(orient="records")
     return jsonify(chart_data)
@@ -105,6 +106,7 @@ def _trans_time(ts, kwd, clus):
 @app.route("/get-time-data", methods=["GET", "POST"])
 def get_time_data():
     data = request.json
+    LOG.info(f'Getting time data for {data}.')
     ts = app.config["N_DF"].query(f'stem == "{data["stem"]}"').iloc[:, 5:]
     ts = ts.T
     ts_recs = _trans_time(ts, data["stem"], data["kmeans_cluster"])
@@ -113,6 +115,7 @@ def get_time_data():
 
 @app.route("/get-all-time-data", methods=["GET", "POST"])
 def get_all_time_data():
+    LOG.info(f'Getting total frequencies for each year.')
     ts = pd.DataFrame(app.config["N_DF"].iloc[:, 5:].sum())
     tmp_df = app.config['YEAR_COUNTS'].copy().sort_values('year')
     ind = tmp_df['year'].apply(lambda x: f'{x}_sum')
@@ -124,6 +127,7 @@ def get_all_time_data():
 
 @app.route("/get-all-options")
 def get_all_options():
+    LOG.info(f'Getting options for scatter axes.')
     opts = app.config["SC_DF"].columns.tolist()
     return jsonify(opts)
 

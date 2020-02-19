@@ -4,16 +4,21 @@ Creating a measure for topic emergence in the Astrophysics Data Sytem (ADS).
 
 See all options by going to root of this repository and running `make`.
 
+- [Prerequisites](#prerequisites)
 - [Installation](#installation)
 - [Data Pipeline](#data-pipeline)
 - [App](#app)
 
+
 ## Installation
-\* requires [GNU make](https://www.gnu.org/software/make/).  
+**Requirements**:
+ - [GNU make](https://www.gnu.org/software/make/). Tested on [this](#make-version) version.
+ - Python 3.7. Tested on Python 3.7.6.
+ - [Docker](https://www.docker.com/). Tested on `Docker version 19.03.5, build 633a0ea`.
 
 First, you will want to be working in a virtual environement. For example, you could make once using python's [built-in venv module](https://docs.python.org/3/library/venv.html).
 ```bash
-python -m venv my-env
+python -m venv my_env
 ```
 You can then activate the environment with `source venv/bin/activate`.
 
@@ -49,3 +54,16 @@ docker run -it -p 5002:5000 -v $(pwd)/data:/home/data $IMAGE
 ```
 
 For development purposes, you can run the app with the make commands `app` or `docker-run-app`. The first command will depend upon having the local environment properly configured with all requirements installed. The second requires only the docker container and some information from git about commits, remotes, and tags. The `docker-build-app` and `docker-run-app` commands service to automatically supply the image with some information about the git repo. 
+
+## Index
+
+### make version
+```txt
+GNU Make 3.81
+Copyright (C) 2006  Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.
+There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE.
+
+This program built for i386-apple-darwin11.3.0
+```

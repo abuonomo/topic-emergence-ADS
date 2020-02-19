@@ -37,7 +37,7 @@ $(DATA_DIR) $(MODEL_DIR) $(VIZ_DIR):
 	mkdir -p $(DATA_DIR) $(MODEL_DIR) $(VIZ_DIR)
 
 ## Install packages to current environment with pip (venv recommended)
-install:
+requirements:
 	pip install -r requirements.txt
 
 RAW_DIR='data/raw'

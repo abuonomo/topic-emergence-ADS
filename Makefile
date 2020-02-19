@@ -212,6 +212,10 @@ sync-app-data-from-s3:
 		aws s3 cp s3://$(BUCKET)$$file $$file --profile $(PROFILE); \
 	done
 
+## sync raw ADS files from s3 bucket
+sync-raw-data-from-s3:
+	aws s3 sync s3://hq-ocio-ci-bigdata/data/ADS/2019_12_19 data/raw
+
 #################################################################################
 # Self Documenting Commands                                                     #
 #################################################################################

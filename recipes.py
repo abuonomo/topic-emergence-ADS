@@ -1,4 +1,5 @@
 import logging
+from tqdm import tqdm
 import os
 from pathlib import Path
 
@@ -6,6 +7,8 @@ import click
 import joblib
 import pandas as pd
 from scipy.io import mmwrite
+from sklearn.utils import resample
+import numpy as np
 
 from src.analyze_keyword_time_series import (
     slope_count_complexity,
@@ -17,6 +20,7 @@ from src.analyze_keyword_time_series import (
     filter_kwds,
     dtw_to_tboard,
 )
+import src.create_keyword_and_syn_lists as ck
 from src.create_keyword_and_syn_lists import (
     flatten_to_keywords,
     normalize_by_perc,
@@ -27,6 +31,7 @@ from src.topic_modeling import (
     topic_model_viz,
     get_doc_len_from_file,
 )
+import src.bootstrapping as bst
 
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
@@ -62,6 +67,25 @@ MODEL_DIR = Path("models") / EXP_NAME
 @click.group()
 def cli():
     pass
+
+
+@cli.command()
+@click.option("--infile", type=Path, default=RECORDS_LOC)
+@click.option("--outfile", type=Path, default=DATA_DIR / "all_keywords.jsonl")
+@click.option("--out_years", type=Path, default=DATA_DIR / "year_counts.csv")
+def prepare_bootstrap(infile, outfile, out_years, min_thresh=100):
+    LOG.info(f"Reading keywords from {infile}.")
+    df = pd.read_json(infile, orient="records", lines=True)
+    kwd_df_resamples, year_counts = bst.get_resamples(df, min_thresh=500)
+    # TODO: feed bootstraps into full pipeline to create all tsfresh metrics, this time with a distribution. How to visualize with distribution?
+    # TODO: get time estimate on how long that would take, knowing how fast one is shoudl be a good approximation.
+    for kwd_df in kwd_df_resamples:
+        kwd_df = kwd_df.reset_index()
+        LOG.info(f"Writing out all keywords to {outfile}.")
+        kwd_df.to_json(outfile, orient="records", lines=True)
+        LOG.info(f"Writing year counts to {out_years}.")
+        year_counts.to_csv(out_years)
+
 
 
 @cli.command()

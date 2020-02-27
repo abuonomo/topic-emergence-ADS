@@ -105,7 +105,7 @@ def stem_kwds(df):
 
 
 def get_stem_aggs(df):
-    LOG.info("Aggregating by stems")
+    LOG.debug("Aggregating by stems")
     df = df.copy()
     years = np.sort(df["year"].unique())
     year_count_dict = {c: "sum" for c in years if not np.isnan(c)}

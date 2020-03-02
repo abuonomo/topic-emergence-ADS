@@ -1,5 +1,4 @@
 import logging
-from tqdm import tqdm
 import os
 from pathlib import Path
 
@@ -7,20 +6,17 @@ import click
 import joblib
 import pandas as pd
 from scipy.io import mmwrite
-from sklearn.utils import resample
-import numpy as np
 
+import src.bootstrapping as bst
 from src.analyze_keyword_time_series import (
     slope_count_complexity,
     plot_slop_complex,
     dtw_to_manifold,
     yellow_plot_kmd,
-    plot_gm_bics,
     plot_time,
     filter_kwds,
     dtw_to_tboard,
 )
-import src.create_keyword_and_syn_lists as ck
 from src.create_keyword_and_syn_lists import (
     flatten_to_keywords,
     normalize_by_perc,
@@ -31,7 +27,6 @@ from src.topic_modeling import (
     topic_model_viz,
     get_doc_len_from_file,
 )
-import src.bootstrapping as bst
 
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)

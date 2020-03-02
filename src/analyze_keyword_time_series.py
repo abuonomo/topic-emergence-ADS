@@ -16,8 +16,6 @@ from tensorboardX.utils import figure_to_image
 from tqdm import tqdm
 from tsfresh.feature_extraction import extract_features
 from tsfresh.feature_extraction import feature_calculators as fc
-from tslearn.clustering import TimeSeriesKMeans
-from tslearn.utils import to_time_series_dataset
 from yellowbrick.cluster import KElbowVisualizer
 from yellowbrick.features import Manifold
 
@@ -73,20 +71,6 @@ def to_tboard(dtw_df, m, images, lim):
     )
     writer.close()
     LOG.info('Use "tensorboard --logdir runs" command to see visualization.')
-
-
-def ts_to_tboard(normed_kwd_years):
-    """Use tslearn to cluster timeseries"""
-    ts_normed = to_time_series_dataset(normed_kwd_years.values)
-    metric = "euclidean"
-    LOG.info(f"Performing kmeans with metric {metric}.")
-    km = TimeSeriesKMeans(n_clusters=6, metric=metric)
-    km.fit(ts_normed)
-
-    lim = 1000
-    to_tboard(normed_kwd_years)
-    images = get_fig_images(normed_kwd_years[0:lim])
-    to_tboard(normed_kwd_years, km, images, lim)
 
 
 def yellow_plot_kmd(X, out_plot, c_min=2, c_max=20):

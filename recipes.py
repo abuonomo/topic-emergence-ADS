@@ -82,7 +82,6 @@ def prepare_bootstrap(infile, outfile, out_years, min_thresh=100):
         year_counts.to_csv(out_years)
 
 
-
 @cli.command()
 @click.option("--infile", type=Path, default=RECORDS_LOC)
 @click.option("--outfile", type=Path, default=DATA_DIR / "all_keywords.jsonl")

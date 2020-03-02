@@ -27,7 +27,6 @@ LOG.setLevel(logging.INFO)
 def plot_time(v, show=False, lnr=False, size=(2, 2)):
     years = v.index.str.replace("_sum", "").astype(int)
     vals = v.values
-    # plt.style.use("seaborn-dark")
     plt.figure(figsize=size)  # Must be square for tensorboard
     plt.plot(years, vals, color="black", linewidth=5)
     if lnr:

@@ -5,7 +5,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import spacy
-from dtw import dtw
 from nltk.stem import PorterStemmer
 from scipy.spatial.distance import euclidean
 from sklearn.preprocessing import LabelBinarizer, MinMaxScaler
@@ -100,7 +99,7 @@ def stem_kwds(df):
     p = PorterStemmer()
     kwd_to_stem = {kwd: p.stem(kwd) for kwd in tqdm(unq_kwds)}
     tqdm.pandas()
-    df["stem"] = df["keyword"].progress_apply(lambda x: kwd_to_stem[x])
+    df["stem"] = df["keyword"].progress_apply(lambda x: kwd_to_stem[x].lower())
     return df
 
 

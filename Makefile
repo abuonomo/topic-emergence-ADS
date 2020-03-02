@@ -38,7 +38,7 @@ $(DATA_DIR) $(MODEL_DIR) $(VIZ_DIR):
 
 ## Install packages to current environment with pip (venv recommended)
 requirements:
-	pip install -r requirements.txt
+	pip install -r requirements.txt && python -m spacy download en_core_web_sm
 
 RAW_DIR='data/raw'
 RAW_FILES=$(shell find $(RAW_DIR) -type f -name '*')

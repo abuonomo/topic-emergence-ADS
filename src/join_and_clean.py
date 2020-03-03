@@ -3,6 +3,8 @@ import logging
 import pandas as pd
 from pathlib import Path
 from tqdm import tqdm
+import spacy
+import pytextrank
 import json
 import RAKE
 from spacy.lang.en.stop_words import STOP_WORDS
@@ -13,6 +15,8 @@ import numpy as np
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
+
+NLP = spacy.load("en_core_web_sm")
 
 
 def load_records_to_dataframe(data_dir: Path, limit=None) -> pd.DataFrame:
@@ -50,7 +54,7 @@ def load_records_to_dataframe(data_dir: Path, limit=None) -> pd.DataFrame:
     return df
 
 
-def get_keywords_from_text(text: pd.Series) -> List[str]:
+def get_keywords_from_text(text: pd.Series) -> List:
     LOG.info(f"Extracting keywords from {text.shape[0]} documents.")
     tqdm.pandas()
     rake = RAKE.Rake(list(STOP_WORDS))
@@ -66,16 +70,35 @@ def get_keywords_from_text(text: pd.Series) -> List[str]:
     return rake_kwds
 
 
+def get_text_rank_kwds(text: pd.Series, batch_size=100) -> List:
+    LOG.info(f"Extracting keywords from {text.shape[0]} documents.")
+    tr = pytextrank.TextRank()
+    NLP.add_pipe(tr.PipelineComponent, name="textrank", last=True)
+    kwd_lists = []
+    pbar = tqdm(NLP.pipe(text.replace(np.nan, ''), batch_size=batch_size), total=len(text))
+    for doc in pbar:
+        kwds = [(p.text, p.rank) for p in doc._.phrases]
+        kwd_lists.append(kwds)
+        pbar.update(1)
+    return kwd_lists
+
+
 def write_records_to_db(df):
     db_loc = "astro2020.db"
     engine = create_engine(f"sqlite:///{db_loc}", echo=False)
     df.to_sql("ADS_records", con=engine, index=False)
 
 
-def main(in_records_dir, out_records, record_limit=None):
+def main(in_records_dir, out_records, record_limit=None, strategy='rake'):
     df = load_records_to_dataframe(in_records_dir, limit=record_limit)
-    text = df['title'] + ' || ' + df['abstract']
-    df['rake_kwds'] = get_keywords_from_text(text)
+    text = df['title'] + '. ' + df['abstract']
+    strats = ['rake', 'textrank']
+    assert strategy in strats, \
+        LOG.exception(f'{strategy} not in {strats}.')
+    if strategy == 'rake':
+        df['rake_kwds'] = get_keywords_from_text(text)
+    elif strategy == 'textrank':
+        df['rake_kwds'] = get_text_rank_kwds(text)
     LOG.info(f"Writing {len(df)} keywords to {out_records}.")
     df.to_json(out_records, orient='records', lines=True)
 
@@ -85,8 +108,9 @@ if __name__ == "__main__":
     parser.add_argument("i", help="input raw records dir", type=Path)
     parser.add_argument("o", help="output jsonslines collected keywords", type=Path)
     parser.add_argument("--limit", help="limit size of dataframe for testing", type=int)
+    parser.add_argument("--strategy", help="choose either rake or textrank keyword extraction", type=str)
     args = parser.parse_args()
     if args.limit == 0:
         LOG.debug("Received limit of 0. Setting to None.")
         args.limit = None
-    main(args.i, args.o, args.limit)
+    main(args.i, args.o, args.limit, args.strategy)

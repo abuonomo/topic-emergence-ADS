@@ -1,26 +1,10 @@
-BUCKET = hq-ocio-ci-bigdata/home/DataSquad/topic-emergence-ADS/
-PROFILE = moderate
+BUCKET=hq-ocio-ci-bigdata/home/DataSquad/topic-emergence-ADS/
+PROFILE=moderate
 RECIPES=python recipes.py
 
 # Set parameters depending on whether running test or full data
-ifeq ($(MODE), full)
-	EXP_NAME=full_02_14_2020
-    RECORDS_LOC=data/$(EXP_NAME)/rake_kwds.jsonl
-    LIMIT=0
-    MIN_THRESH=100
-    FREQ=250
-    SCORE=1.5
-    HARD=10000
-else
-	EXP_NAME=test_02_14_2020
-    RECORDS_LOC=data/$(EXP_NAME)/rake_kwds_small.jsonl
-    LIMIT=500
-    MIN_THRESH=500
-    FREQ=20
-    SCORE=1.5
-    HARD=10000
-    MODE=test
-endif
+CONFIG_FILE=config/example_small.mk
+include $(CONFIG_FILE)
 
 DATA_DIR=data/$(EXP_NAME)
 VIZ_DIR=reports/viz/$(EXP_NAME)
@@ -40,18 +24,19 @@ $(DATA_DIR) $(MODEL_DIR) $(VIZ_DIR):
 requirements:
 	pip install -r requirements.txt && python -m spacy download en_core_web_sm
 
-RAW_DIR='data/raw'
+RAW_DIR=data/raw
 RAW_FILES=$(shell find $(RAW_DIR) -type f -name '*')
+RECORDS_LOC=$(DATA_DIR)/kwds.jsonl
 ## Join all years and and use rake to extract keywords.
 join-and-clean: $(RECORDS_LOC)
-$(RECORDS_LOC): $(RAW_FILES)
+$(RECORDS_LOC): $(RAW_FILES) src/join_and_clean.py
 	mkdir -p $(DATA_DIR); \
 	mkdir -p $(MODEL_DIR); \
 	mkdir -p $(VIZ_DIR); \
 	python src/join_and_clean.py \
 		$(RAW_DIR) \
 		$(RECORDS_LOC) \
-		--limit $(LIMIT)
+		--limit $(LIMIT) --strategy $(STRATEGY)
 
 ALL_KWDS_LOC=$(DATA_DIR)/all_keywords.jsonl
 YEAR_COUNT_LOC=$(DATA_DIR)/year_counts.csv

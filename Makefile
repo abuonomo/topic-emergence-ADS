@@ -29,7 +29,7 @@ RAW_FILES=$(shell find $(RAW_DIR) -type f -name '*')
 RECORDS_LOC=$(DATA_DIR)/kwds.jsonl
 ## Join all years and and use rake to extract keywords.
 join-and-clean: $(RECORDS_LOC)
-$(RECORDS_LOC): $(RAW_FILES) src/join_and_clean.py
+$(RECORDS_LOC): $(RAW_FILES)
 	mkdir -p $(DATA_DIR); \
 	mkdir -p $(MODEL_DIR); \
 	mkdir -p $(VIZ_DIR); \
@@ -151,6 +151,35 @@ $(TMODEL_VIZ_LOC): $(TMODELS)
 		--tmodel_viz_loc $(TMODEL_VIZ_LOC)
 
 #========= Docker =========#
+
+## Build docker image for service, automatically labeling image with link to most recent commit
+PIPELINE_IMAGE_NAME=keyword-emergence-pipeline
+build:
+	export COMMIT=$$(git log -1 --format=%H); \
+	export REPO_URL=$$(git remote get-url $(GIT_REMOTE)); \
+	export REPO_DIR=$$(dirname $$REPO_URL); \
+	export BASE_NAME=$$(basename $$REPO_URL .git); \
+	export GIT_LOC=$$REPO_DIR/$$BASE_NAME/tree/$$COMMIT; \
+	export VERSION=$$(python version.py); \
+	echo $$GIT_LOC; \
+	docker build -t $(PIPELINE_IMAGE_NAME):$$VERSION \
+		--build-arg GIT_URL=$$GIT_LOC \
+		--build-arg VERSION=$$VERSION .
+
+## Push the docker image to storage.analytics.nasa.gov
+push:
+	export VERSION=$$(python version.py); \
+	docker tag $(PIPELINE_IMAGE_NAME):$$VERSION storage.analytics.nasa.gov/datasquad/$(PIPELINE_IMAGE_NAME):$$VERSION; \
+	docker tag $(PIPELINE_IMAGE_NAME):$$VERSION storage.analytics.nasa.gov/datasquad/$(PIPELINE_IMAGE_NAME):latest; \
+	docker push storage.analytics.nasa.gov/datasquad/$(PIPELINE_IMAGE_NAME):$$VERSION; \
+	docker push storage.analytics.nasa.gov/datasquad/$(PIPELINE_IMAGE_NAME):latest
+
+## Push docker image to storage.analytics.nasa.gov as stable version
+push-stable:
+	export VERSION=$$(python version.py); \
+	docker tag $(PIPELINE_IMAGE_NAME):$$VERSION storage.analytics.nasa.gov/datasquad/$(PIPELINE_IMAGE_NAME):stable; \
+	docker push storage.analytics.nasa.gov/datasquad/$(PIPELINE_IMAGE_NAME):latest
+
 
 IMAGE_NAME=keyword-emergence-visualizer
 GIT_REMOTE=origin

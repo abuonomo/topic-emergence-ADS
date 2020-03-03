@@ -1,0 +1,7 @@
+data/*
+references/*
+models/*
+runs/*
+scratch/*
+app/*
+__pycache__/*

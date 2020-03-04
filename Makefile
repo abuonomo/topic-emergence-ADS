@@ -4,6 +4,7 @@ RECIPES=python recipes.py
 
 # Set parameters depending on whether running test or full data
 BATCH_SIZE=1000
+N_PROCESS=1
 CONFIG_FILE=config/example_small.mk
 include $(CONFIG_FILE)
 
@@ -37,7 +38,8 @@ $(RECORDS_LOC): $(RAW_FILES)
 	python src/join_and_clean.py \
 		$(RAW_DIR) \
 		$(RECORDS_LOC) \
-		--limit $(LIMIT) --strategy $(STRATEGY) --batch_size $(BATCH_SIZE)
+		--limit $(LIMIT) --strategy $(STRATEGY) --batch_size $(BATCH_SIZE) \
+		--n_process $(N_PROCESS)
 
 ALL_KWDS_LOC=$(DATA_DIR)/all_keywords.jsonl
 YEAR_COUNT_LOC=$(DATA_DIR)/year_counts.csv

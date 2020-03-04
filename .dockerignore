@@ -1,4 +1,6 @@
 data/*
+*.tar.gz
+*.zip
 references/*
 models/*
 runs/*

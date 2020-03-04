@@ -17,6 +17,8 @@ LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
 
 NLP = spacy.load("en_core_web_sm")
+TR = pytextrank.TextRank()
+NLP.add_pipe(TR.PipelineComponent, name="textrank", last=True)
 
 
 def load_records_to_dataframe(data_dir: Path, limit=None) -> pd.DataFrame:
@@ -70,13 +72,11 @@ def get_keywords_from_text(text: pd.Series) -> List:
     return rake_kwds
 
 
-def get_text_rank_kwds(text: pd.Series, batch_size=1000) -> List:
+def get_text_rank_kwds(text: pd.Series, batch_size=1000, n_process=1) -> List:
     LOG.info(f"Extracting keywords from {text.shape[0]} documents.")
-    tr = pytextrank.TextRank()
-    NLP.add_pipe(tr.PipelineComponent, name="textrank", last=True)
     kwd_lists = []
     pbar = tqdm(
-        NLP.pipe(text.replace(np.nan, ""), batch_size=batch_size, n_threads=-1),
+        NLP.pipe(text.replace(np.nan, ""), batch_size=batch_size, n_process=n_process),
         total=len(text),
     )
     for doc in pbar:
@@ -93,7 +93,12 @@ def write_records_to_db(df):
 
 
 def main(
-    in_records_dir, out_records, record_limit=None, strategy="rake", batch_size=1000
+    in_records_dir,
+    out_records,
+    record_limit=None,
+    strategy="rake",
+    batch_size=1000,
+    n_process=1,
 ):
     df = load_records_to_dataframe(in_records_dir, limit=record_limit)
     text = df["title"] + ". " + df["abstract"]
@@ -102,7 +107,7 @@ def main(
     if strategy == "rake":
         df["rake_kwds"] = get_keywords_from_text(text)
     elif strategy == "textrank":
-        df["rake_kwds"] = get_text_rank_kwds(text, batch_size)
+        df["rake_kwds"] = get_text_rank_kwds(text, batch_size, n_process)
     LOG.info(f"Writing {len(df)} keywords to {out_records}.")
     df.to_json(out_records, orient="records", lines=True)
 
@@ -121,8 +126,14 @@ if __name__ == "__main__":
         type=int,
         default=1000,
     )
+    parser.add_argument(
+        "--n_process",
+        help="If textrank, choose nlp.pipe number of processes",
+        type=int,
+        default=1,
+    )
     args = parser.parse_args()
     if args.limit == 0:
         LOG.debug("Received limit of 0. Setting to None.")
         args.limit = None
-    main(args.i, args.o, args.limit, args.strategy, args.batch_size)
+    main(args.i, args.o, args.limit, args.strategy, args.batch_size, args.n_process)

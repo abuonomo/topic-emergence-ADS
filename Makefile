@@ -3,6 +3,7 @@ PROFILE=moderate
 RECIPES=python recipes.py
 
 # Set parameters depending on whether running test or full data
+BATCH_SIZE=1000
 CONFIG_FILE=config/example_small.mk
 include $(CONFIG_FILE)
 
@@ -36,7 +37,7 @@ $(RECORDS_LOC): $(RAW_FILES)
 	python src/join_and_clean.py \
 		$(RAW_DIR) \
 		$(RECORDS_LOC) \
-		--limit $(LIMIT) --strategy $(STRATEGY)
+		--limit $(LIMIT) --strategy $(STRATEGY) --batch_size $(BATCH_SIZE)
 
 ALL_KWDS_LOC=$(DATA_DIR)/all_keywords.jsonl
 YEAR_COUNT_LOC=$(DATA_DIR)/year_counts.csv
@@ -165,6 +166,7 @@ build:
 	docker build -t $(PIPELINE_IMAGE_NAME):$$VERSION \
 		--build-arg GIT_URL=$$GIT_LOC \
 		--build-arg VERSION=$$VERSION .; \
+	docker tag $(PIPELINE_IMAGE_NAME):$$VERSION $(PIPELINE_IMAGE_NAME):latest; \
 	docker tag $(PIPELINE_IMAGE_NAME):$$VERSION storage.analytics.nasa.gov/datasquad/$(PIPELINE_IMAGE_NAME):$$VERSION; \
 	docker tag $(PIPELINE_IMAGE_NAME):$$VERSION storage.analytics.nasa.gov/datasquad/$(PIPELINE_IMAGE_NAME):latest; \
 

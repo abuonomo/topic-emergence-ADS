@@ -1,4 +1,6 @@
 data/*
+*.zip
+*.tar.gz
 config/*
 !config/example.mk
 !config/example_small.mk

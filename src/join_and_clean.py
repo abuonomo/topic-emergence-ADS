@@ -49,7 +49,7 @@ def load_records_to_dataframe(data_dir: Path, limit=None) -> pd.DataFrame:
     LOG.info("Concatenating dataframes.")
     df = pd.concat(records, sort=False)
     df = df.reset_index(drop=True)
-    df['title'] = df['title'].apply(lambda x: x[0] if type(x) == list else x)
+    df["title"] = df["title"].apply(lambda x: x[0] if type(x) == list else x)
     LOG.info(f"Loaded dataframe with shape: {df.shape}")
     return df
 
@@ -70,12 +70,15 @@ def get_keywords_from_text(text: pd.Series) -> List:
     return rake_kwds
 
 
-def get_text_rank_kwds(text: pd.Series, batch_size=100) -> List:
+def get_text_rank_kwds(text: pd.Series, batch_size=1000) -> List:
     LOG.info(f"Extracting keywords from {text.shape[0]} documents.")
     tr = pytextrank.TextRank()
     NLP.add_pipe(tr.PipelineComponent, name="textrank", last=True)
     kwd_lists = []
-    pbar = tqdm(NLP.pipe(text.replace(np.nan, ''), batch_size=batch_size), total=len(text))
+    pbar = tqdm(
+        NLP.pipe(text.replace(np.nan, ""), batch_size=batch_size, n_threads=-1),
+        total=len(text),
+    )
     for doc in pbar:
         kwds = [(p.text, p.rank) for p in doc._.phrases]
         kwd_lists.append(kwds)
@@ -89,18 +92,19 @@ def write_records_to_db(df):
     df.to_sql("ADS_records", con=engine, index=False)
 
 
-def main(in_records_dir, out_records, record_limit=None, strategy='rake'):
+def main(
+    in_records_dir, out_records, record_limit=None, strategy="rake", batch_size=1000
+):
     df = load_records_to_dataframe(in_records_dir, limit=record_limit)
-    text = df['title'] + '. ' + df['abstract']
-    strats = ['rake', 'textrank']
-    assert strategy in strats, \
-        LOG.exception(f'{strategy} not in {strats}.')
-    if strategy == 'rake':
-        df['rake_kwds'] = get_keywords_from_text(text)
-    elif strategy == 'textrank':
-        df['rake_kwds'] = get_text_rank_kwds(text)
+    text = df["title"] + ". " + df["abstract"]
+    strats = ["rake", "textrank"]
+    assert strategy in strats, LOG.exception(f"{strategy} not in {strats}.")
+    if strategy == "rake":
+        df["rake_kwds"] = get_keywords_from_text(text)
+    elif strategy == "textrank":
+        df["rake_kwds"] = get_text_rank_kwds(text, batch_size)
     LOG.info(f"Writing {len(df)} keywords to {out_records}.")
-    df.to_json(out_records, orient='records', lines=True)
+    df.to_json(out_records, orient="records", lines=True)
 
 
 if __name__ == "__main__":
@@ -108,9 +112,17 @@ if __name__ == "__main__":
     parser.add_argument("i", help="input raw records dir", type=Path)
     parser.add_argument("o", help="output jsonslines collected keywords", type=Path)
     parser.add_argument("--limit", help="limit size of dataframe for testing", type=int)
-    parser.add_argument("--strategy", help="choose either rake or textrank keyword extraction", type=str)
+    parser.add_argument(
+        "--strategy", help="choose either rake or textrank keyword extraction", type=str
+    )
+    parser.add_argument(
+        "--batch_size",
+        help="If textrank, choose nlp.pipe batch size",
+        type=int,
+        default=1000,
+    )
     args = parser.parse_args()
     if args.limit == 0:
         LOG.debug("Received limit of 0. Setting to None.")
         args.limit = None
-    main(args.i, args.o, args.limit, args.strategy)
+    main(args.i, args.o, args.limit, args.strategy, args.batch_size)

@@ -63,7 +63,10 @@ alias emerge='docker run -it --rm \
 ```
 Then, just run `emerge` to see all the Makefile options.
 
-
+You might have to assure that the docker container's user has the right permissions on the attached volumes. You could do this by changing the owner of these directories, using the uid of the container's user (999):
+```bash
+chown -R 999:999 config/ data/ models/ reports/
+```
 ## App
 To just run the app from a docker image, first pull or build the keyword-emergence-visualizer docker image (Dockerfile [here](app/Dockerfile)). You can see available image tags [here](https://storage.analytics.nasa.gov/repository/datasquad/keyword-emergence-visualizer). For example, you can pull the `latest` image with:
  ```

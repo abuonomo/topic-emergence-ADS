@@ -52,7 +52,7 @@ You can run the data pipeline with docker, by either building or pulling the ima
 ```bash
 docker pull storage.analytics.nasa.gov/datasquad/keyword-emergence-pipeline:latest
 ```
-You can then see the make options with:
+You could alias the docker run command like so:
 ```bash
 alias emerge='docker run -it --rm \
     -v $(pwd)/config:/home/config \
@@ -61,8 +61,9 @@ alias emerge='docker run -it --rm \
     -v $(pwd)/reports:/home/reports \
     storage.analytics.nasa.gov/datasquad/keyword-emergence-pipeline:latest'
 ```
+Then, just run `emerge` to see all the Makefile options.
 
- 
+
 ## App
 To just run the app from a docker image, first pull or build the keyword-emergence-visualizer docker image (Dockerfile [here](app/Dockerfile)). You can see available image tags [here](https://storage.analytics.nasa.gov/repository/datasquad/keyword-emergence-visualizer). For example, you can pull the `latest` image with:
  ```

@@ -164,13 +164,13 @@ build:
 	echo $$GIT_LOC; \
 	docker build -t $(PIPELINE_IMAGE_NAME):$$VERSION \
 		--build-arg GIT_URL=$$GIT_LOC \
-		--build-arg VERSION=$$VERSION .
+		--build-arg VERSION=$$VERSION .; \
+	docker tag $(PIPELINE_IMAGE_NAME):$$VERSION storage.analytics.nasa.gov/datasquad/$(PIPELINE_IMAGE_NAME):$$VERSION; \
+	docker tag $(PIPELINE_IMAGE_NAME):$$VERSION storage.analytics.nasa.gov/datasquad/$(PIPELINE_IMAGE_NAME):latest; \
 
 ## Push the docker image to storage.analytics.nasa.gov
 push:
 	export VERSION=$$(python version.py); \
-	docker tag $(PIPELINE_IMAGE_NAME):$$VERSION storage.analytics.nasa.gov/datasquad/$(PIPELINE_IMAGE_NAME):$$VERSION; \
-	docker tag $(PIPELINE_IMAGE_NAME):$$VERSION storage.analytics.nasa.gov/datasquad/$(PIPELINE_IMAGE_NAME):latest; \
 	docker push storage.analytics.nasa.gov/datasquad/$(PIPELINE_IMAGE_NAME):$$VERSION; \
 	docker push storage.analytics.nasa.gov/datasquad/$(PIPELINE_IMAGE_NAME):latest
 

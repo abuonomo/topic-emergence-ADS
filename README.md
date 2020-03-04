@@ -45,6 +45,23 @@ The pipeline process is as follows:
 5. Finally, a flask app can run which displays a scatter plot with each keyword time series as a point. The axes are each one of the extracted time series features. The bubbles are sized by the log of their counts and colored by their dynamic time warp kmeans cluster (`link-data-to-app`, `app`).
 
 See list of all options with descriptions by running `make`.
+
+### With Docker
+
+You can run the data pipeline with docker, by either building or pulling the image. For example, pulling the image:
+```bash
+docker pull storage.analytics.nasa.gov/datasquad/keyword-emergence-pipeline:latest
+```
+You can then see the make options with:
+```bash
+alias emerge='docker run -it --rm \
+    -v $(pwd)/config:/home/config \
+    -v $(pwd)/data:/home/data \
+    -v $(pwd)/models:/home/models \
+    -v $(pwd)/reports:/home/reports \
+    storage.analytics.nasa.gov/datasquad/keyword-emergence-pipeline:latest'
+```
+
  
 ## App
 To just run the app from a docker image, first pull or build the keyword-emergence-visualizer docker image (Dockerfile [here](app/Dockerfile)). You can see available image tags [here](https://storage.analytics.nasa.gov/repository/datasquad/keyword-emergence-visualizer). For example, you can pull the `latest` image with:

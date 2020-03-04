@@ -1,4 +1,7 @@
 data/*
+config/*
+!config/example.mk
+!config/example_small.mk
 my_env/*
 *.jsonl
 models/*

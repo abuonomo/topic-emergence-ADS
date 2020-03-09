@@ -5,6 +5,7 @@ RECIPES=python recipes.py
 # Set parameters depending on whether running test or full data
 BATCH_SIZE=1000
 N_PROCESS=1
+MIN_THRESH=100
 CONFIG_FILE=config/example_small.mk
 include $(CONFIG_FILE)
 
@@ -49,7 +50,12 @@ $(ALL_KWDS_LOC) $(YEAR_COUNT_LOC): $(RECORDS_LOC)
 	$(RECIPES) docs-to-keywords-df \
 		--infile $(RECORDS_LOC) \
 		--outfile $(ALL_KWDS_LOC) \
-		--out_years $(YEAR_COUNT_LOC)
+		--out_years $(YEAR_COUNT_LOC) \
+		--min_thresh $(MIN_THRESH)
+
+bootstrap: $(RECORDS_LOC)
+	python src/bootstrapping.py $(RECORDS_LOC)
+
 
 FILT_KWDS_LOC=$(DATA_DIR)/all_keywords_threshold_$(FREQ)_$(SCORE)_$(HARD).jsonl
 ## Filter keywords by total frequency and rake score. Also provide hard limit.

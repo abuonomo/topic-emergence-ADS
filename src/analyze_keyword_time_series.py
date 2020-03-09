@@ -124,12 +124,13 @@ def plot_gm_bics(dtw_df, out_plot, c_min=2, c_max=20):
     plt.clf()
 
 
-def dtw_to_manifold(dtw_df, out_plot):
+def dtw_to_manifold(dtw_df, out_plot=None):
     LOG.info("Computing tsne manifold.")
     viz = Manifold(manifold="tsne")
     dtw_man = viz.fit_transform(dtw_df)  # Fit the data to the visualizer
-    LOG.info(f"Writing tsne manifold plot to {out_plot}.")
-    viz.show(out_plot)  # Finalize and render the figure
+    if out_plot is not None:
+        LOG.info(f"Writing tsne manifold plot to {out_plot}.")
+        viz.show(out_plot)  # Finalize and render the figure
     return dtw_man
 
 
@@ -198,7 +199,7 @@ def plot_slop_complex(se_df, viz_dir, x_measure="slope", y_measure="complexity")
     ipv.save(out_vol_viz)
 
 
-def filter_kwds(kwd_df, out_loc, threshold=50, score_thresh=1.3, hard_limit=10_000):
+def filter_kwds(kwd_df, threshold=50, score_thresh=1.3, hard_limit=10_000):
     LOG.info(f"Only getting keywords which occur in more than {threshold} docs.")
     lim_kwd_df = (
         kwd_df.query(f"doc_id_count > {threshold}")
@@ -206,12 +207,10 @@ def filter_kwds(kwd_df, out_loc, threshold=50, score_thresh=1.3, hard_limit=10_0
         .sort_values("rake_score_mean", ascending=False)
         .iloc[0:hard_limit]
     )
-    LOG.info(f"Writing dataframe with size {lim_kwd_df.shape[0]} to {out_loc}.")
-    lim_kwd_df.to_json(out_loc, orient="records", lines=True)
     return lim_kwd_df
 
 
-def slope_count_complexity(lim_kwd_df, out_csv):
+def slope_count_complexity(lim_kwd_df):
     only_years = lim_kwd_df.iloc[:, 5:]
 
     f2 = lambda x: fc.mean_change(x[~x.isna()])
@@ -226,9 +225,7 @@ def slope_count_complexity(lim_kwd_df, out_csv):
     features["count"] = lim_kwd_df["doc_id_count"]
     features["stem"] = lim_kwd_df["stem"]
     features["mean_change_nan_before_exist"] = only_years.apply(f2, axis=1)
-
-    LOG.info(f"Writing time series features to {out_csv}")
-    features.to_csv(out_csv)
+    return features
 
 
 def main(in_dir: Path):

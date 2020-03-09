@@ -153,6 +153,7 @@ N_TOPICS=7
 visualize-topic-models: $(TMODEL_VIZ_LOC)
 $(TMODEL_VIZ_LOC): $(TMODELS)
 	$(RECIPES) visualize-topic-models \
+		--infile $(RECORDS_LOC) \
 		--tmodel_dir $(TMODEL_DIR) \
 		--n $(N_TOPICS) \
 		--mlb_loc $(MULT_LAB_BIN_LOC) \

@@ -1,5 +1,6 @@
 data/*
 *.zip
+dask-worker-space/
 *.tar.gz
 config/*
 !config/example.mk

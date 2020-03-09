@@ -29,7 +29,7 @@ def write_syn_file(out_syn_file, lim_sg):
                 f0.write("\n")
 
 
-def get_kwd_occurences(df, min_tresh=5):
+def get_kwd_occurences(df, min_thresh=5, max_thresh=0.7):
     LOG.info("Flattening along document rake_kwds.")
     df = df.copy()
     df = df.applymap(lambda x: np.nan if x is None else x)
@@ -42,11 +42,13 @@ def get_kwd_occurences(df, min_tresh=5):
     kwd_df["year"] = df.loc[kwd_df["doc_id"], "year"].tolist()
     ta = df["title"] + "||" + df["abstract"]  # pass this from join func
     ta = ta[ta.apply(lambda x: type(x) == str)]
-
+    n_docs = len(kwd_df.doc_id.unique())
+    max_thresh_int = np.ceil(max_thresh * n_docs)
     kwds = (
         kwd_df.groupby("keyword")
-        .agg({"keyword": "count"})
-        .query(f"keyword > {min_tresh}")
+        .count()
+        .query(f"doc_id > {min_thresh}")
+        .query(f"doc_id < {max_thresh_int}")
         .index
     )
 

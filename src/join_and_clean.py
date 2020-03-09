@@ -80,6 +80,7 @@ def get_text_rank_kwds(text: pd.Series, batch_size=1000, n_process=1) -> List:
         total=len(text),
     )
     for doc in pbar:
+        import ipdb; ipdb.set_trace()
         kwds = [(p.text, p.rank) for p in doc._.phrases]
         kwd_lists.append(kwds)
         pbar.update(1)

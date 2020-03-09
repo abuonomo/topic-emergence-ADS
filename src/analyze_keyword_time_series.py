@@ -139,11 +139,7 @@ def dtw_to_tboard(normed_kwd_years, dtw_df, c=6, lim=1000):
     # TODO: Used elbow to determine, but not being placed programmatically
     LOG.info(f"Performing kmeans with {c} clusters.")
     m = KMeans(n_clusters=c)
-    # m = GaussianMixture(n_components=c)
     m.fit(dtw_df.values)
-
-    images = get_fig_images(normed_kwd_years[0:lim])
-    to_tboard(dtw_df, m, images, lim)
     return m
 
 

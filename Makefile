@@ -31,7 +31,7 @@ RAW_DIR=data/raw
 RAW_FILES=$(shell find $(RAW_DIR) -type f -name '*')
 RECORDS_LOC=$(DATA_DIR)/kwds.jsonl
 ## Join all years and and use rake to extract keywords.
-join-and-clean: $(RECORDS_LOC)
+join-and-clean: $(RECORDS_LOC) $(CONFIG_FILE)
 $(RECORDS_LOC): $(RAW_FILES)
 	mkdir -p $(DATA_DIR); \
 	mkdir -p $(MODEL_DIR); \

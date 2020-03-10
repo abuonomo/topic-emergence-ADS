@@ -101,6 +101,7 @@ def stem_kwds(df):
     p = PorterStemmer()
     kwd_to_stem = {kwd: p.stem(kwd) for kwd in tqdm(unq_kwds)}
     tqdm.pandas()
+    # Could also remove start with s here, also could resolve the
     df["stem"] = df["keyword"].progress_apply(lambda x: kwd_to_stem[x].lower().strip())
     return df
 

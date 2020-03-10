@@ -1,16 +1,18 @@
 import argparse
-import logging
-import pandas as pd
-from pathlib import Path
-from tqdm import tqdm
-import spacy
-import pytextrank
 import json
+import logging
+from pathlib import Path
+from typing import List
+from xml.sax.saxutils import unescape
+
 import RAKE
+import numpy as np
+import pandas as pd
+import pytextrank
+import spacy
 from spacy.lang.en.stop_words import STOP_WORDS
 from sqlalchemy import create_engine
-from typing import List
-import numpy as np
+from tqdm import tqdm
 
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
@@ -103,6 +105,7 @@ def main(
 ):
     df = load_records_to_dataframe(in_records_dir, limit=record_limit)
     text = df["title"] + ". " + df["abstract"]
+    text = text.apply(unescape)
     strats = ["rake", "textrank"]
     assert strategy in strats, LOG.exception(f"{strategy} not in {strats}.")
     if strategy == "rake":

@@ -164,7 +164,8 @@ def dtw_viz(norm_loc, dtw_loc, kmeans_loc, out_man_plot, out_man_points):
     LOG.info(f"Reading dynamic time warp distances from {dtw_loc}.")
     dtw_df = pd.read_csv(dtw_loc, index_col=0)
 
-    kwd_years = kwds_df.set_index("stem").iloc[:, 5:]
+    kwd_years = kwds_df.set_index("stem").iloc[:, 6:]
+    # TODO: get years in different way, pulling out index by number is inflexible.
     kmeans = dtw_to_tboard(kwd_years, dtw_df, c=7)  # c taken from elbow viz
     dtw_man = dtw_to_manifold(dtw_df, out_man_plot)
 

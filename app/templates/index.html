@@ -38,6 +38,7 @@
     <div style="width: 100%; overflow: hidden;">
       <div id="views" style="width: 100px; float: left; margin-top: 50px">
         <div class="btn-group">
+          <button id="cagrNasaafil">CAGR vs NASA Affiliation</button>
           <button id="manifold">manifold</button>
           <button id="maxSkew">First max location vs skewness</button>
           <button id="changeComplex">mean change vs complexity</button>
@@ -726,6 +727,13 @@
       }
 
       // Saved views
+      d3.select("#cagrNasaafil").on("click", function (d) {
+                let x = 'nasa_afil';
+                let y = 'cagr';
+                return scatterRequestPlot(d, x, y);
+              }
+      );
+
       d3.select("#manifold").on("click", function (d) {
           let x = 'manifold_x';
           let y = 'manifold_y';
@@ -746,6 +754,7 @@
                 return scatterRequestPlot(d, x, y);
               }
       );
+
 
     </script>
   <footer id="footerInfo">

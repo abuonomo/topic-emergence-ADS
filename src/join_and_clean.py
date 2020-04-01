@@ -82,7 +82,6 @@ def get_text_rank_kwds(text: pd.Series, batch_size=1000, n_process=1) -> List:
         total=len(text),
     )
     for doc in pbar:
-        import ipdb; ipdb.set_trace()
         kwds = [(p.text, p.rank) for p in doc._.phrases]
         kwd_lists.append(kwds)
         pbar.update(1)
@@ -104,8 +103,9 @@ def main(
     n_process=1,
 ):
     df = load_records_to_dataframe(in_records_dir, limit=record_limit)
+    df = df.dropna(subset=["abstract", "year", "nasa_afil", "title"])
     text = df["title"] + ". " + df["abstract"]
-    text = text.apply(unescape)
+    text = text.apply(unescape).astype(str)
     strats = ["rake", "textrank"]
     assert strategy in strats, LOG.exception(f"{strategy} not in {strats}.")
     if strategy == "rake":

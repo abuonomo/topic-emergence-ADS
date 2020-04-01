@@ -6,8 +6,9 @@ RECIPES=python recipes.py
 BATCH_SIZE=1000
 N_PROCESS=1
 MIN_THRESH=100
+RAW_DIR=data/raw
 CONFIG_FILE=config/example_small.mk
-include $(CONFIG_FILE)
+include $(CONFIG_FILE) # This file may overwrite some defaults variables above
 
 DATA_DIR=data/$(EXP_NAME)
 VIZ_DIR=reports/viz/$(EXP_NAME)
@@ -27,7 +28,6 @@ $(DATA_DIR) $(MODEL_DIR) $(VIZ_DIR):
 requirements:
 	pip install -r requirements.txt && python -m spacy download en_core_web_sm
 
-RAW_DIR=data/raw
 RAW_FILES=$(shell find $(RAW_DIR) -type f -name '*')
 RECORDS_LOC=$(DATA_DIR)/kwds.jsonl
 ## Join all years and and use rake to extract keywords.
@@ -162,8 +162,8 @@ $(TMODEL_VIZ_LOC): $(TMODELS)
 
 #========= Docker =========#
 
-## Build docker image for service, automatically labeling image with link to most recent commit
 PIPELINE_IMAGE_NAME=keyword-emergence-pipeline
+## Build docker image for service, automatically labeling image with link to most recent commit
 build:
 	export COMMIT=$$(git log -1 --format=%H); \
 	export REPO_URL=$$(git remote get-url $(GIT_REMOTE)); \

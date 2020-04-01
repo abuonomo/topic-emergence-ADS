@@ -107,7 +107,7 @@ def _trans_time(ts, kwd, clus):
 def get_time_data():
     data = request.json
     LOG.info(f'Getting time data for {data}.')
-    ts = app.config["N_DF"].query(f'stem == "{data["stem"]}"').iloc[:, 5:]
+    ts = app.config["N_DF"].query(f'stem == "{data["stem"]}"').iloc[:, 6:]
     ts = ts.T
     ts_recs = _trans_time(ts, data["stem"], data["kmeans_cluster"])
     return jsonify(ts_recs)

@@ -206,8 +206,14 @@ def filter_kwds(kwd_df, threshold=50, score_thresh=1.3, hard_limit=10_000):
     return lim_kwd_df
 
 
+def cagr(x):
+    x = x[~x.isna()]
+    return (x[-1] / x[0]) ** (1/len(x)) - 1
+
+
 def slope_count_complexity(lim_kwd_df):
-    only_years = lim_kwd_df.iloc[:, 5:]
+    only_years = lim_kwd_df.iloc[:, 6:]
+    # TODO: using an index by number here is quite inflexible to change. Fix it.
 
     f2 = lambda x: fc.mean_change(x[~x.isna()])
     trans_t = (
@@ -220,7 +226,9 @@ def slope_count_complexity(lim_kwd_df):
     features = extract_features(trans_t.fillna(0), column_id="index", column_sort="year")
     features["count"] = lim_kwd_df["doc_id_count"]
     features["stem"] = lim_kwd_df["stem"]
+    features["nasa_afil"] = lim_kwd_df["nasa_afil"]
     features["mean_change_nan_before_exist"] = only_years.apply(f2, axis=1)
+    features["cagr"] = only_years.apply(cagr, axis=1)
     return features
 
 

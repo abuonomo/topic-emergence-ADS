@@ -40,6 +40,7 @@ def get_kwd_occurences(df, min_thresh=5, max_thresh=0.7):
     kwd_df = pd.DataFrame(all_kwds)
     kwd_df.columns = ["doc_id", "keyword", "rake_score"]
     kwd_df["year"] = df.loc[kwd_df["doc_id"], "year"].tolist()
+    kwd_df["nasa_afil"] = df.loc[kwd_df["doc_id"], "nasa_afil"].tolist()
     ta = df["title"] + "||" + df["abstract"]  # pass this from join func
     ta = ta[ta.apply(lambda x: type(x) == str)]
     n_docs = len(kwd_df.doc_id.unique())
@@ -61,25 +62,26 @@ def get_kwd_occurences(df, min_thresh=5, max_thresh=0.7):
     dke = doc_to_kwds.explode().reset_index()
     dke.columns = ["doc_id", "keyword"]
     LOG.info("Filling years column.")
-    doc_to_year = kwd_df.groupby("doc_id").agg({"year": lambda x: x[0]})
+    doc_to_year = kwd_df.groupby("doc_id").agg(
+        {"year": lambda x: x[0], "nasa_afil": lambda x: x[0]}
+    )
     dke["rake_score"] = np.nan
     dke["keyword"] = dke["keyword"].astype(str)
     ys = doc_to_year.loc[dke["doc_id"], "year"].tolist()
+    nasa_afil = doc_to_year.loc[dke["doc_id"], "nasa_afil"].tolist()
     LOG.info(f"Years with len: {len(ys)}")
     dke["year"] = ys
+    dke["nasa_afil"] = nasa_afil
     LOG.info(f"dke with len: {len(dke)}")
     overlap_inds = pd.merge(dke.reset_index(), kwd_df, on=["doc_id", "keyword"])[
         "index"
     ]
     sdke = dke[~dke.index.isin(overlap_inds)]
     c_df = pd.concat([sdke, kwd_df]).sort_values("doc_id").reset_index(drop=True)
-    tmp_c_loc = Path('tmp_c_df.jsonl')
-    LOG.info(f'Outputting to {tmp_c_loc}')
-    c_df.to_json(tmp_c_loc, orient='records', lines=True)
-    na_ind = c_df['year'].isna()
+    na_ind = c_df["year"].isna()
     LOG.info(f"Remove {sum(na_ind)} keywords with NaN years.")
     c_df = c_df[~na_ind]
-    c_df['year'] = c_df['year'].astype(int)
+    c_df["year"] = c_df["year"].astype(int)
     return c_df
 
 
@@ -109,6 +111,7 @@ def stem_kwds(df):
 def get_stem_aggs(df):
     LOG.debug("Aggregating by stems")
     df = df.copy()
+    df["nasa_afil"] = df["nasa_afil"].apply(lambda x: 1 if x == "YES" else 0)
     years = np.sort(df["year"].unique())
     year_count_dict = {c: "sum" for c in years if not np.isnan(c)}
     df = df.groupby("stem").agg(
@@ -117,12 +120,15 @@ def get_stem_aggs(df):
                 "rake_score": "mean",
                 "doc_id": ["count", list],
                 "keyword": lambda x: list(set(x)),
+                "nasa_afil": lambda x: x.sum() / len(x),
             },
             **year_count_dict,
         }
     )
     df.columns = [f"{c}_{v}" for c, v in df.columns.values]
-    df = df.rename(columns={'keyword_<lambda>': 'keyword_list'})
+    df = df.rename(
+        columns={"keyword_<lambda>": "keyword_list", "nasa_afil_<lambda>": "nasa_afil"}
+    )
     return df
 
 
@@ -180,7 +186,7 @@ def flatten_to_keywords(df, min_thresh=5):
     LOG.info(f"Limiting to documents in database {allowed_db}")
     df = df[df["database"].apply(lambda x: allowed_db in x)]
     na_years = df["year"].isna()
-    LOG.info(f'Remove {sum(na_years)} rows with NaN years.')
+    LOG.info(f"Remove {sum(na_years)} rows with NaN years.")
     df = df[~na_years]
     kwd_df = (
         df.pipe(get_kwd_occurences, min_thresh)

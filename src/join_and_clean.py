@@ -107,7 +107,8 @@ def main(
     text = df["title"] + ". " + df["abstract"]
     text = text.apply(unescape).astype(str)
     strats = ["rake", "textrank"]
-    assert strategy in strats, LOG.exception(f"{strategy} not in {strats}.")
+    if strategy not in strats:
+        raise ValueError(f"{strategy} not in {strats}.")
     if strategy == "rake":
         df["rake_kwds"] = get_keywords_from_text(text)
     elif strategy == "textrank":

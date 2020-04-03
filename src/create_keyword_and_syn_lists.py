@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import spacy
 from nltk.stem import PorterStemmer
+from pandarallel import pandarallel
 from scipy.spatial.distance import euclidean
 from sklearn.preprocessing import LabelBinarizer, MinMaxScaler
 from tqdm import tqdm
@@ -15,6 +16,7 @@ LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
 
 NLP = spacy.load("en_core_web_sm")
+pandarallel.initialize()
 
 
 def write_syn_file(out_syn_file, lim_sg):
@@ -58,7 +60,7 @@ def get_kwd_occurences(df, min_thresh=5, max_thresh=0.7):
     # locations. Only says keyword is present if it passes through RAKE.
     tqdm.pandas()
     LOG.info("Going back through dataset to find keyword doc_id locations.")
-    doc_to_kwds = ta.progress_apply(lambda x: [k for k in kwds if k in x])
+    doc_to_kwds = ta.parallel_apply(lambda x: [k for k in kwds if k in x])
     dke = doc_to_kwds.explode().reset_index()
     dke.columns = ["doc_id", "keyword"]
     LOG.info("Filling years column.")
@@ -67,8 +69,8 @@ def get_kwd_occurences(df, min_thresh=5, max_thresh=0.7):
     )
     dke["rake_score"] = np.nan
     dke["keyword"] = dke["keyword"].astype(str)
-    ys = doc_to_year.loc[dke["doc_id"], "year"].tolist()
-    nasa_afil = doc_to_year.loc[dke["doc_id"], "nasa_afil"].tolist()
+    ys = doc_to_year.reindex(dke["doc_id"])["year"].tolist()
+    nasa_afil = doc_to_year.reindex(dke["doc_id"])["nasa_afil"].tolist()
     LOG.info(f"Years with len: {len(ys)}")
     dke["year"] = ys
     dke["nasa_afil"] = nasa_afil
@@ -104,7 +106,7 @@ def stem_kwds(df):
     kwd_to_stem = {kwd: p.stem(kwd) for kwd in tqdm(unq_kwds)}
     tqdm.pandas()
     # Could also remove start with s here, also could resolve the
-    df["stem"] = df["keyword"].progress_apply(lambda x: kwd_to_stem[x].lower().strip())
+    df["stem"] = df["keyword"].parallel_apply(lambda x: kwd_to_stem[x].lower().strip())
     return df
 
 

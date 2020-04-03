@@ -14,6 +14,7 @@ DATA_DIR=data/$(EXP_NAME)
 VIZ_DIR=reports/viz/$(EXP_NAME)
 MODEL_DIR=models/$(EXP_NAME)
 
+
 .PHONY: join-and-clean docs-to-keywords-df get-filtered-kwds normalize-keyword-freqs \
 		slope-complexity dtw cluster-tests dtw-viz \
 		make-topic-models visualize-topic-models app
@@ -191,6 +192,20 @@ push-stable:
 	docker tag $(PIPELINE_IMAGE_NAME):$$VERSION storage.analytics.nasa.gov/datasquad/$(PIPELINE_IMAGE_NAME):stable; \
 	docker push storage.analytics.nasa.gov/datasquad/$(PIPELINE_IMAGE_NAME):latest
 
+## Save the docker image locally
+save:
+	docker save $(PIPELINE_IMAGE_NAME):latest | gzip > $(PIPELINE_IMAGE_NAME)_latest.tar.gz
+
+# Server name here references an entry in the ~/.ssh/config file
+SERVER_NAME=compute-ml
+## Upload docker image to server
+upload:
+	scp $(PIPELINE_IMAGE_NAME)_latest.tar.gz \
+		compute-ml:/home/ubuntu/projects/keyword-emergence/$(PIPELINE_IMAGE_NAME)_latest.tar.gz
+
+## Load docker image on remote server from local file which was uploaded
+load:
+	ssh compute-ml "cd /home/ubuntu/projects/keyword-emergence/ && docker load < $(PIPELINE_IMAGE_NAME)_latest.tar.gz"
 
 IMAGE_NAME=keyword-emergence-visualizer
 GIT_REMOTE=origin

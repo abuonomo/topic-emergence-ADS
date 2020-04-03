@@ -15,7 +15,7 @@ See all options by going to root of this repository and running `make`.
  - Python 3.7. Tested on Python 3.7.6.
  - [Docker](https://www.docker.com/). Tested on `Docker version 19.03.5, build 633a0ea`.
 
-First, you will want to be working in a virtual environement. For example, you could make one using python's [built-in venv module](https://docs.python.org/3/library/venv.html).
+First, you will want to be working in a virtual environment. For example, you could make one using python's [built-in venv module](https://docs.python.org/3/library/venv.html).
 ```bash
 python -m venv my_env
 ```

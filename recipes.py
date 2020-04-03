@@ -49,6 +49,23 @@ def docs_to_keywords_df(infile, outfile, out_years, min_thresh):
 
     LOG.info(f"Reading keywords from {infile}.")
     df = pd.read_json(infile, orient="records", lines=True)
+    df = df.drop(
+        [
+            "arxiv_class",
+            "alternate_bibcode",
+            "bibcode",
+            "keyword",
+            "ack",
+            "aff",
+            "bibstem",
+            "aff_id",
+            "citation_count",
+        ],
+        axis=1,
+    )
+    df['title'] = df['title'].astype(str)
+    df['abstract'] = df['abstract'].astype(str)
+    df['year'] = df['year'].astype(int)
     kwd_df, year_counts = flatten_to_keywords(df, min_thresh)
     LOG.info(f"Writing out all keywords to {outfile}.")
     kwd_df.to_json(outfile, orient="records", lines=True)

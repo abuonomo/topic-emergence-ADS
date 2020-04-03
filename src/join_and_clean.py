@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import pytextrank
 import spacy
+from pandarallel import pandarallel
 from spacy.lang.en.stop_words import STOP_WORDS
 from sqlalchemy import create_engine
 from tqdm import tqdm
@@ -21,6 +22,7 @@ LOG.setLevel(logging.INFO)
 NLP = spacy.load("en_core_web_sm")
 TR = pytextrank.TextRank()
 NLP.add_pipe(TR.PipelineComponent, name="textrank", last=True)
+pandarallel.initialize()
 
 
 def load_records_to_dataframe(data_dir: Path, limit=None) -> pd.DataFrame:
@@ -70,7 +72,7 @@ def get_keywords_from_text(text: pd.Series) -> List:
             val = np.nan
         return val
 
-    rake_kwds = text.progress_apply(f)
+    rake_kwds = text.parallel_apply(f)
     return rake_kwds
 
 
@@ -104,6 +106,10 @@ def main(
 ):
     df = load_records_to_dataframe(in_records_dir, limit=record_limit)
     df = df.dropna(subset=["abstract", "year", "nasa_afil", "title"])
+    allowed_db = "astronomy"
+    import ipdb; ipdb.set_trace()
+    df = df[df["database"].apply(lambda x: allowed_db in x)]
+    LOG.info(f"Limited to documents in database {allowed_db}. {df.shape}")
     text = df["title"] + ". " + df["abstract"]
     text = text.apply(unescape).astype(str)
     strats = ["rake", "textrank"]
@@ -113,7 +119,7 @@ def main(
         df["rake_kwds"] = get_keywords_from_text(text)
     elif strategy == "textrank":
         df["rake_kwds"] = get_text_rank_kwds(text, batch_size, n_process)
-    LOG.info(f"Writing {len(df)} keywords to {out_records}.")
+    LOG.info(f"Writing {len(df)} records to {out_records}.")
     df.to_json(out_records, orient="records", lines=True)
 
 

@@ -46,7 +46,7 @@ def main(infile):  #, outfile, out_years, min_thresh=100):
     df = pd.read_json(infile, orient="records", lines=True)
     kwd_df_resamples, year_counts_resamples = get_resamples(df, min_thresh=100, n=5)
     # TODO: feed bootstraps into full pipeline to create all tsfresh metrics, this time with a distribution. How to visualize with distribution?
-    # TODO: get time estimate on how long that would take, knowing how fast one is shoudl be a good approximation.
+    # TODO: get time estimate on how long that would take, knowing how fast one is should be a good approximation.
     for kwd_df, year_counts in zip(kwd_df_resamples, year_counts_resamples):
         kwd_df = kwd_df.reset_index()
         lim_kwd_df = ak.filter_kwds(

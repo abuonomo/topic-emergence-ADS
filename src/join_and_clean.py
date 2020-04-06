@@ -107,7 +107,6 @@ def main(
     df = load_records_to_dataframe(in_records_dir, limit=record_limit)
     df = df.dropna(subset=["abstract", "year", "nasa_afil", "title"])
     allowed_db = "astronomy"
-    import ipdb; ipdb.set_trace()
     df = df[df["database"].apply(lambda x: allowed_db in x)]
     LOG.info(f"Limited to documents in database {allowed_db}. {df.shape}")
     text = df["title"] + ". " + df["abstract"]

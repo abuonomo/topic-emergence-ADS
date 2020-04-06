@@ -91,10 +91,24 @@ def binarize_years(df):
     LOG.info("Binarizing year columns.")
     df = df.copy()
     lb = LabelBinarizer()
+    df['year'] = df['year'].astype(np.int16)
     year_binary = lb.fit_transform(df["year"])  # there should not be NAs.
     year_binary_df = pd.DataFrame(year_binary)
     year_binary_df.columns = lb.classes_
+    # Write both to h5py, load in chunks and write concat to another h5py?
     df = pd.concat([df, year_binary_df], axis=1)
+    return df
+
+
+def stem_reduce(df):
+    df = df.copy()
+    LOG.info('Filtering down by keyword stems.')
+    kwds_counts = df['stem'].value_counts()
+    valid_stems = kwds_counts[kwds_counts > min_thresh].index
+    s0 = df.shape[0]
+    df = df.set_index('stem').loc[valid_stems, :].reset_index()
+    s1 = df.shape[0]
+    LOG.info(f'Removed {s0-s1} rows from dataframe.')
     return df
 
 
@@ -190,12 +204,13 @@ def flatten_to_keywords(df, min_thresh=5):
     na_years = df["year"].isna()
     LOG.info(f"Remove {sum(na_years)} rows with NaN years.")
     df = df[~na_years]
-    kwd_df = (
-        df.pipe(get_kwd_occurences, min_thresh)
-        .pipe(binarize_years)
-        .pipe(stem_kwds)
-        .pipe(get_stem_aggs)
-    )
+    # kwd_df = (
+    df = df.pipe(get_kwd_occurences, min_thresh)
+    df = df.pipe(stem_kwds)
+    df = df.pipe(stem_reduce)
+    df = df.pipe(binarize_years)
+    kwd_df = df.pipe(get_stem_aggs)
+    # )
     year_counts = df["year"].value_counts().reset_index()
     year_counts.columns = ["year", "count"]
     kwd_df = kwd_df.reset_index()

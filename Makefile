@@ -256,9 +256,15 @@ sync-from-s3:
 
 ## sync data and models to s3 bucket
 sync-to-s3:
+ifeq (default,$(PROFILE))
+	aws s3 sync models/$(EXP_NAME) s3://$(BUCKET)models/$(EXP_NAME)
+	aws s3 sync data/$(EXP_NAME) s3://$(BUCKET)data/$(EXP_NAME)
+	aws s3 sync reports/viz/$(EXP_NAME) s3://$(BUCKET)reports/viz/$(EXP_NAME)
+else
 	aws s3 sync models/$(EXP_NAME) s3://$(BUCKET)models/$(EXP_NAME) --profile $(PROFILE)
 	aws s3 sync data/$(EXP_NAME) s3://$(BUCKET)data/$(EXP_NAME) --profile $(PROFILE)
 	aws s3 sync reports/viz/$(EXP_NAME) s3://$(BUCKET)reports/viz/$(EXP_NAME) --profile $(PROFILE)
+endif
 
 ## sync app data and models from s3 bucket. WARNING: This will overwrite existing files for current experiment.
 sync-app-data-from-s3:

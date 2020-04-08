@@ -69,8 +69,8 @@ def get_kwd_occurences(df, min_thresh=5, max_thresh=0.7):
     # Do this because RAKE gives us candidate keywords but does not assure us of their
     # locations. Only says keyword is present if it passes through RAKE.
     LOG.info("Going back through dataset to find keyword doc_id locations.")
-    # doc_to_kwds = ta.parallel_apply(lambda x: [k for k in kwds if k in x])
-    doc_to_kwds = ta.progress_apply(lambda x: [k for k in kwds if k in x])
+    doc_to_kwds = ta.parallel_apply(lambda x: [k for k in kwds if k in x])
+    # doc_to_kwds = ta.progress_apply(lambda x: [k for k in kwds if k in x])
     dke = doc_to_kwds.explode().reset_index()
     dke.columns = ["doc_id", "keyword"]
     LOG.info("Filling years column.")

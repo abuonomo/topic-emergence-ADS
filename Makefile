@@ -207,6 +207,20 @@ upload:
 load:
 	ssh compute-ml "cd /home/ubuntu/projects/keyword-emergence/ && docker load < $(PIPELINE_IMAGE_NAME)_latest.tar.gz"
 
+## Run docker image remotely
+run-remote:
+	ssh compute-ml << HERE
+		cd /home/ubuntu/projects/keyword-emergence/
+		docker run -d --shm-size 4g \
+			--env NB_WORKERS=12 \
+			-v $(pwd)/config:/home/config \
+			-v $(pwd)/data:/home/data \
+			-v $(pwd)/models:/home/models \
+			-v $(pwd)/reports:/home/reports \
+			keyword-emergence-pipeline:latest \
+			dtw-viz CONFIG_FILE=config/full_new_data.mk"
+	HERE
+
 IMAGE_NAME=keyword-emergence-visualizer
 GIT_REMOTE=origin
 ## Build flask app docker container

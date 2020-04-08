@@ -1,6 +1,8 @@
 import argparse
 import logging
+import os
 from pathlib import Path
+from multiprocessing import cpu_count
 
 import numpy as np
 import pandas as pd
@@ -10,13 +12,21 @@ from pandarallel import pandarallel
 from scipy.spatial.distance import euclidean
 from sklearn.preprocessing import LabelBinarizer, MinMaxScaler
 from tqdm import tqdm
+from memory_profiler import profile
 
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
 
 NLP = spacy.load("en_core_web_sm")
-pandarallel.initialize()
+if "NB_WORKERS" in os.environ:
+    NB_WORKERS = int(os.environ['NB_WORKERS'])
+else:
+    NB_WORKERS = cpu_count()
+LOG.info(f'Using {NB_WORKERS} workers for pandarallel')
+
+tqdm.pandas()
+pandarallel.initialize(nb_workers=NB_WORKERS, progress_bar=True)
 
 
 def write_syn_file(out_syn_file, lim_sg):
@@ -58,9 +68,9 @@ def get_kwd_occurences(df, min_thresh=5, max_thresh=0.7):
     # Go back and string match the keywords against all titles and abstracts.
     # Do this because RAKE gives us candidate keywords but does not assure us of their
     # locations. Only says keyword is present if it passes through RAKE.
-    tqdm.pandas()
     LOG.info("Going back through dataset to find keyword doc_id locations.")
-    doc_to_kwds = ta.parallel_apply(lambda x: [k for k in kwds if k in x])
+    # doc_to_kwds = ta.parallel_apply(lambda x: [k for k in kwds if k in x])
+    doc_to_kwds = ta.progress_apply(lambda x: [k for k in kwds if k in x])
     dke = doc_to_kwds.explode().reset_index()
     dke.columns = ["doc_id", "keyword"]
     LOG.info("Filling years column.")
@@ -100,7 +110,7 @@ def binarize_years(df):
     return df
 
 
-def stem_reduce(df):
+def stem_reduce(df, min_thresh):
     df = df.copy()
     LOG.info('Filtering down by keyword stems.')
     kwds_counts = df['stem'].value_counts()
@@ -118,14 +128,14 @@ def stem_kwds(df):
     unq_kwds = df["keyword"].astype(str).unique()
     p = PorterStemmer()
     kwd_to_stem = {kwd: p.stem(kwd) for kwd in tqdm(unq_kwds)}
-    tqdm.pandas()
     # Could also remove start with s here, also could resolve the
-    df["stem"] = df["keyword"].parallel_apply(lambda x: kwd_to_stem[x].lower().strip())
+    df["stem"] = df["keyword"].progress_apply(lambda x: kwd_to_stem[x].lower().strip())
     return df
 
 
+@profile
 def get_stem_aggs(df):
-    LOG.debug("Aggregating by stems")
+    LOG.info("Aggregating by stems")
     df = df.copy()
     df["nasa_afil"] = df["nasa_afil"].apply(lambda x: 1 if x == "YES" else 0)
     years = np.sort(df["year"].unique())
@@ -207,7 +217,7 @@ def flatten_to_keywords(df, min_thresh=5):
     # kwd_df = (
     df = df.pipe(get_kwd_occurences, min_thresh)
     df = df.pipe(stem_kwds)
-    df = df.pipe(stem_reduce)
+    df = df.pipe(stem_reduce, min_thresh)
     df = df.pipe(binarize_years)
     kwd_df = df.pipe(get_stem_aggs)
     # )

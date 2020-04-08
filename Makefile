@@ -29,6 +29,10 @@ $(DATA_DIR) $(MODEL_DIR) $(VIZ_DIR):
 requirements:
 	pip install -r requirements.txt && python -m spacy download en_core_web_sm
 
+## Install the requirements for the app
+requirements-app:
+	pip install -r app/requirements.txt
+
 RAW_FILES=$(shell find $(RAW_DIR) -type f -name '*')
 RECORDS_LOC=$(DATA_DIR)/kwds.jsonl
 ## Join all years and and use rake to extract keywords.
@@ -125,8 +129,6 @@ link-data-to-app:
 
 ## Run app for visualize results
 app: | $(APP_DATA_FILES)
-	@echo "Changing virtual environments to one for running app"
-	source app/venv/bin/activate; \
 	export APP_DATA_DIR=data && cd app && flask run
 
 #========= Topic Modeling =========#

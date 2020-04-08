@@ -15,11 +15,11 @@ LOG.setLevel(logging.INFO)
 app = Flask(__name__)
 
 try:
-    VERSION = os.environ['VERSION']
-    GIT_URL = os.environ['GIT_URL']
+    VERSION = os.environ["VERSION"]
+    GIT_URL = os.environ["GIT_URL"]
 except KeyError:
-    VERSION = 'unspecified'
-    GIT_URL = 'unspecified'
+    VERSION = "unspecified"
+    GIT_URL = "unspecified"
 
 DATA_DIR = Path(os.environ["APP_DATA_DIR"])
 
@@ -56,7 +56,7 @@ def init():
     app.config["KMEANS"] = joblib.load(app.config["KMEANS_LOC"])
 
     manifold_data = joblib.load(app.config["MAN_LOC"])
-    app.config['YEAR_COUNTS'] = pd.read_csv(app.config['YC_LOC'], index_col=0)
+    app.config["YEAR_COUNTS"] = pd.read_csv(app.config["YC_LOC"], index_col=0)
 
     app.config["SC_DF"]["kmeans_cluster"] = app.config["KMEANS"].labels_
     log_count = np.log(app.config["SC_DF"]["count"])
@@ -72,16 +72,21 @@ def init():
 
 @app.route("/")
 def index():
-    LOG.info('Serving page.')
+    LOG.info("Serving page.")
     return render_template("index.html", version=VERSION, git_url=GIT_URL)
 
 
 @app.route("/get-scatter-data", methods=["GET", "POST"])
 def get_scatter_data():
     in_data = request.json
-    LOG.info(f'Getting scatter data for {in_data}.')
+    LOG.info(f"Getting scatter data for {in_data}.")
     cols = list(set(app.config["LOAD_COLS"] + [in_data["x"], in_data["y"]]))
-    chart_data = app.config["SC_DF"].loc[:, cols].to_dict(orient="records")
+    chart_data = (
+        app.config["SC_DF"]
+        .query(f"count >= {in_data['min_count']}")
+        .loc[:, cols]
+        .to_dict(orient="records")
+    )
     return jsonify(chart_data)
 
 
@@ -93,11 +98,11 @@ def _trans_time(ts, kwd, clus):
     ts["kmeans_cluster"] = clus
 
     def f(x):
-        total = app.config['YEAR_COUNTS'].query(f'year == {x["year"]}').iloc[0]['count']
-        norm_val = x['count'] / total
+        total = app.config["YEAR_COUNTS"].query(f'year == {x["year"]}').iloc[0]["count"]
+        norm_val = x["count"] / total
         return norm_val
 
-    ts['norm_count'] = ts.apply(f, axis=1)
+    ts["norm_count"] = ts.apply(f, axis=1)
     ts = ts.loc[:, ["stem", "kmeans_cluster", "year", "count", "norm_count"]]
     ts_recs = ts.to_dict(orient="records")
     return ts_recs
@@ -106,7 +111,7 @@ def _trans_time(ts, kwd, clus):
 @app.route("/get-time-data", methods=["GET", "POST"])
 def get_time_data():
     data = request.json
-    LOG.info(f'Getting time data for {data}.')
+    LOG.info(f"Getting time data for {data}.")
     ts = app.config["N_DF"].query(f'stem == "{data["stem"]}"').iloc[:, 6:]
     ts = ts.T
     ts_recs = _trans_time(ts, data["stem"], data["kmeans_cluster"])
@@ -115,19 +120,19 @@ def get_time_data():
 
 @app.route("/get-all-time-data", methods=["GET", "POST"])
 def get_all_time_data():
-    LOG.info(f'Getting total frequencies for each year.')
+    LOG.info(f"Getting total frequencies for each year.")
     ts = pd.DataFrame(app.config["N_DF"].iloc[:, 5:].sum())
-    tmp_df = app.config['YEAR_COUNTS'].copy().sort_values('year')
-    ind = tmp_df['year'].apply(lambda x: f'{x}_sum')
-    tmp_df['index'] = ind
-    tmp_df = tmp_df.set_index('index').drop(columns=['year'])
+    tmp_df = app.config["YEAR_COUNTS"].copy().sort_values("year")
+    ind = tmp_df["year"].apply(lambda x: f"{x}_sum")
+    tmp_df["index"] = ind
+    tmp_df = tmp_df.set_index("index").drop(columns=["year"])
     ts_recs = _trans_time(tmp_df, "all", 0)
     return jsonify(ts_recs)
 
 
 @app.route("/get-all-options")
 def get_all_options():
-    LOG.info(f'Getting options for scatter axes.')
+    LOG.info(f"Getting options for scatter axes.")
     opts = app.config["SC_DF"].columns.tolist()
     return jsonify(opts)
 

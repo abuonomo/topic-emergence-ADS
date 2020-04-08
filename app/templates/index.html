@@ -29,6 +29,7 @@
         <ul style="list-style-type:none">
           <li>x: <select id="selectButtonX" class="selector"></select></li>
           <li>y: <select id="selectButtonY" class="selector"></select></li>
+          <li>min_count: <input id="minCountInput" defaultValue="0" type="number"></input></li>
           <li><button type="button" id="enterButton">Transform</button></li>
           <li><br></li>
           <li><button type="button" id="toggleNorm">Toggle Time Series Normalize</button></li>
@@ -615,8 +616,8 @@
       var chart0 = scatterChart()
       .height(height)
       .width(width)
-      .xName('value__mean_change')
-      .yName('value__cid_ce__normalize_True')
+      .xName('nasa_afil')
+      .yName('cagr')
       .timeSvg(timeSvg)
       .timeChart(timeChart)
       .color(color);
@@ -631,10 +632,12 @@
       .timeChart(timeChart)
       .color(color);
 
+      var min_count = 0;
+
       d3.json(window.location.pathname + "get-scatter-data", {
             method:"POST",
             body: JSON.stringify({
-              x: 'value__mean_change', y: 'value__cid_ce__normalize_True'
+              x: 'nasa_afil', y: 'cagr', min_count: min_count
             }),
             headers: {
               "Content-type": "application/json; charset=UTF-8"
@@ -669,21 +672,8 @@
               // recover the option that has been chosen
               var selectedX = d3.select("#selectButtonX").property("value");
               var selectedY = d3.select("#selectButtonY").property("value");
-              scatterSvg.selectAll('*').remove();
-              d3.json(window.location.pathname + "get-scatter-data", {
-                method:"POST",
-                body: JSON.stringify({
-                  x: selectedX, y: selectedY
-                }),
-                headers: {
-                  "Content-type": "application/json; charset=UTF-8"
-                }
-              })
-                .then(function(data) {
-                  scatterSvg
-                    .datum(data)
-                    .call(chart0.xName(selectedX).yName(selectedY));
-                  });
+              var min_count = d3.select("#minCountInput").property("value");
+              return scatterRequestPlot(d, selectedX, selectedY, min_count);
               }
             )}
         );
@@ -705,7 +695,7 @@
         }
       });
 
-      function scatterRequestPlot(d, selectedX, selectedY) {
+      function scatterRequestPlot(d, selectedX, selectedY, min_count) {
         // recover the option that has been chosen
         // let selectedX = 'manifold_x';
         // let selectedY = 'manifold_y';
@@ -713,7 +703,7 @@
         d3.json(window.location.pathname + "get-scatter-data", {
           method:"POST",
           body: JSON.stringify({
-            x: selectedX, y: selectedY
+            x: selectedX, y: selectedY, min_count: min_count
           }),
           headers: {
             "Content-type": "application/json; charset=UTF-8"

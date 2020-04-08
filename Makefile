@@ -125,6 +125,8 @@ link-data-to-app:
 
 ## Run app for visualize results
 app: | $(APP_DATA_FILES)
+	@echo "Changing virtual environments to one for running app"
+	source app/venv/bin/activate; \
 	export APP_DATA_DIR=data && cd app && flask run
 
 #========= Topic Modeling =========#

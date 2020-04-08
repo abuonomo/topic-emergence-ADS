@@ -12,7 +12,6 @@ from pandarallel import pandarallel
 from scipy.spatial.distance import euclidean
 from sklearn.preprocessing import LabelBinarizer, MinMaxScaler
 from tqdm import tqdm
-from memory_profiler import profile
 
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
@@ -133,7 +132,6 @@ def stem_kwds(df):
     return df
 
 
-@profile
 def get_stem_aggs(df):
     LOG.info("Aggregating by stems")
     df = df.copy()

@@ -84,6 +84,7 @@ def get_scatter_data():
     chart_data = (
         app.config["SC_DF"]
         .query(f"count >= {in_data['min_count']}")
+        .query(f"rake_score_mean >= {in_data['minRake']}")
         .loc[:, cols]
         .to_dict(orient="records")
     )

@@ -58,6 +58,12 @@ $(ALL_KWDS_LOC) $(YEAR_COUNT_LOC): $(RECORDS_LOC)
 		--out_years $(YEAR_COUNT_LOC) \
 		--min_thresh $(MIN_THRESH)
 
+OUT_AFFIL=$(DATA_DIR)/nasa_affiliation.csv
+## Get overall nasa affiliation
+affil: $(OUT_AFFIL)
+$(OUT_AFFIL): $(RECORDS_LOC) src/get_overall_nasa_affil.py
+	python src/get_overall_nasa_affil.py $(RECORDS_LOC) $(OUT_AFFIL)
+
 bootstrap: $(RECORDS_LOC)
 	python src/bootstrapping.py $(RECORDS_LOC)
 
@@ -83,9 +89,10 @@ $(NORM_KWDS_LOC): $(FILT_KWDS_LOC) $(YEAR_COUNT_LOC)
 TS_FEATURES_LOC=$(DATA_DIR)/slope_complex.csv
 ## Get various measures for keyword time series
 slope-complexity: $(TS_FEATURES_LOC)
-$(TS_FEATURES_LOC): $(NORM_KWDS_LOC)
+$(TS_FEATURES_LOC): $(NORM_KWDS_LOC) $(OUT_AFFIL)
 	$(RECIPES) slope-complexity \
 		--norm_loc $(NORM_KWDS_LOC) \
+		--affil_loc $(OUT_AFFIL) \
 		--out_df $(TS_FEATURES_LOC)
 
 DTW_DISTS_LOC=$(DATA_DIR)/dynamic_time_warp_distances.csv

@@ -114,15 +114,17 @@ def normalize_keyword_freqs(kwds_loc, in_years, out_norm):
 
 @cli.command()
 @click.option("--norm_loc", type=Path)
+@click.option("--affil_loc", type=Path)
 @click.option("--out_df", type=Path)
-def slope_complexity(norm_loc, out_df):
+def slope_complexity(norm_loc, affil_loc, out_df):
     """
     Get various measures for keyword time series
     """
     # TODO: Variable for the path above?
     LOG.info(f"Reading normalized keywords years from {norm_loc}.")
     normed_kwds_df = pd.read_json(norm_loc, orient="records", lines=True)
-    features = slope_count_complexity(normed_kwds_df)
+    overall_affil = pd.read_csv(affil_loc)['nasa_affiliation'].iloc[0]
+    features = slope_count_complexity(normed_kwds_df, overall_affil)
     LOG.info(f"Writing time series features to {out_df}")
     features.to_csv(out_df)
 

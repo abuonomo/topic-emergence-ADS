@@ -211,7 +211,7 @@ def cagr(x):
     return (x[-1] / x[0]) ** (1/len(x)) - 1
 
 
-def slope_count_complexity(lim_kwd_df):
+def slope_count_complexity(lim_kwd_df, overall_affil):
     only_years = lim_kwd_df.iloc[:, 6:]
     # TODO: using an index by number here is quite inflexible to change. Fix it.
 
@@ -227,8 +227,10 @@ def slope_count_complexity(lim_kwd_df):
     features["count"] = lim_kwd_df["doc_id_count"]
     features["stem"] = lim_kwd_df["stem"]
     features["nasa_afil"] = lim_kwd_df["nasa_afil"]
+    features["norm_nasa_afil"] = lim_kwd_df["nasa_afil"] / overall_affil
     features["mean_change_nan_before_exist"] = only_years.apply(f2, axis=1)
     features["cagr"] = only_years.apply(cagr, axis=1)
+    features["rake_score_mean"] = lim_kwd_df['rake_score_mean']
     return features
 
 

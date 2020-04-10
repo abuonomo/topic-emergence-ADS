@@ -676,7 +676,7 @@
 
             d3.select("#selectButtonXScale")
             .selectAll('myOptions')
-            .data(['linear', 'sqrt'])
+            .data(['linear', '^0.1'])
             .enter()
             .append('option')
             .text(function (d) { return d; }) // text showed in the menu
@@ -689,8 +689,8 @@
               var min_count = d3.select("#minCountInput").property("value");
               var minRake = d3.select("#minRakeInput").property("value");
               var selectedXScale = d3.select("#selectButtonXScale").property("value");
-              if (selectedXScale === 'sqrt') {
-                var xScale = d3.scalePow().exponent(0.5)
+              if (selectedXScale === '^0.1') {
+                var xScale = d3.scalePow().exponent(0.1)
               }
               else {
                 var xScale = d3.scaleLinear()

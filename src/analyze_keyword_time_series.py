@@ -11,6 +11,7 @@ from scipy.spatial.distance import cdist
 from scipy.stats import linregress
 from sklearn.cluster import KMeans
 from sklearn.mixture import GaussianMixture
+from sklearn.preprocessing import minmax_scale
 from tensorboardX import SummaryWriter
 from tensorboardX.utils import figure_to_image
 from tqdm import tqdm
@@ -208,7 +209,7 @@ def filter_kwds(kwd_df, threshold=50, score_thresh=1.3, hard_limit=10_000):
 
 def cagr(x):
     x = x[~x.isna()]
-    return (x[-1] / x[0]) ** (1/len(x)) - 1
+    return (x[-1] / x[0]) ** (1 / len(x)) - 1
 
 
 def slope_count_complexity(lim_kwd_df, overall_affil):
@@ -223,14 +224,25 @@ def slope_count_complexity(lim_kwd_df, overall_affil):
     )
     trans_t["year"] = trans_t["variable"].apply(lambda x: int(x[0:4]))
     trans_t = trans_t.drop(columns=["variable"])
-    features = extract_features(trans_t.fillna(0), column_id="index", column_sort="year")
+    features = extract_features(
+        trans_t.fillna(0), column_id="index", column_sort="year"
+    )
     features["count"] = lim_kwd_df["doc_id_count"]
     features["stem"] = lim_kwd_df["stem"]
     features["nasa_afil"] = lim_kwd_df["nasa_afil"]
     features["norm_nasa_afil"] = lim_kwd_df["nasa_afil"] / overall_affil
+
+    up_ind = features["norm_nasa_afil"] >= 1
+    down_ind = features["norm_nasa_afil"] <= 1
+
+    sg1 = minmax_scale(features["norm_nasa_afil"][up_ind], feature_range=(0, 100))
+    sl1 = minmax_scale(features["norm_nasa_afil"][down_ind], feature_range=(0, 1))
+    features.loc[up_ind, "norm_nasa_afil"] = sg1
+    features.loc[down_ind, "norm_nasa_afil"] = sl1
+
     features["mean_change_nan_before_exist"] = only_years.apply(f2, axis=1)
     features["cagr"] = only_years.apply(cagr, axis=1)
-    features["rake_score_mean"] = lim_kwd_df['rake_score_mean']
+    features["rake_score_mean"] = lim_kwd_df["rake_score_mean"]
     return features
 
 

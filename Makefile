@@ -180,6 +180,18 @@ $(TMODEL_VIZ_LOC): $(TMODELS)
 		--map_loc $(MAP_LOC) \
 		--tmodel_viz_loc $(TMODEL_VIZ_LOC)
 
+TOPIC_TO_BIBCODES_LOC=$(VIZ_DIR)/topic_to_bibcodes.csv
+## Explore topic models and how they connect to original dataset
+explore-topic-models: $(TOPIC_TO_BIBCODES_LOC)
+$(TOPIC_TO_BIBCODES_LOC):  $(TMODEL_VIZ_LOC)
+	python src/topic_modeling.py explore-topic-models \
+		--infile $(RECORDS_LOC) \
+		--tmodel_dir $(TMODEL_DIR) \
+		--n $(N_TOPICS) \
+		--mlb_loc $(MULT_LAB_BIN_LOC) \
+		--map_loc $(MAP_LOC) \
+		--topic_to_bibcodes_loc $(TOPIC_TO_BIBCODES_LOC)
+
 #========= Docker =========#
 
 PIPELINE_IMAGE_NAME=keyword-emergence-pipeline

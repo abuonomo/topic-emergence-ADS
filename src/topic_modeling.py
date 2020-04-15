@@ -108,8 +108,20 @@ def get_doc_length(line):
     doc_len = nanlen(record["title"]) + nanlen(record["abstract"])
     return doc_len
 
+def get_bib_titles(line):
+    record = json.loads(line)
+    b = record['bibcode']
+    t = record['title']
+    return (b, t)
 
-def get_doc_len_from_file(infile):
+
+def get_bibcodes_from_file(infile):
+    with open(infile, "r") as f0:
+        bts = list(zip(*[get_bib_titles(line) for line in tqdm(f0)]))
+    return bts
+
+
+def get_doc_len_from_file(infile,):
     with open(infile, "r") as f0:
         doc_lens = [get_doc_length(line) for line in tqdm(f0)]
     return doc_lens
@@ -179,6 +191,42 @@ def visualize_topic_models(infile, tmodel_dir, n, mlb_loc, map_loc, tmodel_viz_l
 
     mdoc_lens = [doc_lens[i] for i in mat_id_to_doc_id["matrix_row_index"]]
     topic_model_viz(tmodel, mlb, mdoc_lens, tmodel_viz_loc)
+
+
+@cli.command()
+@click.option("--infile", type=Path)
+@click.option("--tmodel_dir", type=Path)
+@click.option("--n", type=int, default=7)
+@click.option("--mlb_loc", type=Path)
+@click.option("--map_loc", type=Path)
+@click.option("--topic_to_bibcodes_loc", type=Path)
+def explore_topic_models(
+    infile, tmodel_dir, n, mlb_loc, map_loc, topic_to_bibcodes_loc
+):
+    tmodel_loc = tmodel_dir / f"topics_{n}.jbl"
+    LOG.info(f"Loading topic model from {tmodel_loc}")
+    tmodel = joblib.load(tmodel_loc)
+
+    LOG.info(f"Loading multilabel binarizer from {mlb_loc}")
+    mlb = joblib.load(mlb_loc)
+
+    LOG.info(f"Reading matrix to doc id mapping from {map_loc}")
+    mat_id_to_doc_id = pd.read_csv(map_loc, index_col=0)
+
+    LOG.info(f"Getting document bibcodes from {infile}.")
+    bibcodes, titles = get_bibcodes_from_file(infile)
+    mdoc_bibs = [bibcodes[i] for i in mat_id_to_doc_id["matrix_row_index"]]
+    mdoc_titles = [titles[i] for i in mat_id_to_doc_id["matrix_row_index"]]
+    df = pd.DataFrame(
+        {
+            "topic": tmodel.embedding_.argmax(axis=1),
+            "bibcode": mdoc_bibs
+            "titles": mdoc_titles,
+        }
+    )
+
+    LOG.info(f"Writing bibcodes to {topic_to_bibcodes_loc}")
+    df.to_csv(topic_to_bibcodes_loc)
 
 
 if __name__ == "__main__":

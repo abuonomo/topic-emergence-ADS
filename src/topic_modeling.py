@@ -1,12 +1,15 @@
-import argparse
 import json
 import logging
+from pathlib import Path
 
+import click
 import joblib
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import pyLDAvis
 from enstop import PLSA, EnsembleTopics
+from scipy.io import mmwrite, mmread
 from sklearn.preprocessing import MultiLabelBinarizer
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
@@ -17,6 +20,7 @@ LOG.setLevel(logging.INFO)
 
 
 def get_feature_matrix(lim_kwds_df):
+    LOG.info("Making feature matrix...")
     doc_to_kwd = (
         lim_kwds_df.explode("doc_id_list").groupby("doc_id_list").agg({"stem": list})
     )
@@ -74,11 +78,11 @@ def plot_coherence(topic_range, coherences, show=False):
     return plt.gcf()
 
 
-def feature_and_topic_model(lim_kwds_df, plot_loc, tmodels_dir, tboard=False):
-    X, mlb, mat_doc_id_map = get_feature_matrix(lim_kwds_df)
+def run_topic_models_inner(X, mat_doc_id_map, plot_loc, tmodels_dir, tboard=False):
     labels = mat_doc_id_map["doc_id"].tolist()
     # TODO: add train and test? But its clustering so maybe no?
-    topic_range = list(range(2, 12, 1))
+    # topic_range = list(range(2, 12, 1))
+    topic_range = [50, 100, 300]
     coherences = []
     # TODO: instead of appending, directly write to dir of tmodels with n_topics
 
@@ -86,7 +90,7 @@ def feature_and_topic_model(lim_kwds_df, plot_loc, tmodels_dir, tboard=False):
     topic_pbar = tqdm(topic_range)
     for n in topic_pbar:
         topic_pbar.set_description(f"n_topics: {n}")
-        # model = EnsembleTopics(n_components=n, n_jobs=12).fit(X) # TODO: make var?
+        # model = EnsembleTopics(n_components=n, n_jobs=12).fit(X)
         model = PLSA(n_components=n).fit(X)
         joblib.dump(model, tmodels_dir / f"topics_{n}.jbl")
         if tboard:  # will slow things down by A LOT, also does not seem to work yet
@@ -94,9 +98,8 @@ def feature_and_topic_model(lim_kwds_df, plot_loc, tmodels_dir, tboard=False):
         coherences.append(model.coherence())
     fig = plot_coherence(topic_range, coherences)
     LOG.info(f"Writing plot to {plot_loc}.")
-    fig.savefig(plot_loc)
-
-    return X, mlb, mat_doc_id_map
+    fig.savefig(str(plot_loc))
+    return plot_loc
 
 
 def get_doc_length(line):
@@ -112,15 +115,71 @@ def get_doc_len_from_file(infile):
     return doc_lens
 
 
-def main(msg, feature):
-    LOG.info(f"{msg} and feature is {feature}.")
+@click.group()
+def cli():
+    pass
+
+
+@cli.command()
+@click.option("--norm_loc", type=Path)
+@click.option("--mat_loc", type=Path)
+@click.option("--mlb_loc", type=Path)
+@click.option("--map_loc", type=Path)
+def prepare_features(norm_loc, mat_loc, mlb_loc, map_loc):
+    """
+    Create document term matrix
+    """
+    LOG.info(f"Reading normalized keywords years from {norm_loc}.")
+    lim_kwds_df = pd.read_json(norm_loc, orient="records", lines=True)
+    X, mlb, mat_doc_id_map = get_feature_matrix(lim_kwds_df)
+
+    LOG.info("Writing matrix, multilabel binarizer, and matrix to doc id mapping.")
+    LOG.info(f"Writing doc feature matrix to  {mat_loc}")
+    mmwrite(str(mat_loc), X)
+    LOG.info(f"Writing multilabel binarizer to {mlb_loc}")
+    joblib.dump(mlb, mlb_loc)
+    LOG.info(f"Writing matrix to doc id mapping to {map_loc}")
+    mat_doc_id_map.to_csv(map_loc)
+
+
+@cli.command()
+@click.option("--plot_loc", type=Path)
+@click.option("--mat_loc", type=Path)
+@click.option("--mlb_loc", type=Path)
+@click.option("--map_loc", type=Path)
+@click.option("--tmodels_dir", type=Path)
+def run_topic_models(plot_loc, mat_loc, mlb_loc, map_loc, tmodels_dir):
+    """
+    Create topic models and write to tensorboard
+    """
+    LOG.info(f"Reading doc feature matrix from  {mat_loc}")
+    X = mmread(str(mat_loc)).tocsr()
+    LOG.info(f"Read matrix to doc id mapping from {map_loc}")
+    mat_doc_id_map = pd.read_csv(map_loc, index_col=0)
+    run_topic_models_inner(X, mat_doc_id_map, plot_loc, tmodels_dir)
+
+
+@cli.command()
+@click.option("--infile", type=Path)
+@click.option("--tmodel_dir", type=Path)
+@click.option("--n", type=int, default=7)
+@click.option("--mlb_loc", type=Path)
+@click.option("--map_loc", type=Path)
+@click.option("--tmodel_viz_loc", type=Path)
+def visualize_topic_models(infile, tmodel_dir, n, mlb_loc, map_loc, tmodel_viz_loc):
+    tmodel_loc = tmodel_dir / f"topics_{n}.jbl"
+    LOG.info(f"Counting document lengths from {infile}.")
+    doc_lens = get_doc_len_from_file(infile)
+    LOG.info(f"Loading topic model from {tmodel_loc}")
+    tmodel = joblib.load(tmodel_loc)
+    LOG.info(f"Loading multilabel binarizer from {mlb_loc}")
+    mlb = joblib.load(mlb_loc)
+    LOG.info(f"Reading matrix to doc id mapping from {map_loc}")
+    mat_id_to_doc_id = pd.read_csv(map_loc, index_col=0)
+
+    mdoc_lens = [doc_lens[i] for i in mat_id_to_doc_id["matrix_row_index"]]
+    topic_model_viz(tmodel, mlb, mdoc_lens, tmodel_viz_loc)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Say hello")
-    parser.add_argument("i", help="input txt file")
-    parser.add_argument("--feature", dest="feature", action="store_true")
-    parser.add_argument("--no-feature", dest="feature", action="store_false")
-    parser.set_defaults(feature=True)
-    args = parser.parse_args()
-    main(args.i, args.feature)
+    cli()

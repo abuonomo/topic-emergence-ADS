@@ -21,7 +21,6 @@ from src.create_keyword_and_syn_lists import (
 )
 from src.dtw_time_analysis import dtw_kwds
 from src.topic_modeling import (
-    feature_and_topic_model,
     topic_model_viz,
     get_doc_len_from_file,
 )
@@ -192,55 +191,6 @@ def dtw_viz(norm_loc, dtw_loc, kmeans_loc, out_man_plot, out_man_points):
     joblib.dump(kmeans, kmeans_loc)
     LOG.info(f"Writing manifold points to {out_man_points}.")
     joblib.dump(dtw_man, out_man_points)
-
-
-@cli.command()
-@click.option("--norm_loc", type=Path)
-@click.option("--plot_loc", type=Path)
-@click.option("--mat_loc", type=Path)
-@click.option("--mlb_loc", type=Path)
-@click.option("--map_loc", type=Path)
-@click.option("--tmodels_dir", type=Path)
-def make_topic_models(norm_loc, plot_loc, mat_loc, mlb_loc, map_loc, tmodels_dir):
-    """
-    Create document term matrix, topic model, and write to tensorboard
-    """
-    LOG.info(f"Reading normalized keywords years from {norm_loc}.")
-    lim_kwds_df = pd.read_json(norm_loc, orient="records", lines=True)
-
-    X, mlb, mat_id_to_doc_id = feature_and_topic_model(
-        lim_kwds_df, plot_loc, tmodels_dir
-    )
-
-    LOG.info("Writing matrix, multilabel binarizer, and matrix to doc id mapping.")
-    LOG.info(f"Writing doc feature matrix to  {mat_loc}")
-    mmwrite(str(mat_loc), X)
-    LOG.info(f"Writing multilabel binarizer to {mlb_loc}")
-    joblib.dump(mlb, mlb_loc)
-    LOG.info(f"Writing matrix to doc id mapping to {map_loc}")
-    mat_id_to_doc_id.to_csv(map_loc)
-
-
-@cli.command()
-@click.option("--infile", type=Path)
-@click.option("--tmodel_dir", type=Path)
-@click.option("--n", type=int, default=7)
-@click.option("--mlb_loc", type=Path)
-@click.option("--map_loc", type=Path)
-@click.option("--tmodel_viz_loc", type=Path)
-def visualize_topic_models(infile, tmodel_dir, n, mlb_loc, map_loc, tmodel_viz_loc):
-    tmodel_loc = tmodel_dir / f"topics_{n}.jbl"
-    LOG.info(f"Counting document lengths from {infile}.")
-    doc_lens = get_doc_len_from_file(infile)
-    LOG.info(f"Loading topic model from {tmodel_loc}")
-    tmodel = joblib.load(tmodel_loc)
-    LOG.info(f"Loading multilabel binarizer from {mlb_loc}")
-    mlb = joblib.load(mlb_loc)
-    LOG.info(f"Reading matrix to doc id mapping from {map_loc}")
-    mat_id_to_doc_id = pd.read_csv(map_loc, index_col=0)
-
-    mdoc_lens = [doc_lens[i] for i in mat_id_to_doc_id["matrix_row_index"]]
-    topic_model_viz(tmodel, mlb, mdoc_lens, tmodel_viz_loc)
 
 
 if __name__ == "__main__":

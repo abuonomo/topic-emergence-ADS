@@ -140,17 +140,25 @@ app: | $(APP_DATA_FILES)
 
 #========= Topic Modeling =========#
 
-COH_PLT_LOC=$(VIZ_DIR)/coherence.png
-DOC_FEAT_MAT_LOC=$(DATA_DIR)/doc_feature_matrix.mm
+DOC_FEAT_MAT_LOC=$(DATA_DIR)/doc_feature_matrix.mtx
 MULT_LAB_BIN_LOC=$(MODEL_DIR)/mlb.jbl
 MAP_LOC=$(MODEL_DIR)/mat_doc_mapping.csv
-TMODEL_DIR=$(MODEL_DIR)/topic_models
-## Create document term matrix, topic model, and write to tensorboard
-make-topic-models: $(COH_PLT_LOC) $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC)
-$(COH_PLT_LOC) $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC): $(NORM_KWDS_LOC)
-	mkdir -p $(TMODEL_DIR); \
-	$(RECIPES) make-topic-models \
+## Create document term matrix
+prepare-features: $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC)
+$(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC): $(NORM_KWDS_LOC)
+	python src/topic_modeling.py prepare-features \
 		--norm_loc $(NORM_KWDS_LOC) \
+		--mat_loc $(DOC_FEAT_MAT_LOC) \
+		--mlb_loc $(MULT_LAB_BIN_LOC) \
+		--map_loc $(MAP_LOC) \
+
+COH_PLT_LOC=$(VIZ_DIR)/coherence.png
+TMODEL_DIR=$(MODEL_DIR)/topic_models
+## Create test topic models of varying sizes
+run-topic-models: $(COH_PLT_LOC)
+$(COH_PLT_LOC): $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC)
+	mkdir -p $(TMODEL_DIR); \
+	python src/topic_modeling.py run-topic-models \
 		--plot_loc $(COH_PLT_LOC) \
 		--mat_loc $(DOC_FEAT_MAT_LOC) \
 		--mlb_loc $(MULT_LAB_BIN_LOC) \
@@ -159,12 +167,12 @@ $(COH_PLT_LOC) $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC): $(NORM_KWDS_L
 
 TMODEL_VIZ_LOC=$(VIZ_DIR)/topic_model_viz.html
 TMODELS=$(shell find $(TMODEL_DIR) -type f -name '*')
-N_TOPICS=7
+N_TOPICS=50
 # Above line collects all files in dir for command prerequisite
 ## Visualize topic models with pyLDAviz
 visualize-topic-models: $(TMODEL_VIZ_LOC)
 $(TMODEL_VIZ_LOC): $(TMODELS)
-	$(RECIPES) visualize-topic-models \
+	python src/topic_modeling.py visualize-topic-models \
 		--infile $(RECORDS_LOC) \
 		--tmodel_dir $(TMODEL_DIR) \
 		--n $(N_TOPICS) \

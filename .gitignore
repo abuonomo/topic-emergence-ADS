@@ -1,4 +1,14 @@
 data/*
+*.svg
+*.png
+*.dot
+*.dat
+*.zip
+dask-worker-space/
+*.tar.gz
+config/*
+!config/example.mk
+!config/example_small.mk
 my_env/*
 *.jsonl
 models/*

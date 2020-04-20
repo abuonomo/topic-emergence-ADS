@@ -220,7 +220,7 @@ def explore_topic_models(
     df = pd.DataFrame(
         {
             "topic": tmodel.embedding_.argmax(axis=1),
-            "bibcode": mdoc_bibs
+            "bibcode": mdoc_bibs,
             "titles": mdoc_titles,
         }
     )

@@ -33,6 +33,10 @@ def get_feature_matrix(lim_kwds_df):
     return X, mlb, mat_id_to_doc_id
 
 
+def __num_dist_rows__(array, ndigits=2):
+   return array.shape[0] - int((pd.DataFrame(array).sum(axis=1) < 0.99).sum())
+
+
 def topic_model_viz(model, mlb, mdoc_lens, viz_loc):
     term_freq = np.array(model.training_data_.sum(axis=0))[0]
     data = {
@@ -42,6 +46,7 @@ def topic_model_viz(model, mlb, mdoc_lens, viz_loc):
         "term_frequency": term_freq,
         "doc_lengths": mdoc_lens,
     }
+    pyLDAvis._prepare.__num_dist_rows__ = __num_dist_rows__
     LOG.info("Preparing data for pyLDAvis")
     viz_data = pyLDAvis.prepare(**data)
     LOG.info(f"Writing visualization to {viz_loc}")
@@ -196,7 +201,7 @@ def visualize_topic_models(infile, tmodel_dir, n, mlb_loc, map_loc, tmodel_viz_l
 @cli.command()
 @click.option("--infile", type=Path)
 @click.option("--tmodel_dir", type=Path)
-@click.option("--n", type=int, default=7)
+@click.option("--n", type=int)
 @click.option("--mlb_loc", type=Path)
 @click.option("--map_loc", type=Path)
 @click.option("--topic_to_bibcodes_loc", type=Path)

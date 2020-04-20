@@ -165,9 +165,9 @@ $(COH_PLT_LOC): $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC)
 		--map_loc $(MAP_LOC) \
 		--tmodels_dir $(TMODEL_DIR)
 
-TMODEL_VIZ_LOC=$(VIZ_DIR)/topic_model_viz.html
 TMODELS=$(shell find $(TMODEL_DIR) -type f -name '*')
-N_TOPICS=50
+N_TOPICS=100
+TMODEL_VIZ_LOC=$(VIZ_DIR)/topic_model_viz$(N_TOPICS).html
 # Above line collects all files in dir for command prerequisite
 ## Visualize topic models with pyLDAviz
 visualize-topic-models: $(TMODEL_VIZ_LOC)

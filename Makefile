@@ -154,6 +154,7 @@ $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC): $(NORM_KWDS_LOC)
 
 COH_PLT_LOC=$(VIZ_DIR)/coherence.png
 TMODEL_DIR=$(MODEL_DIR)/topic_models
+ALG='lda'
 ## Create test topic models of varying sizes
 run-topic-models: $(COH_PLT_LOC)
 $(COH_PLT_LOC): $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC)
@@ -163,7 +164,8 @@ $(COH_PLT_LOC): $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC)
 		--mat_loc $(DOC_FEAT_MAT_LOC) \
 		--mlb_loc $(MULT_LAB_BIN_LOC) \
 		--map_loc $(MAP_LOC) \
-		--tmodels_dir $(TMODEL_DIR)
+		--tmodels_dir $(TMODEL_DIR) \
+		--alg $(ALG)
 
 TMODELS=$(shell find $(TMODEL_DIR) -type f -name '*')
 N_TOPICS=100

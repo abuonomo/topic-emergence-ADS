@@ -9,6 +9,8 @@ import numpy as np
 import pandas as pd
 import pyLDAvis
 from enstop import PLSA, EnsembleTopics
+from enstop.utils import coherence
+from sklearn.decomposition import LatentDirichletAllocation
 from scipy.io import mmwrite, mmread
 from sklearn.preprocessing import MultiLabelBinarizer
 from tensorboardX import SummaryWriter
@@ -34,7 +36,7 @@ def get_feature_matrix(lim_kwds_df):
 
 
 def __num_dist_rows__(array, ndigits=2):
-   return array.shape[0] - int((pd.DataFrame(array).sum(axis=1) < 0.99).sum())
+    return array.shape[0] - int((pd.DataFrame(array).sum(axis=1) < 0.99).sum())
 
 
 def topic_model_viz(model, mlb, mdoc_lens, viz_loc):
@@ -83,11 +85,21 @@ def plot_coherence(topic_range, coherences, show=False):
     return plt.gcf()
 
 
-def run_topic_models_inner(X, mat_doc_id_map, plot_loc, tmodels_dir, tboard=False):
+def run_topic_models_inner(
+    X, mat_doc_id_map, plot_loc, tmodels_dir, tboard=False, alg="plsa"
+):
     labels = mat_doc_id_map["doc_id"].tolist()
     # TODO: add train and test? But its clustering so maybe no?
-    # topic_range = list(range(2, 12, 1))
-    topic_range = [50, 100, 300]
+    if alg == "plsa":
+        TopicModel = PLSA
+    elif alg == "lda":
+        TopicModel = LatentDirichletAllocation
+    elif alg == "enstop":
+        TopicModel = EnsembleTopics
+    else:
+        ValueError(f'Must choose algorithm from "plsa", "lda", and "enstop".')
+
+    topic_range = [10, 20, 30]
     coherences = []
     # TODO: instead of appending, directly write to dir of tmodels with n_topics
 
@@ -96,11 +108,19 @@ def run_topic_models_inner(X, mat_doc_id_map, plot_loc, tmodels_dir, tboard=Fals
     for n in topic_pbar:
         topic_pbar.set_description(f"n_topics: {n}")
         # model = EnsembleTopics(n_components=n, n_jobs=12).fit(X)
-        model = PLSA(n_components=n).fit(X)
+        model = TopicModel(n_components=n).fit(X)
         joblib.dump(model, tmodels_dir / f"topics_{n}.jbl")
         if tboard:  # will slow things down by A LOT, also does not seem to work yet
             tmodel_to_tboard(X, model, labels)
-        coherences.append(model.coherence())
+        if alg == "plsa":
+            c = model.coherence()
+        elif alg == "enstop":
+            c = model.coherence()
+        elif alg == "lda":
+            c = coherence(model.components_, n, X, n_words=20)
+        else:
+            ValueError(f'Must choose algorithm from "plsa", "lda", and "enstop".')
+        coherences.append(c)
     fig = plot_coherence(topic_range, coherences)
     LOG.info(f"Writing plot to {plot_loc}.")
     fig.savefig(str(plot_loc))
@@ -113,10 +133,11 @@ def get_doc_length(line):
     doc_len = nanlen(record["title"]) + nanlen(record["abstract"])
     return doc_len
 
+
 def get_bib_titles(line):
     record = json.loads(line)
-    b = record['bibcode']
-    t = record['title']
+    b = record["bibcode"]
+    t = record["title"]
     return (b, t)
 
 
@@ -165,7 +186,8 @@ def prepare_features(norm_loc, mat_loc, mlb_loc, map_loc):
 @click.option("--mlb_loc", type=Path)
 @click.option("--map_loc", type=Path)
 @click.option("--tmodels_dir", type=Path)
-def run_topic_models(plot_loc, mat_loc, mlb_loc, map_loc, tmodels_dir):
+@click.option("--alg", type=str, default="plsa")
+def run_topic_models(plot_loc, mat_loc, mlb_loc, map_loc, tmodels_dir, alg="plsa"):
     """
     Create topic models and write to tensorboard
     """
@@ -173,7 +195,7 @@ def run_topic_models(plot_loc, mat_loc, mlb_loc, map_loc, tmodels_dir):
     X = mmread(str(mat_loc)).tocsr()
     LOG.info(f"Read matrix to doc id mapping from {map_loc}")
     mat_doc_id_map = pd.read_csv(map_loc, index_col=0)
-    run_topic_models_inner(X, mat_doc_id_map, plot_loc, tmodels_dir)
+    run_topic_models_inner(X, mat_doc_id_map, plot_loc, tmodels_dir, alg=alg)
 
 
 @cli.command()

@@ -168,7 +168,7 @@ $(COH_PLT_LOC): $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC)
 		--alg $(ALG)
 
 TMODELS=$(shell find $(TMODEL_DIR) -type f -name '*')
-N_TOPICS=100
+N_TOPICS=50
 TMODEL_VIZ_LOC=$(VIZ_DIR)/topic_model_viz$(N_TOPICS).html
 # Above line collects all files in dir for command prerequisite
 ## Visualize topic models with pyLDAviz
@@ -185,7 +185,7 @@ $(TMODEL_VIZ_LOC): $(TMODELS)
 TOPIC_TO_BIBCODES_LOC=$(VIZ_DIR)/topic_to_bibcodes.csv
 ## Explore topic models and how they connect to original dataset
 explore-topic-models: $(TOPIC_TO_BIBCODES_LOC)
-$(TOPIC_TO_BIBCODES_LOC):  $(TMODEL_VIZ_LOC)
+$(TOPIC_TO_BIBCODES_LOC):  $(TMODELS)
 	python src/topic_modeling.py explore-topic-models \
 		--infile $(RECORDS_LOC) \
 		--tmodel_dir $(TMODEL_DIR) \

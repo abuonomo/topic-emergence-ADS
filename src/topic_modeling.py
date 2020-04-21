@@ -46,11 +46,11 @@ def topic_model_viz(model, mlb, mdoc_lens, viz_loc):
         "doc_topic_dists": model.embedding_,
         "vocab": mlb.classes_,
         "term_frequency": term_freq,
-        "doc_lengths": mdoc_lens,
+        "doc_lengths": np.array(mdoc_lens),
     }
     pyLDAvis._prepare.__num_dist_rows__ = __num_dist_rows__
     LOG.info("Preparing data for pyLDAvis")
-    viz_data = pyLDAvis.prepare(**data)
+    viz_data = pyLDAvis.prepare(**data, sort_topics=False)
     LOG.info(f"Writing visualization to {viz_loc}")
     pyLDAvis.save_html(viz_data, str(viz_loc))
     return viz_loc
@@ -215,7 +215,6 @@ def visualize_topic_models(infile, tmodel_dir, n, mlb_loc, map_loc, tmodel_viz_l
     mlb = joblib.load(mlb_loc)
     LOG.info(f"Reading matrix to doc id mapping from {map_loc}")
     mat_id_to_doc_id = pd.read_csv(map_loc, index_col=0)
-
     mdoc_lens = [doc_lens[i] for i in mat_id_to_doc_id["matrix_row_index"]]
     topic_model_viz(tmodel, mlb, mdoc_lens, tmodel_viz_loc)
 
@@ -242,18 +241,21 @@ def explore_topic_models(
 
     LOG.info(f"Getting document bibcodes from {infile}.")
     bibcodes, titles = get_bibcodes_from_file(infile)
-    mdoc_bibs = [bibcodes[i] for i in mat_id_to_doc_id["matrix_row_index"]]
-    mdoc_titles = [titles[i] for i in mat_id_to_doc_id["matrix_row_index"]]
-    df = pd.DataFrame(
-        {
-            "topic": tmodel.embedding_.argmax(axis=1),
-            "bibcode": mdoc_bibs,
-            "titles": mdoc_titles,
-        }
-    )
-
+    mdoc_bibs = [bibcodes[i] for i in mat_id_to_doc_id["doc_id"]]
+    mdoc_titles = [titles[i] for i in mat_id_to_doc_id["doc_id"]]
+    df = pd.DataFrame(tmodel.embedding_)
+    df["bibcode"] = mdoc_bibs
+    df["titles"] = mdoc_titles
+    cols = df.columns[-2:].tolist() + df.columns[0:-2].tolist()
+    df = df[cols]
+    LOG.info('Reorder by descending topic scores where given topic is max')
+    new_df = pd.DataFrame()
+    top_topics = df.iloc[:, 2:].values.argmax(axis=1)
+    for t in tqdm(range(tmodel.embedding_.shape[1])):
+        new_df = new_df.append(df.iloc[top_topics == t, :].sort_values(t, ascending=False))
+    import ipdb; ipdb.set_trace()
     LOG.info(f"Writing bibcodes to {topic_to_bibcodes_loc}")
-    df.to_csv(topic_to_bibcodes_loc)
+    new_df.to_csv(topic_to_bibcodes_loc)
 
 
 if __name__ == "__main__":

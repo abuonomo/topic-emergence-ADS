@@ -11,13 +11,12 @@ from scipy.spatial.distance import cdist
 from scipy.stats import linregress
 from sklearn.cluster import KMeans
 from sklearn.mixture import GaussianMixture
+from sklearn.preprocessing import minmax_scale
 from tensorboardX import SummaryWriter
 from tensorboardX.utils import figure_to_image
 from tqdm import tqdm
 from tsfresh.feature_extraction import extract_features
 from tsfresh.feature_extraction import feature_calculators as fc
-from tslearn.clustering import TimeSeriesKMeans
-from tslearn.utils import to_time_series_dataset
 from yellowbrick.cluster import KElbowVisualizer
 from yellowbrick.features import Manifold
 
@@ -29,7 +28,6 @@ LOG.setLevel(logging.INFO)
 def plot_time(v, show=False, lnr=False, size=(2, 2)):
     years = v.index.str.replace("_sum", "").astype(int)
     vals = v.values
-    # plt.style.use("seaborn-dark")
     plt.figure(figsize=size)  # Must be square for tensorboard
     plt.plot(years, vals, color="black", linewidth=5)
     if lnr:
@@ -73,20 +71,6 @@ def to_tboard(dtw_df, m, images, lim):
     )
     writer.close()
     LOG.info('Use "tensorboard --logdir runs" command to see visualization.')
-
-
-def ts_to_tboard(normed_kwd_years):
-    """Use tslearn to cluster timeseries"""
-    ts_normed = to_time_series_dataset(normed_kwd_years.values)
-    metric = "euclidean"
-    LOG.info(f"Performing kmeans with metric {metric}.")
-    km = TimeSeriesKMeans(n_clusters=6, metric=metric)
-    km.fit(ts_normed)
-
-    lim = 1000
-    to_tboard(normed_kwd_years)
-    images = get_fig_images(normed_kwd_years[0:lim])
-    to_tboard(normed_kwd_years, km, images, lim)
 
 
 def yellow_plot_kmd(X, out_plot, c_min=2, c_max=20):
@@ -141,12 +125,13 @@ def plot_gm_bics(dtw_df, out_plot, c_min=2, c_max=20):
     plt.clf()
 
 
-def dtw_to_manifold(dtw_df, out_plot):
+def dtw_to_manifold(dtw_df, out_plot=None):
     LOG.info("Computing tsne manifold.")
     viz = Manifold(manifold="tsne")
     dtw_man = viz.fit_transform(dtw_df)  # Fit the data to the visualizer
-    LOG.info(f"Writing tsne manifold plot to {out_plot}.")
-    viz.show(out_plot)  # Finalize and render the figure
+    if out_plot is not None:
+        LOG.info(f"Writing tsne manifold plot to {out_plot}.")
+        viz.show(out_plot)  # Finalize and render the figure
     return dtw_man
 
 
@@ -155,11 +140,7 @@ def dtw_to_tboard(normed_kwd_years, dtw_df, c=6, lim=1000):
     # TODO: Used elbow to determine, but not being placed programmatically
     LOG.info(f"Performing kmeans with {c} clusters.")
     m = KMeans(n_clusters=c)
-    # m = GaussianMixture(n_components=c)
     m.fit(dtw_df.values)
-
-    images = get_fig_images(normed_kwd_years[0:lim])
-    to_tboard(dtw_df, m, images, lim)
     return m
 
 
@@ -215,7 +196,7 @@ def plot_slop_complex(se_df, viz_dir, x_measure="slope", y_measure="complexity")
     ipv.save(out_vol_viz)
 
 
-def filter_kwds(kwd_df, out_loc, threshold=50, score_thresh=1.3, hard_limit=10_000):
+def filter_kwds(kwd_df, threshold=50, score_thresh=1.3, hard_limit=10_000):
     LOG.info(f"Only getting keywords which occur in more than {threshold} docs.")
     lim_kwd_df = (
         kwd_df.query(f"doc_id_count > {threshold}")
@@ -223,13 +204,17 @@ def filter_kwds(kwd_df, out_loc, threshold=50, score_thresh=1.3, hard_limit=10_0
         .sort_values("rake_score_mean", ascending=False)
         .iloc[0:hard_limit]
     )
-    LOG.info(f"Writing dataframe with size {lim_kwd_df.shape[0]} to {out_loc}.")
-    lim_kwd_df.to_json(out_loc, orient="records", lines=True)
     return lim_kwd_df
 
 
-def slope_count_complexity(lim_kwd_df, out_csv):
-    only_years = lim_kwd_df.iloc[:, 5:]
+def cagr(x):
+    x = x[~x.isna()]
+    return (x[-1] / x[0]) ** (1 / len(x)) - 1
+
+
+def slope_count_complexity(lim_kwd_df, overall_affil):
+    only_years = lim_kwd_df.iloc[:, 6:]
+    # TODO: using an index by number here is quite inflexible to change. Fix it.
 
     f2 = lambda x: fc.mean_change(x[~x.isna()])
     trans_t = (
@@ -239,13 +224,26 @@ def slope_count_complexity(lim_kwd_df, out_csv):
     )
     trans_t["year"] = trans_t["variable"].apply(lambda x: int(x[0:4]))
     trans_t = trans_t.drop(columns=["variable"])
-    features = extract_features(trans_t.fillna(0), column_id="index", column_sort="year")
+    features = extract_features(
+        trans_t.fillna(0), column_id="index", column_sort="year"
+    )
     features["count"] = lim_kwd_df["doc_id_count"]
     features["stem"] = lim_kwd_df["stem"]
-    features["mean_change_nan_before_exist"] = only_years.apply(f2, axis=1)
+    features["nasa_afil"] = lim_kwd_df["nasa_afil"]
+    features["norm_nasa_afil"] = lim_kwd_df["nasa_afil"] / overall_affil
 
-    LOG.info(f"Writing time series features to {out_csv}")
-    features.to_csv(out_csv)
+    up_ind = features["norm_nasa_afil"] >= 1
+    down_ind = features["norm_nasa_afil"] <= 1
+
+    sg1 = minmax_scale(features["norm_nasa_afil"][up_ind], feature_range=(0, 100))
+    sl1 = minmax_scale(features["norm_nasa_afil"][down_ind], feature_range=(0, 1))
+    features.loc[up_ind, "norm_nasa_afil"] = sg1
+    features.loc[down_ind, "norm_nasa_afil"] = sl1
+
+    features["mean_change_nan_before_exist"] = only_years.apply(f2, axis=1)
+    features["cagr"] = only_years.apply(cagr, axis=1)
+    features["rake_score_mean"] = lim_kwd_df["rake_score_mean"]
+    return features
 
 
 def main(in_dir: Path):

@@ -1,30 +1,19 @@
-BUCKET = hq-ocio-ci-bigdata/home/DataSquad/topic-emergence-ADS/
-PROFILE = moderate
+BUCKET=hq-ocio-ci-bigdata/home/DataSquad/topic-emergence-ADS/
+PROFILE=moderate
 RECIPES=python recipes.py
 
 # Set parameters depending on whether running test or full data
-ifeq ($(MODE), full)
-	EXP_NAME=full_02_14_2020
-    RECORDS_LOC=data/$(EXP_NAME)/rake_kwds.jsonl
-    LIMIT=0
-    MIN_THRESH=100
-    FREQ=250
-    SCORE=1.5
-    HARD=10000
-else
-	EXP_NAME=test_02_14_2020
-    RECORDS_LOC=data/$(EXP_NAME)/rake_kwds_small.jsonl
-    LIMIT=500
-    MIN_THRESH=500
-    FREQ=20
-    SCORE=1.5
-    HARD=10000
-    MODE=test
-endif
+BATCH_SIZE=1000
+N_PROCESS=1
+MIN_THRESH=100
+RAW_DIR=data/raw
+CONFIG_FILE=config/example_small.mk
+include $(CONFIG_FILE) # This file may overwrite some defaults variables above
 
 DATA_DIR=data/$(EXP_NAME)
 VIZ_DIR=reports/viz/$(EXP_NAME)
 MODEL_DIR=models/$(EXP_NAME)
+
 
 .PHONY: join-and-clean docs-to-keywords-df get-filtered-kwds normalize-keyword-freqs \
 		slope-complexity dtw cluster-tests dtw-viz \
@@ -38,10 +27,14 @@ $(DATA_DIR) $(MODEL_DIR) $(VIZ_DIR):
 
 ## Install packages to current environment with pip (venv recommended)
 requirements:
-	pip install -r requirements.txt
+	pip install -r requirements.txt && python -m spacy download en_core_web_sm
 
-RAW_DIR='data/raw'
+## Install the requirements for the app
+requirements-app:
+	pip install -r app/requirements.txt
+
 RAW_FILES=$(shell find $(RAW_DIR) -type f -name '*')
+RECORDS_LOC=$(DATA_DIR)/kwds.jsonl
 ## Join all years and and use rake to extract keywords.
 join-and-clean: $(RECORDS_LOC)
 $(RECORDS_LOC): $(RAW_FILES)
@@ -51,7 +44,8 @@ $(RECORDS_LOC): $(RAW_FILES)
 	python src/join_and_clean.py \
 		$(RAW_DIR) \
 		$(RECORDS_LOC) \
-		--limit $(LIMIT)
+		--limit $(LIMIT) --strategy $(STRATEGY) --batch_size $(BATCH_SIZE) \
+		--n_process $(N_PROCESS)
 
 ALL_KWDS_LOC=$(DATA_DIR)/all_keywords.jsonl
 YEAR_COUNT_LOC=$(DATA_DIR)/year_counts.csv
@@ -61,7 +55,18 @@ $(ALL_KWDS_LOC) $(YEAR_COUNT_LOC): $(RECORDS_LOC)
 	$(RECIPES) docs-to-keywords-df \
 		--infile $(RECORDS_LOC) \
 		--outfile $(ALL_KWDS_LOC) \
-		--out_years $(YEAR_COUNT_LOC)
+		--out_years $(YEAR_COUNT_LOC) \
+		--min_thresh $(MIN_THRESH)
+
+OUT_AFFIL=$(DATA_DIR)/nasa_affiliation.csv
+## Get overall nasa affiliation
+affil: $(OUT_AFFIL)
+$(OUT_AFFIL): $(RECORDS_LOC) src/get_overall_nasa_affil.py
+	python src/get_overall_nasa_affil.py $(RECORDS_LOC) $(OUT_AFFIL)
+
+bootstrap: $(RECORDS_LOC)
+	python src/bootstrapping.py $(RECORDS_LOC)
+
 
 FILT_KWDS_LOC=$(DATA_DIR)/all_keywords_threshold_$(FREQ)_$(SCORE)_$(HARD).jsonl
 ## Filter keywords by total frequency and rake score. Also provide hard limit.
@@ -84,9 +89,10 @@ $(NORM_KWDS_LOC): $(FILT_KWDS_LOC) $(YEAR_COUNT_LOC)
 TS_FEATURES_LOC=$(DATA_DIR)/slope_complex.csv
 ## Get various measures for keyword time series
 slope-complexity: $(TS_FEATURES_LOC)
-$(TS_FEATURES_LOC): $(NORM_KWDS_LOC)
+$(TS_FEATURES_LOC): $(NORM_KWDS_LOC) $(OUT_AFFIL)
 	$(RECIPES) slope-complexity \
 		--norm_loc $(NORM_KWDS_LOC) \
+		--affil_loc $(OUT_AFFIL) \
 		--out_df $(TS_FEATURES_LOC)
 
 DTW_DISTS_LOC=$(DATA_DIR)/dynamic_time_warp_distances.csv
@@ -134,38 +140,119 @@ app: | $(APP_DATA_FILES)
 
 #========= Topic Modeling =========#
 
-COH_PLT_LOC=$(VIZ_DIR)/coherence.png
-DOC_FEAT_MAT_LOC=$(DATA_DIR)/doc_feature_matrix.mm
+DOC_FEAT_MAT_LOC=$(DATA_DIR)/doc_feature_matrix.mtx
 MULT_LAB_BIN_LOC=$(MODEL_DIR)/mlb.jbl
 MAP_LOC=$(MODEL_DIR)/mat_doc_mapping.csv
-TMODEL_DIR=$(MODEL_DIR)/topic_models
-## Create document term matrix, topic model, and write to tensorboard
-make-topic-models: $(COH_PLT_LOC) $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC)
-$(COH_PLT_LOC) $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC): $(NORM_KWDS_LOC)
-	mkdir -p $(TMODEL_DIR); \
-	$(RECIPES) make-topic-models \
+## Create document term matrix
+prepare-features: $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC)
+$(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC): $(NORM_KWDS_LOC)
+	python src/topic_modeling.py prepare-features \
 		--norm_loc $(NORM_KWDS_LOC) \
+		--mat_loc $(DOC_FEAT_MAT_LOC) \
+		--mlb_loc $(MULT_LAB_BIN_LOC) \
+		--map_loc $(MAP_LOC) \
+
+COH_PLT_LOC=$(VIZ_DIR)/coherence.png
+TMODEL_DIR=$(MODEL_DIR)/topic_models
+ALG='lda'
+## Create test topic models of varying sizes
+run-topic-models: $(COH_PLT_LOC)
+$(COH_PLT_LOC): $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC)
+	mkdir -p $(TMODEL_DIR); \
+	python src/topic_modeling.py run-topic-models \
 		--plot_loc $(COH_PLT_LOC) \
 		--mat_loc $(DOC_FEAT_MAT_LOC) \
 		--mlb_loc $(MULT_LAB_BIN_LOC) \
 		--map_loc $(MAP_LOC) \
-		--tmodels_dir $(TMODEL_DIR)
+		--tmodels_dir $(TMODEL_DIR) \
+		--alg $(ALG)
 
-TMODEL_VIZ_LOC=$(VIZ_DIR)/topic_model_viz.html
 TMODELS=$(shell find $(TMODEL_DIR) -type f -name '*')
-N_TOPICS=7
+N_TOPICS=50
+TMODEL_VIZ_LOC=$(VIZ_DIR)/topic_model_viz$(N_TOPICS).html
 # Above line collects all files in dir for command prerequisite
 ## Visualize topic models with pyLDAviz
 visualize-topic-models: $(TMODEL_VIZ_LOC)
 $(TMODEL_VIZ_LOC): $(TMODELS)
-	$(RECIPES) visualize-topic-models \
+	python src/topic_modeling.py visualize-topic-models \
+		--infile $(RECORDS_LOC) \
 		--tmodel_dir $(TMODEL_DIR) \
 		--n $(N_TOPICS) \
 		--mlb_loc $(MULT_LAB_BIN_LOC) \
 		--map_loc $(MAP_LOC) \
 		--tmodel_viz_loc $(TMODEL_VIZ_LOC)
 
+TOPIC_TO_BIBCODES_LOC=$(VIZ_DIR)/topic_to_bibcodes.csv
+## Explore topic models and how they connect to original dataset
+explore-topic-models: $(TOPIC_TO_BIBCODES_LOC)
+$(TOPIC_TO_BIBCODES_LOC):  $(TMODELS)
+	python src/topic_modeling.py explore-topic-models \
+		--infile $(RECORDS_LOC) \
+		--tmodel_dir $(TMODEL_DIR) \
+		--n $(N_TOPICS) \
+		--mlb_loc $(MULT_LAB_BIN_LOC) \
+		--map_loc $(MAP_LOC) \
+		--topic_to_bibcodes_loc $(TOPIC_TO_BIBCODES_LOC)
+
 #========= Docker =========#
+
+PIPELINE_IMAGE_NAME=keyword-emergence-pipeline
+## Build docker image for service, automatically labeling image with link to most recent commit
+build:
+	export COMMIT=$$(git log -1 --format=%H); \
+	export REPO_URL=$$(git remote get-url $(GIT_REMOTE)); \
+	export REPO_DIR=$$(dirname $$REPO_URL); \
+	export BASE_NAME=$$(basename $$REPO_URL .git); \
+	export GIT_LOC=$$REPO_DIR/$$BASE_NAME/tree/$$COMMIT; \
+	export VERSION=$$(python version.py); \
+	echo $$GIT_LOC; \
+	docker build -t $(PIPELINE_IMAGE_NAME):$$VERSION \
+		--build-arg GIT_URL=$$GIT_LOC \
+		--build-arg VERSION=$$VERSION .; \
+	docker tag $(PIPELINE_IMAGE_NAME):$$VERSION $(PIPELINE_IMAGE_NAME):latest; \
+	docker tag $(PIPELINE_IMAGE_NAME):$$VERSION storage.analytics.nasa.gov/datasquad/$(PIPELINE_IMAGE_NAME):$$VERSION; \
+	docker tag $(PIPELINE_IMAGE_NAME):$$VERSION storage.analytics.nasa.gov/datasquad/$(PIPELINE_IMAGE_NAME):latest; \
+
+## Push the docker image to storage.analytics.nasa.gov
+push:
+	export VERSION=$$(python version.py); \
+	docker push storage.analytics.nasa.gov/datasquad/$(PIPELINE_IMAGE_NAME):$$VERSION; \
+	docker push storage.analytics.nasa.gov/datasquad/$(PIPELINE_IMAGE_NAME):latest
+
+## Push docker image to storage.analytics.nasa.gov as stable version
+push-stable:
+	export VERSION=$$(python version.py); \
+	docker tag $(PIPELINE_IMAGE_NAME):$$VERSION storage.analytics.nasa.gov/datasquad/$(PIPELINE_IMAGE_NAME):stable; \
+	docker push storage.analytics.nasa.gov/datasquad/$(PIPELINE_IMAGE_NAME):latest
+
+## Save the docker image locally
+save:
+	docker save $(PIPELINE_IMAGE_NAME):latest | gzip > $(PIPELINE_IMAGE_NAME)_latest.tar.gz
+
+# Server name here references an entry in the ~/.ssh/config file
+SERVER_NAME=compute-ml
+## Upload docker image to server
+upload:
+	scp $(PIPELINE_IMAGE_NAME)_latest.tar.gz \
+		compute-ml:/home/ubuntu/projects/keyword-emergence/$(PIPELINE_IMAGE_NAME)_latest.tar.gz
+
+## Load docker image on remote server from local file which was uploaded
+load:
+	ssh compute-ml "cd /home/ubuntu/projects/keyword-emergence/ && docker load < $(PIPELINE_IMAGE_NAME)_latest.tar.gz"
+
+## Run docker image remotely
+run-remote:
+	ssh compute-ml << HERE
+		cd /home/ubuntu/projects/keyword-emergence/
+		docker run -d --shm-size 4g \
+			--env NB_WORKERS=12 \
+			-v $(pwd)/config:/home/config \
+			-v $(pwd)/data:/home/data \
+			-v $(pwd)/models:/home/models \
+			-v $(pwd)/reports:/home/reports \
+			keyword-emergence-pipeline:latest \
+			dtw-viz CONFIG_FILE=config/full_new_data.mk"
+	HERE
 
 IMAGE_NAME=keyword-emergence-visualizer
 GIT_REMOTE=origin
@@ -202,9 +289,15 @@ sync-from-s3:
 
 ## sync data and models to s3 bucket
 sync-to-s3:
+ifeq (default,$(PROFILE))
+	aws s3 sync models/$(EXP_NAME) s3://$(BUCKET)models/$(EXP_NAME)
+	aws s3 sync data/$(EXP_NAME) s3://$(BUCKET)data/$(EXP_NAME)
+	aws s3 sync reports/viz/$(EXP_NAME) s3://$(BUCKET)reports/viz/$(EXP_NAME)
+else
 	aws s3 sync models/$(EXP_NAME) s3://$(BUCKET)models/$(EXP_NAME) --profile $(PROFILE)
 	aws s3 sync data/$(EXP_NAME) s3://$(BUCKET)data/$(EXP_NAME) --profile $(PROFILE)
 	aws s3 sync reports/viz/$(EXP_NAME) s3://$(BUCKET)reports/viz/$(EXP_NAME) --profile $(PROFILE)
+endif
 
 ## sync app data and models from s3 bucket. WARNING: This will overwrite existing files for current experiment.
 sync-app-data-from-s3:
@@ -214,7 +307,7 @@ sync-app-data-from-s3:
 
 ## sync raw ADS files from s3 bucket
 sync-raw-data-from-s3:
-	aws s3 sync s3://hq-ocio-ci-bigdata/data/ADS/2019_12_19 data/raw
+	aws s3 sync s3://hq-ocio-ci-bigdata/data/ADS/2020_03_15 data/raw
 
 #################################################################################
 # Self Documenting Commands                                                     #

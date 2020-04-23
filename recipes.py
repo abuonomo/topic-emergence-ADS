@@ -1,5 +1,4 @@
 import logging
-import os
 from pathlib import Path
 
 import click
@@ -12,7 +11,6 @@ from src.analyze_keyword_time_series import (
     plot_slop_complex,
     dtw_to_manifold,
     yellow_plot_kmd,
-    plot_gm_bics,
     plot_time,
     filter_kwds,
     dtw_to_tboard,
@@ -23,7 +21,6 @@ from src.create_keyword_and_syn_lists import (
 )
 from src.dtw_time_analysis import dtw_kwds
 from src.topic_modeling import (
-    feature_and_topic_model,
     topic_model_viz,
     get_doc_len_from_file,
 )
@@ -32,32 +29,6 @@ logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
 
-try:
-    MODE = os.environ["MODE"]
-except KeyError:
-    MODE = "test"
-
-if MODE == "full":
-    LOG.info("Full mode")
-    EXP_NAME = "kwd_analysis_full_perc2"
-    RECORDS_LOC = Path("data/rake_kwds.jsonl")
-    MIN_THRESH = 100
-    FREQ = 250
-    SCORE = 1.5
-    HARD = 10_000
-else:
-    LOG.info("Testing mode")
-    EXP_NAME = "kwd_analysis_perc"
-    RECORDS_LOC = Path("data/rake_kwds_small.jsonl")
-    MIN_THRESH = 500
-    FREQ = 20
-    SCORE = 1.5
-    HARD = 10_000
-
-DATA_DIR = Path("data") / EXP_NAME
-VIZ_DIR = Path("reports/viz") / EXP_NAME
-MODEL_DIR = Path("models") / EXP_NAME
-
 
 @click.group()
 def cli():
@@ -65,10 +36,11 @@ def cli():
 
 
 @cli.command()
-@click.option("--infile", type=Path, default=RECORDS_LOC)
-@click.option("--outfile", type=Path, default=DATA_DIR / "all_keywords.jsonl")
-@click.option("--out_years", type=Path, default=DATA_DIR / "year_counts.csv")
-def docs_to_keywords_df(infile, outfile, out_years):
+@click.option("--infile", type=Path)
+@click.option("--outfile", type=Path)
+@click.option("--out_years", type=Path)
+@click.option("--min_thresh", type=int, default=100)
+def docs_to_keywords_df(infile, outfile, out_years, min_thresh):
     """
     Get dataframe of keyword frequencies over the years
     """
@@ -76,7 +48,24 @@ def docs_to_keywords_df(infile, outfile, out_years):
 
     LOG.info(f"Reading keywords from {infile}.")
     df = pd.read_json(infile, orient="records", lines=True)
-    kwd_df, year_counts = flatten_to_keywords(df, MIN_THRESH)
+    df = df.drop(
+        [
+            "arxiv_class",
+            "alternate_bibcode",
+            "bibcode",
+            "keyword",
+            "ack",
+            "aff",
+            "bibstem",
+            "aff_id",
+            "citation_count",
+        ],
+        axis=1,
+    )
+    df['title'] = df['title'].astype(str)
+    df['abstract'] = df['abstract'].astype(str)
+    df['year'] = df['year'].astype(int)
+    kwd_df, year_counts = flatten_to_keywords(df, min_thresh)
     LOG.info(f"Writing out all keywords to {outfile}.")
     kwd_df.to_json(outfile, orient="records", lines=True)
     LOG.info(f"Writing year counts to {out_years}.")
@@ -84,38 +73,26 @@ def docs_to_keywords_df(infile, outfile, out_years):
 
 
 @cli.command()
-@click.option("--infile", type=Path, default=DATA_DIR / "all_keywords.jsonl")
-@click.option(
-    "--out_loc",
-    type=Path,
-    default=DATA_DIR / f"all_keywords_threshold_{FREQ}_{SCORE}_{HARD}.jsonl",
-)
-@click.option("--threshold", type=int, default=FREQ)
-@click.option("--score_thresh", type=float, default=SCORE)
-@click.option("--hard_limit", type=int, default=HARD)
+@click.option("--infile", type=Path)
+@click.option("--out_loc", type=Path)
+@click.option("--threshold", type=int)
+@click.option("--score_thresh", type=float)
+@click.option("--hard_limit", type=int)
 def get_filtered_kwds(infile, out_loc, threshold, score_thresh, hard_limit):
     """
     Filter keywords by total frequency and rake score. Also provide hard limit.
     """
     LOG.info(f"Reading from {infile}")
     df = pd.read_json(infile, orient="records", lines=True)
-    filter_kwds(df, out_loc, threshold, score_thresh, hard_limit)
+    lim_kwd_df = filter_kwds(df, threshold, score_thresh, hard_limit)
+    LOG.info(f"Writing dataframe with size {lim_kwd_df.shape[0]} to {out_loc}.")
+    lim_kwd_df.to_json(out_loc, orient="records", lines=True)
 
 
 @cli.command()
-@click.option(
-    "--kwds_loc",
-    type=Path,
-    default=DATA_DIR / f"all_keywords_threshold_{FREQ}_{SCORE}_{HARD}.jsonl",
-)
-@click.option(
-    "--in_years", type=Path, default=DATA_DIR / "year_counts.csv",
-)
-@click.option(
-    "--out_norm",
-    type=Path,
-    default=DATA_DIR / f"all_keywords_norm_threshold_{FREQ}_{SCORE}_{HARD}.jsonl",
-)
+@click.option("--kwds_loc", type=Path)
+@click.option("--in_years", type=Path)
+@click.option("--out_norm", type=Path)
 def normalize_keyword_freqs(kwds_loc, in_years, out_norm):
     """
     Normalize keyword frequencies by year totals and percent of baselines.
@@ -135,27 +112,25 @@ def normalize_keyword_freqs(kwds_loc, in_years, out_norm):
 
 
 @cli.command()
-@click.option(
-    "--norm_loc",
-    type=Path,
-    default=DATA_DIR / f"all_keywords_norm_threshold_{FREQ}_{SCORE}_{HARD}.jsonl",
-)
-@click.option(
-    "--out_df", type=Path, default=DATA_DIR / "slope_complex.csv",
-)
-def slope_complexity(norm_loc, out_df):
+@click.option("--norm_loc", type=Path)
+@click.option("--affil_loc", type=Path)
+@click.option("--out_df", type=Path)
+def slope_complexity(norm_loc, affil_loc, out_df):
     """
     Get various measures for keyword time series
     """
     # TODO: Variable for the path above?
     LOG.info(f"Reading normalized keywords years from {norm_loc}.")
     normed_kwds_df = pd.read_json(norm_loc, orient="records", lines=True)
-    slope_count_complexity(normed_kwds_df, out_df)
+    overall_affil = pd.read_csv(affil_loc)['nasa_affiliation'].iloc[0]
+    features = slope_count_complexity(normed_kwds_df, overall_affil)
+    LOG.info(f"Writing time series features to {out_df}")
+    features.to_csv(out_df)
 
 
 @cli.command()
-@click.option("--infile", type=Path, default=DATA_DIR / "slope_complex.csv")
-@click.option("--viz_dir", type=Path, default=VIZ_DIR)
+@click.option("--infile", type=Path)
+@click.option("--viz_dir", type=Path)
 def plot_slope(infile, viz_dir):
     """
     Plot slope and complexity
@@ -165,28 +140,8 @@ def plot_slope(infile, viz_dir):
 
 
 @cli.command()
-def plot_times():
-    """
-    Plot time series for individual keywords
-    """
-    infile = DATA_DIR / f"all_keywords_threshold_{FREQ}_{SCORE}_{HARD}.jsonl"
-    LOG.info(f"Reading from {infile}")
-    df = pd.read_json(infile, orient="records", lines=True)
-    inner_plot = lambda x: plot_time(x, size=(7, 7), show=True)
-    lim_df = df.set_index("stem").iloc[:, 5:]
-    # Placeholder for debugging / examining the individual plots
-    inner_plot(lim_df.iloc[0])
-
-
-@cli.command()
-@click.option(
-    "--norm_loc",
-    type=Path,
-    default=DATA_DIR / f"all_keywords_norm_threshold_{FREQ}_{SCORE}_{HARD}.jsonl",
-)
-@click.option(
-    "--dtw_loc", type=Path, default=DATA_DIR / "dynamic_time_warp_distances.csv"
-)
+@click.option("--norm_loc", type=Path)
+@click.option("--dtw_loc", type=Path)
 def dtw(norm_loc, dtw_loc):
     """
     Compute pairwise dynamic time warp between keywords
@@ -200,10 +155,8 @@ def dtw(norm_loc, dtw_loc):
 
 
 @cli.command()
-@click.option(
-    "--dtw_loc", type=Path, default=DATA_DIR / "dynamic_time_warp_distances.csv"
-)
-@click.option("--out_elbow_plot", type=Path, default=VIZ_DIR / "elbow.png")
+@click.option("--dtw_loc", type=Path)
+@click.option("--out_elbow_plot", type=Path)
 def cluster_tests(dtw_loc, out_elbow_plot):
     """
     Try various numbers of clusters for kmeans, produce plots
@@ -214,23 +167,11 @@ def cluster_tests(dtw_loc, out_elbow_plot):
 
 
 @cli.command()
-@click.option(
-    "--norm_loc",
-    type=Path,
-    default=DATA_DIR / f"all_keywords_threshold_{FREQ}_{SCORE}_{HARD}.jsonl",
-)
-@click.option(
-    "--dtw_loc", type=Path, default=DATA_DIR / "dynamic_time_warp_distances.csv",
-)
-@click.option(
-    "--kmeans_loc", type=Path, default=MODEL_DIR / "kmeans.jbl",
-)
-@click.option(
-    "--out_man_plot", type=Path, default=VIZ_DIR / "manifold.png",
-)
-@click.option(
-    "--out_man_points", type=Path, default=MODEL_DIR / "dtw_manifold_proj.jbl",
-)
+@click.option("--norm_loc", type=Path)
+@click.option("--dtw_loc", type=Path)
+@click.option("--kmeans_loc", type=Path)
+@click.option("--out_man_plot", type=Path)
+@click.option("--out_man_points", type=Path)
 def dtw_viz(norm_loc, dtw_loc, kmeans_loc, out_man_plot, out_man_points):
     """
     Cluster keywords by dynamic time warp values and plot in tensorboard.
@@ -241,7 +182,8 @@ def dtw_viz(norm_loc, dtw_loc, kmeans_loc, out_man_plot, out_man_points):
     LOG.info(f"Reading dynamic time warp distances from {dtw_loc}.")
     dtw_df = pd.read_csv(dtw_loc, index_col=0)
 
-    kwd_years = kwds_df.set_index("stem").iloc[:, 5:]
+    kwd_years = kwds_df.set_index("stem").iloc[:, 6:]
+    # TODO: get years in different way, pulling out index by number is inflexible.
     kmeans = dtw_to_tboard(kwd_years, dtw_df, c=7)  # c taken from elbow viz
     dtw_man = dtw_to_manifold(dtw_df, out_man_plot)
 
@@ -249,70 +191,6 @@ def dtw_viz(norm_loc, dtw_loc, kmeans_loc, out_man_plot, out_man_points):
     joblib.dump(kmeans, kmeans_loc)
     LOG.info(f"Writing manifold points to {out_man_points}.")
     joblib.dump(dtw_man, out_man_points)
-
-
-@cli.command()
-@click.option(
-    "--norm_loc",
-    type=Path,
-    default=DATA_DIR / f"all_keywords_norm_threshold_{FREQ}_{SCORE}_{HARD}.jsonl",
-)
-@click.option(
-    "--plot_loc", type=Path, default=VIZ_DIR / "coherence.png",
-)
-@click.option(
-    "--mat_loc", type=Path, default=DATA_DIR / "doc_feature_matrix.mm",
-)
-@click.option(
-    "--mlb_loc", type=Path, default=MODEL_DIR / "mlb.jbl",
-)
-@click.option(
-    "--map_loc", type=Path, default=MODEL_DIR / "mat_doc_mapping.csv",
-)
-@click.option(
-    "--tmodels_dir", type=Path, default=MODEL_DIR / "topic_models",
-)
-def make_topic_models(norm_loc, plot_loc, mat_loc, mlb_loc, map_loc, tmodels_dir):
-    """
-    Create document term matrix, topic model, and write to tensorboard
-    """
-    LOG.info(f"Reading normalized keywords years from {norm_loc}.")
-    lim_kwds_df = pd.read_json(norm_loc, orient="records", lines=True)
-
-    X, mlb, mat_id_to_doc_id = feature_and_topic_model(
-        lim_kwds_df, plot_loc, tmodels_dir
-    )
-
-    LOG.info("Writing matrix, multilabel binarizer, and matrix to doc id mapping.")
-    MODEL_DIR.mkdir(exist_ok=True)
-
-    LOG.info(f"Writing doc feature matrix to  {mat_loc}")
-    mmwrite(str(mat_loc), X)
-    LOG.info(f"Writing multilabel binarizer to {mlb_loc}")
-    joblib.dump(mlb, mlb_loc)
-    LOG.info(f"Writing matrix to doc id mapping to {map_loc}")
-    mat_id_to_doc_id.to_csv(map_loc)
-
-
-@cli.command()
-@click.option("--tmodel_dir", type=Path, default=MODEL_DIR / "topic_models")
-@click.option("--n", type=int, default=7)
-@click.option("--mlb_loc", type=Path, default=MODEL_DIR / "mlb.jbl")
-@click.option("--map_loc", type=Path, default=MODEL_DIR / "mat_doc_mapping.csv")
-@click.option("--tmodel_viz_loc", type=Path, default=VIZ_DIR / "topic_model_viz.html")
-def visualize_topic_models(tmodel_dir, n, mlb_loc, map_loc, tmodel_viz_loc):
-    tmodel_loc = tmodel_dir / f"topics_{n}.jbl"
-    LOG.info(f"Counting document lengths from {RECORDS_LOC}.")
-    doc_lens = get_doc_len_from_file(RECORDS_LOC)
-    LOG.info(f"Loading topic model from {tmodel_loc}")
-    tmodel = joblib.load(tmodel_loc)
-    LOG.info(f"Loading multilabel binarizer from {mlb_loc}")
-    mlb = joblib.load(mlb_loc)
-    LOG.info(f"Reading matrix to doc id mapping from {map_loc}")
-    mat_id_to_doc_id = pd.read_csv(map_loc, index_col=0)
-
-    mdoc_lens = [doc_lens[i] for i in mat_id_to_doc_id["matrix_row_index"]]
-    topic_model_viz(tmodel, mlb, mdoc_lens, tmodel_viz_loc)
 
 
 if __name__ == "__main__":

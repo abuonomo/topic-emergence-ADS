@@ -15,7 +15,7 @@ See all options by going to root of this repository and running `make`.
  - Python 3.7. Tested on Python 3.7.6.
  - [Docker](https://www.docker.com/). Tested on `Docker version 19.03.5, build 633a0ea`.
 
-First, you will want to be working in a virtual environement. For example, you could make one using python's [built-in venv module](https://docs.python.org/3/library/venv.html).
+First, you will want to be working in a virtual environment. For example, you could make one using python's [built-in venv module](https://docs.python.org/3/library/venv.html).
 ```bash
 python -m venv my_env
 ```
@@ -45,7 +45,28 @@ The pipeline process is as follows:
 5. Finally, a flask app can run which displays a scatter plot with each keyword time series as a point. The axes are each one of the extracted time series features. The bubbles are sized by the log of their counts and colored by their dynamic time warp kmeans cluster (`link-data-to-app`, `app`).
 
 See list of all options with descriptions by running `make`.
- 
+
+### With Docker
+
+You can run the data pipeline with docker, by either building or pulling the image. For example, pulling the image:
+```bash
+docker pull storage.analytics.nasa.gov/datasquad/keyword-emergence-pipeline:latest
+```
+You could alias the docker run command like so:
+```bash
+alias emerge='docker run -it --rm \
+    -v $(pwd)/config:/home/config \
+    -v $(pwd)/data:/home/data \
+    -v $(pwd)/models:/home/models \
+    -v $(pwd)/reports:/home/reports \
+    storage.analytics.nasa.gov/datasquad/keyword-emergence-pipeline:latest'
+```
+Then, just run `emerge` to see all the Makefile options.
+
+You might have to assure that the docker container's user has the right permissions on the attached volumes. You could do this by changing the owner of these directories, using the uid of the container's user (999):
+```bash
+chown -R 999:999 config/ data/ models/ reports/
+```
 ## App
 To just run the app from a docker image, first pull or build the keyword-emergence-visualizer docker image (Dockerfile [here](app/Dockerfile)). You can see available image tags [here](https://storage.analytics.nasa.gov/repository/datasquad/keyword-emergence-visualizer). For example, you can pull the `latest` image with:
  ```

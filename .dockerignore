@@ -1,0 +1,11 @@
+data/*
+venv/*
+dask-worker-space/*
+*.tar.gz
+*.zip
+references/*
+models/*
+runs/*
+scratch/*
+app/*
+__pycache__/*

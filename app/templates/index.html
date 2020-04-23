@@ -15,8 +15,8 @@
   </head>
   <body>
     <h1>Keyword Emergence Visualizer <span id="version">(version: {{ version }})</span></h1>
-    <div style="width: 100%; overflow: hidden; margin-left: 4%">
-      <div style="width: 50%; float: left; margin-top: 20px; margin-bottom: 0px">
+    <div style="width: 100%; overflow: hidden; margin-left: 4%; display: flex">
+      <div style="flex: 50%; float: left; margin-top: 20px; margin-bottom: 0px;">
         <p id="description">
           We calcluated many measures from the the frequencies of keywords in the Astrophysics Data System (ADS).
           The two dropdowns contain names of values calculated from the keyword time series.
@@ -25,10 +25,13 @@
           On the left, there are a few predefined views which may be useful.
         </p>
       </div>
-      <div id='options' style="margin-left: 50px; margin-top:0px">
+      <div id='options' style="flex: 50%; margin-left: 50px; margin-top:0px; float: right;">
         <ul style="list-style-type:none">
           <li>x: <select id="selectButtonX" class="selector"></select></li>
           <li>y: <select id="selectButtonY" class="selector"></select></li>
+          <li>xScale: <select id="selectButtonXScale" class="selector"></select></li>
+          <li>minimum count: <input id="minCountInput" value="0" type="number"></input></li>
+          <li>minimum rake score: <input id="minRakeInput" value="7" type="number"></input></li>
           <li><button type="button" id="enterButton">Transform</button></li>
           <li><br></li>
           <li><button type="button" id="toggleNorm">Toggle Time Series Normalize</button></li>
@@ -38,6 +41,7 @@
     <div style="width: 100%; overflow: hidden;">
       <div id="views" style="width: 100px; float: left; margin-top: 50px">
         <div class="btn-group">
+          <button id="cagrNasaafil">CAGR vs NASA Affiliation</button>
           <button id="manifold">manifold</button>
           <button id="maxSkew">First max location vs skewness</button>
           <button id="changeComplex">mean change vs complexity</button>
@@ -222,7 +226,6 @@
             }
           }).then(
             function(data) {
-              console.log(data);
               timeChart.data(data);
             }
           )
@@ -360,6 +363,12 @@
           return my;
         };
 
+        my.xScale = function(value) {
+          if (!arguments.length) return xScale;
+          xScale = value;
+          return my;
+        };
+
         return my;
       }
 
@@ -402,9 +411,7 @@
 
             formatData = function(d) {
               d[xName] = parseTime(d[xName]);
-              console.log(d[xName]);
               d[yName] = +d[yName];
-              console.log(d[yName]);
             };
 
             updateData = function() {
@@ -614,8 +621,8 @@
       var chart0 = scatterChart()
       .height(height)
       .width(width)
-      .xName('value__mean_change')
-      .yName('value__cid_ce__normalize_True')
+      .xName('nasa_afil')
+      .yName('cagr')
       .timeSvg(timeSvg)
       .timeChart(timeChart)
       .color(color);
@@ -630,10 +637,13 @@
       .timeChart(timeChart)
       .color(color);
 
+      var min_count = 0;
+      var minRake=0;
+
       d3.json(window.location.pathname + "get-scatter-data", {
             method:"POST",
             body: JSON.stringify({
-              x: 'value__mean_change', y: 'value__cid_ce__normalize_True'
+              x: 'nasa_afil', y: 'cagr', min_count: min_count, minRake: minRake
             }),
             headers: {
               "Content-type": "application/json; charset=UTF-8"
@@ -664,25 +674,28 @@
             .text(function (d) { return d; }) // text showed in the menu
             .attr("value", function (d) { return d; }); // corresponding value returned by the button
 
+            d3.select("#selectButtonXScale")
+            .selectAll('myOptions')
+            .data(['linear', '^0.1'])
+            .enter()
+            .append('option')
+            .text(function (d) { return d; }) // text showed in the menu
+            .attr("value", function (d) { return d; }); // corresponding value returned by the button
+
             d3.select("#enterButton").on("click", function(d) {
               // recover the option that has been chosen
               var selectedX = d3.select("#selectButtonX").property("value");
               var selectedY = d3.select("#selectButtonY").property("value");
-              scatterSvg.selectAll('*').remove();
-              d3.json(window.location.pathname + "get-scatter-data", {
-                method:"POST",
-                body: JSON.stringify({
-                  x: selectedX, y: selectedY
-                }),
-                headers: {
-                  "Content-type": "application/json; charset=UTF-8"
-                }
-              })
-                .then(function(data) {
-                  scatterSvg
-                    .datum(data)
-                    .call(chart0.xName(selectedX).yName(selectedY));
-                  });
+              var min_count = d3.select("#minCountInput").property("value");
+              var minRake = d3.select("#minRakeInput").property("value");
+              var selectedXScale = d3.select("#selectButtonXScale").property("value");
+              if (selectedXScale === '^0.1') {
+                var xScale = d3.scalePow().exponent(0.1)
+              }
+              else {
+                var xScale = d3.scaleLinear()
+              }
+              return scatterRequestPlot(d, selectedX, selectedY, min_count, minRake, xScale);
               }
             )}
         );
@@ -690,10 +703,10 @@
       d3.json(window.location.pathname + 'get-all-time-data')
         .then(
           function(data) {
-            console.log(data);
             timeSvg.call(timeChart.data(data));
           }
       );
+
 
       d3.select('#toggleNorm').on('click', function(d) {
         tc = chart0.timeChart();
@@ -704,15 +717,12 @@
         }
       });
 
-      function scatterRequestPlot(d, selectedX, selectedY) {
-        // recover the option that has been chosen
-        // let selectedX = 'manifold_x';
-        // let selectedY = 'manifold_y';
+      function scatterRequestPlot(d, selectedX, selectedY, min_count=0, minRake=0, xScale=d3.scaleLinear()) {
         scatterSvg.selectAll('*').remove();
         d3.json(window.location.pathname + "get-scatter-data", {
           method:"POST",
           body: JSON.stringify({
-            x: selectedX, y: selectedY
+            x: selectedX, y: selectedY, min_count: min_count, minRake: minRake
           }),
           headers: {
             "Content-type": "application/json; charset=UTF-8"
@@ -721,11 +731,18 @@
         .then(function(data) {
           scatterSvg
           .datum(data)
-          .call(chart0.xName(selectedX).yName(selectedY));
+          .call(chart0.xName(selectedX).yName(selectedY).xScale(xScale));
         });
       }
 
       // Saved views
+      d3.select("#cagrNasaafil").on("click", function (d) {
+                let x = 'nasa_afil';
+                let y = 'cagr';
+                return scatterRequestPlot(d, x, y);
+              }
+      );
+
       d3.select("#manifold").on("click", function (d) {
           let x = 'manifold_x';
           let y = 'manifold_y';
@@ -746,6 +763,7 @@
                 return scatterRequestPlot(d, x, y);
               }
       );
+
 
     </script>
   <footer id="footerInfo">

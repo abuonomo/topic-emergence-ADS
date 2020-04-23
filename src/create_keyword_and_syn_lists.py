@@ -1,12 +1,14 @@
 import argparse
 import logging
+import os
 from pathlib import Path
+from multiprocessing import cpu_count
 
 import numpy as np
 import pandas as pd
 import spacy
-from dtw import dtw
 from nltk.stem import PorterStemmer
+from pandarallel import pandarallel
 from scipy.spatial.distance import euclidean
 from sklearn.preprocessing import LabelBinarizer, MinMaxScaler
 from tqdm import tqdm
@@ -16,6 +18,14 @@ LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
 
 NLP = spacy.load("en_core_web_sm")
+if "NB_WORKERS" in os.environ:
+    NB_WORKERS = int(os.environ['NB_WORKERS'])
+else:
+    NB_WORKERS = cpu_count()
+LOG.info(f'Using {NB_WORKERS} workers for pandarallel')
+
+tqdm.pandas()
+pandarallel.initialize(nb_workers=NB_WORKERS, progress_bar=True)
 
 
 def write_syn_file(out_syn_file, lim_sg):
@@ -30,7 +40,7 @@ def write_syn_file(out_syn_file, lim_sg):
                 f0.write("\n")
 
 
-def get_kwd_occurences(df, min_tresh=5):
+def get_kwd_occurences(df, min_thresh=5, max_thresh=0.7):
     LOG.info("Flattening along document rake_kwds.")
     df = df.copy()
     df = df.applymap(lambda x: np.nan if x is None else x)
@@ -41,44 +51,48 @@ def get_kwd_occurences(df, min_tresh=5):
     kwd_df = pd.DataFrame(all_kwds)
     kwd_df.columns = ["doc_id", "keyword", "rake_score"]
     kwd_df["year"] = df.loc[kwd_df["doc_id"], "year"].tolist()
+    kwd_df["nasa_afil"] = df.loc[kwd_df["doc_id"], "nasa_afil"].tolist()
     ta = df["title"] + "||" + df["abstract"]  # pass this from join func
     ta = ta[ta.apply(lambda x: type(x) == str)]
-
+    n_docs = len(kwd_df.doc_id.unique())
+    max_thresh_int = np.ceil(max_thresh * n_docs)
     kwds = (
         kwd_df.groupby("keyword")
-        .agg({"keyword": "count"})
-        .query(f"keyword > {min_tresh}")
+        .count()
+        .query(f"doc_id > {min_thresh}")
+        .query(f"doc_id < {max_thresh_int}")
         .index
     )
 
     # Go back and string match the keywords against all titles and abstracts.
     # Do this because RAKE gives us candidate keywords but does not assure us of their
     # locations. Only says keyword is present if it passes through RAKE.
-    tqdm.pandas()
     LOG.info("Going back through dataset to find keyword doc_id locations.")
-    doc_to_kwds = ta.progress_apply(lambda x: [k for k in kwds if k in x])
+    doc_to_kwds = ta.parallel_apply(lambda x: [k for k in kwds if k in x])
+    # doc_to_kwds = ta.progress_apply(lambda x: [k for k in kwds if k in x])
     dke = doc_to_kwds.explode().reset_index()
     dke.columns = ["doc_id", "keyword"]
     LOG.info("Filling years column.")
-    doc_to_year = kwd_df.groupby("doc_id").agg({"year": lambda x: x[0]})
+    doc_to_year = kwd_df.groupby("doc_id").agg(
+        {"year": lambda x: x[0], "nasa_afil": lambda x: x[0]}
+    )
     dke["rake_score"] = np.nan
     dke["keyword"] = dke["keyword"].astype(str)
-    ys = doc_to_year.loc[dke["doc_id"], "year"].tolist()
+    ys = doc_to_year.reindex(dke["doc_id"])["year"].tolist()
+    nasa_afil = doc_to_year.reindex(dke["doc_id"])["nasa_afil"].tolist()
     LOG.info(f"Years with len: {len(ys)}")
     dke["year"] = ys
+    dke["nasa_afil"] = nasa_afil
     LOG.info(f"dke with len: {len(dke)}")
     overlap_inds = pd.merge(dke.reset_index(), kwd_df, on=["doc_id", "keyword"])[
         "index"
     ]
     sdke = dke[~dke.index.isin(overlap_inds)]
     c_df = pd.concat([sdke, kwd_df]).sort_values("doc_id").reset_index(drop=True)
-    tmp_c_loc = Path('tmp_c_df.jsonl')
-    LOG.info(f'Outputting to {tmp_c_loc}')
-    c_df.to_json(tmp_c_loc, orient='records', lines=True)
-    na_ind = c_df['year'].isna()
+    na_ind = c_df["year"].isna()
     LOG.info(f"Remove {sum(na_ind)} keywords with NaN years.")
     c_df = c_df[~na_ind]
-    c_df['year'] = c_df['year'].astype(int)
+    c_df["year"] = c_df["year"].astype(int)
     return c_df
 
 
@@ -86,10 +100,24 @@ def binarize_years(df):
     LOG.info("Binarizing year columns.")
     df = df.copy()
     lb = LabelBinarizer()
+    df['year'] = df['year'].astype(np.int16)
     year_binary = lb.fit_transform(df["year"])  # there should not be NAs.
     year_binary_df = pd.DataFrame(year_binary)
     year_binary_df.columns = lb.classes_
+    # Write both to h5py, load in chunks and write concat to another h5py?
     df = pd.concat([df, year_binary_df], axis=1)
+    return df
+
+
+def stem_reduce(df, min_thresh):
+    df = df.copy()
+    LOG.info('Filtering down by keyword stems.')
+    kwds_counts = df['stem'].value_counts()
+    valid_stems = kwds_counts[kwds_counts > min_thresh].index
+    s0 = df.shape[0]
+    df = df.set_index('stem').loc[valid_stems, :].reset_index()
+    s1 = df.shape[0]
+    LOG.info(f'Removed {s0-s1} rows from dataframe.')
     return df
 
 
@@ -99,14 +127,15 @@ def stem_kwds(df):
     unq_kwds = df["keyword"].astype(str).unique()
     p = PorterStemmer()
     kwd_to_stem = {kwd: p.stem(kwd) for kwd in tqdm(unq_kwds)}
-    tqdm.pandas()
-    df["stem"] = df["keyword"].progress_apply(lambda x: kwd_to_stem[x])
+    # Could also remove start with s here, also could resolve the
+    df["stem"] = df["keyword"].progress_apply(lambda x: kwd_to_stem[x].lower().strip())
     return df
 
 
 def get_stem_aggs(df):
     LOG.info("Aggregating by stems")
     df = df.copy()
+    df["nasa_afil"] = df["nasa_afil"].apply(lambda x: 1 if x == "YES" else 0)
     years = np.sort(df["year"].unique())
     year_count_dict = {c: "sum" for c in years if not np.isnan(c)}
     df = df.groupby("stem").agg(
@@ -115,12 +144,15 @@ def get_stem_aggs(df):
                 "rake_score": "mean",
                 "doc_id": ["count", list],
                 "keyword": lambda x: list(set(x)),
+                "nasa_afil": lambda x: x.sum() / len(x),
             },
             **year_count_dict,
         }
     )
     df.columns = [f"{c}_{v}" for c, v in df.columns.values]
-    df = df.rename(columns={'keyword_<lambda>': 'keyword_list'})
+    df = df.rename(
+        columns={"keyword_<lambda>": "keyword_list", "nasa_afil_<lambda>": "nasa_afil"}
+    )
     return df
 
 
@@ -178,14 +210,15 @@ def flatten_to_keywords(df, min_thresh=5):
     LOG.info(f"Limiting to documents in database {allowed_db}")
     df = df[df["database"].apply(lambda x: allowed_db in x)]
     na_years = df["year"].isna()
-    LOG.info(f'Remove {sum(na_years)} rows with NaN years.')
+    LOG.info(f"Remove {sum(na_years)} rows with NaN years.")
     df = df[~na_years]
-    kwd_df = (
-        df.pipe(get_kwd_occurences, min_thresh)
-        .pipe(binarize_years)
-        .pipe(stem_kwds)
-        .pipe(get_stem_aggs)
-    )
+    # kwd_df = (
+    df = df.pipe(get_kwd_occurences, min_thresh)
+    df = df.pipe(stem_kwds)
+    df = df.pipe(stem_reduce, min_thresh)
+    df = df.pipe(binarize_years)
+    kwd_df = df.pipe(get_stem_aggs)
+    # )
     year_counts = df["year"].value_counts().reset_index()
     year_counts.columns = ["year", "count"]
     kwd_df = kwd_df.reset_index()

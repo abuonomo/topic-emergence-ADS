@@ -173,9 +173,9 @@ $(COH_PLT_LOC): $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC)
 		--alg $(ALG)
 
 ## Make topic models using gensim's LdaMulticore
-run-gensim-lda-mult: $(COH_PLT_LOC)
-PHONY: $(COH_PLT_LOC)
+#PHONY: $(COH_PLT_LOC)
 $(COH_PLT_LOC): # $(DCT_LOC) $(CORP_LOC) $(MAP_LOC)
+run-gensim-lda-mult: #$(COH_PLT_LOC)
 	mkdir -p $(TMODEL_DIR); \
 	python src/topic_modeling.py run-gensim-lda-mult \
 		--plot_loc $(COH_PLT_LOC) \

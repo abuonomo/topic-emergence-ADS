@@ -143,7 +143,10 @@ app: | $(APP_DATA_FILES)
 DOC_FEAT_MAT_LOC=$(DATA_DIR)/doc_feature_matrix.mtx
 MULT_LAB_BIN_LOC=$(MODEL_DIR)/mlb.jbl
 MAP_LOC=$(MODEL_DIR)/mat_doc_mapping.csv
+DCT_LOC=$(MODEL_DIR)/gensim_dct.mm
+CORP_LOC=$(MODEL_DIR)/gensim_corpus.mm
 ## Create document term matrix
+#.PHONY: $(MAP_LOC)
 prepare-features: $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC)
 $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC): $(NORM_KWDS_LOC)
 	python src/topic_modeling.py prepare-features \
@@ -151,6 +154,8 @@ $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC): $(NORM_KWDS_LOC)
 		--mat_loc $(DOC_FEAT_MAT_LOC) \
 		--mlb_loc $(MULT_LAB_BIN_LOC) \
 		--map_loc $(MAP_LOC) \
+		--dct_loc $(DCT_LOC) \
+		--corp_loc $(CORP_LOC)
 
 COH_PLT_LOC=$(VIZ_DIR)/coherence.png
 TMODEL_DIR=$(MODEL_DIR)/topic_models
@@ -167,6 +172,16 @@ $(COH_PLT_LOC): $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC)
 		--tmodels_dir $(TMODEL_DIR) \
 		--alg $(ALG)
 
+## Make topic models using gensim's LdaMulticore
+run-gensim-lda-mult: $(COH_PLT_LOC)
+$(COH_PLT_LOC): $(DCT_LOC) $(CORP_LOC) $(MAP_LOC)
+	mkdir -p $(TMODEL_DIR); \
+	python src/topic_modeling.py run-gensim-lda-mult \
+		--plot_loc $(COH_PLT_LOC) \
+		--dct_loc $(DCT_LOC) \
+		--corp_loc $(CORP_LOC) \
+		--tmodels_dir $(TMODEL_DIR)
+
 TMODELS=$(shell find $(TMODEL_DIR) -type f -name '*')
 N_TOPICS=50
 TMODEL_VIZ_LOC=$(VIZ_DIR)/topic_model_viz$(N_TOPICS).html
@@ -182,7 +197,7 @@ $(TMODEL_VIZ_LOC): $(TMODELS)
 		--map_loc $(MAP_LOC) \
 		--tmodel_viz_loc $(TMODEL_VIZ_LOC)
 
-TOPIC_TO_BIBCODES_LOC=$(VIZ_DIR)/topic_to_bibcodes.csv
+TOPIC_TO_BIBCODES_LOC=$(VIZ_DIR)/topic_distribs_to_bibcodes.csv
 ## Explore topic models and how they connect to original dataset
 explore-topic-models: $(TOPIC_TO_BIBCODES_LOC)
 $(TOPIC_TO_BIBCODES_LOC):  $(TMODELS)

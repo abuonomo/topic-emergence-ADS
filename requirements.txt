@@ -115,3 +115,4 @@ zict==2.0.0
 zipp==3.0.0
 pytextrank==2.0.1
 pandarallel==1.4.6
+gensim==3.8.2

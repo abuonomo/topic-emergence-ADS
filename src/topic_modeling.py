@@ -225,9 +225,12 @@ def run_gensim_lda_mult(plot_loc, dct_loc, corp_loc, tmodels_dir):
     dct = Dictionary.load(str(dct_loc))
     corpus = MmCorpus(str(corp_loc))
 
-    topic_range = [20, 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1500]
+    topic_range = list(range(10, 2000, 10))
+    # topic_range = [20, 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1500]
     coherences = []
-    for n_topics in topic_range:
+    pbar = tqdm(topic_range)
+    for n_topics in pbar:
+        pbar.set_description(f'n_topics: {n_topics}')
         lda = LdaMulticore(corpus, id2word=dct, num_topics=n_topics)
         cm = CoherenceModel(model=lda, corpus=corpus, coherence='u_mass')
         coherence = cm.get_coherence()  # get coherence value

@@ -10,8 +10,12 @@ import pandas as pd
 import pyLDAvis
 from enstop import PLSA, EnsembleTopics
 from enstop.utils import coherence
-from sklearn.decomposition import LatentDirichletAllocation
+from gensim.corpora import Dictionary
+from gensim.corpora import MmCorpus
+from gensim.models import LdaMulticore
+from gensim.models.coherencemodel import CoherenceModel
 from scipy.io import mmwrite, mmread
+from sklearn.decomposition import LatentDirichletAllocation
 from sklearn.preprocessing import MultiLabelBinarizer
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
@@ -29,10 +33,13 @@ def get_feature_matrix(lim_kwds_df):
     mat_id_to_doc_id = (
         doc_to_kwd.reset_index().reset_index().loc[:, ["index", "doc_id_list"]]
     )
+
+    dct = Dictionary(doc_to_kwd['stem'])
+    corpus = [dct.doc2bow(text) for text in tqdm(doc_to_kwd['stem'])]
     mat_id_to_doc_id.columns = ["matrix_row_index", "doc_id"]
     mlb = MultiLabelBinarizer(sparse_output=True)
     X = mlb.fit_transform(doc_to_kwd["stem"])  # inverse for docs x kwds
-    return X, mlb, mat_id_to_doc_id
+    return X, mlb, mat_id_to_doc_id, dct, corpus
 
 
 def __num_dist_rows__(array, ndigits=2):
@@ -163,21 +170,32 @@ def cli():
 @click.option("--mat_loc", type=Path)
 @click.option("--mlb_loc", type=Path)
 @click.option("--map_loc", type=Path)
-def prepare_features(norm_loc, mat_loc, mlb_loc, map_loc):
+@click.option("--dct_loc", type=Path)
+@click.option("--corp_loc", type=Path)
+def prepare_features(norm_loc, mat_loc, mlb_loc, map_loc, dct_loc, corp_loc):
     """
     Create document term matrix
     """
     LOG.info(f"Reading normalized keywords years from {norm_loc}.")
     lim_kwds_df = pd.read_json(norm_loc, orient="records", lines=True)
-    X, mlb, mat_doc_id_map = get_feature_matrix(lim_kwds_df)
+    X, mlb, mat_doc_id_map, dct, corpus = get_feature_matrix(lim_kwds_df)
 
     LOG.info("Writing matrix, multilabel binarizer, and matrix to doc id mapping.")
+
     LOG.info(f"Writing doc feature matrix to  {mat_loc}")
     mmwrite(str(mat_loc), X)
+
     LOG.info(f"Writing multilabel binarizer to {mlb_loc}")
     joblib.dump(mlb, mlb_loc)
+
     LOG.info(f"Writing matrix to doc id mapping to {map_loc}")
     mat_doc_id_map.to_csv(map_loc)
+
+    LOG.info(f"Writing gensim dictionary to {dct_loc}")
+    dct.save(str(dct_loc))
+
+    LOG.info(f'Writing gensim corpus to {corp_loc}')
+    MmCorpus.serialize(str(corp_loc), corpus)
 
 
 @cli.command()
@@ -196,6 +214,32 @@ def run_topic_models(plot_loc, mat_loc, mlb_loc, map_loc, tmodels_dir, alg="plsa
     LOG.info(f"Read matrix to doc id mapping from {map_loc}")
     mat_doc_id_map = pd.read_csv(map_loc, index_col=0)
     run_topic_models_inner(X, mat_doc_id_map, plot_loc, tmodels_dir, alg=alg)
+
+
+@cli.command()
+@click.option("--plot_loc", type=Path)
+@click.option("--dct_loc", type=Path)
+@click.option("--corp_loc", type=Path)
+@click.option("--tmodels_dir", type=Path)
+def run_gensim_lda_mult(plot_loc, dct_loc, corp_loc, tmodels_dir):
+    dct = Dictionary.load(str(dct_loc))
+    corpus = MmCorpus(str(corp_loc))
+
+    topic_range = [50, 100, 200, 400, 800, 1000]
+    coherences = []
+    for n_topics in topic_range:
+        lda = LdaMulticore(corpus, id2word=dct, num_topics=n_topics)
+        cm = CoherenceModel(model=lda, corpus=corpus, coherence='u_mass')
+        coherence = cm.get_coherence()  # get coherence value
+        coherences.append(coherence)
+        # Save model to disk.
+        out_model = tmodels_dir / f'gensim_topic_model{n_topics}'
+        lda.save(str(out_model))
+    fig = plot_coherence(topic_range, coherences)
+    LOG.info(f"Writing plot to {plot_loc}.")
+    fig.savefig(str(plot_loc))
+    return plot_loc
+
 
 
 @cli.command()
@@ -243,17 +287,19 @@ def explore_topic_models(
     bibcodes, titles = get_bibcodes_from_file(infile)
     mdoc_bibs = [bibcodes[i] for i in mat_id_to_doc_id["doc_id"]]
     mdoc_titles = [titles[i] for i in mat_id_to_doc_id["doc_id"]]
+
     df = pd.DataFrame(tmodel.embedding_)
     df["bibcode"] = mdoc_bibs
     df["titles"] = mdoc_titles
     cols = df.columns[-2:].tolist() + df.columns[0:-2].tolist()
     df = df[cols]
+
     LOG.info('Reorder by descending topic scores where given topic is max')
     new_df = pd.DataFrame()
     top_topics = df.iloc[:, 2:].values.argmax(axis=1)
     for t in tqdm(range(tmodel.embedding_.shape[1])):
         new_df = new_df.append(df.iloc[top_topics == t, :].sort_values(t, ascending=False))
-    import ipdb; ipdb.set_trace()
+
     LOG.info(f"Writing bibcodes to {topic_to_bibcodes_loc}")
     new_df.to_csv(topic_to_bibcodes_loc)
 

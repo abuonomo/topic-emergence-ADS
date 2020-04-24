@@ -1,4 +1,5 @@
 import json
+import re
 import logging
 from pathlib import Path
 
@@ -12,7 +13,7 @@ from enstop import PLSA, EnsembleTopics
 from enstop.utils import coherence
 from gensim.corpora import Dictionary
 from gensim.corpora import MmCorpus
-from gensim.models import LdaMulticore
+from gensim.models import LdaMulticore, LdaModel
 from gensim.models.coherencemodel import CoherenceModel
 from scipy.io import mmwrite, mmread
 from sklearn.decomposition import LatentDirichletAllocation
@@ -34,8 +35,8 @@ def get_feature_matrix(lim_kwds_df):
         doc_to_kwd.reset_index().reset_index().loc[:, ["index", "doc_id_list"]]
     )
 
-    dct = Dictionary(doc_to_kwd['stem'])
-    corpus = [dct.doc2bow(text) for text in tqdm(doc_to_kwd['stem'])]
+    dct = Dictionary(doc_to_kwd["stem"])
+    corpus = [dct.doc2bow(text) for text in tqdm(doc_to_kwd["stem"])]
     mat_id_to_doc_id.columns = ["matrix_row_index", "doc_id"]
     mlb = MultiLabelBinarizer(sparse_output=True)
     X = mlb.fit_transform(doc_to_kwd["stem"])  # inverse for docs x kwds
@@ -61,6 +62,30 @@ def topic_model_viz(model, mlb, mdoc_lens, viz_loc):
     LOG.info(f"Writing visualization to {viz_loc}")
     pyLDAvis.save_html(viz_data, str(viz_loc))
     return viz_loc
+
+
+def topic_model_viz_gensim(corpus, dct, lda, doc_lens, viz_loc):
+    LOG.info('Getting documents topic distributions.')
+    tc = lda.get_document_topics(corpus, minimum_probability=0)
+    tmp = [[v for t, v in r] for r in tqdm(tc)]
+    tmp_a = np.vstack(tmp)
+
+    term_freqs = np.array([dct.cfs[i] for i in range(lda.num_terms)])
+    vocab = np.array([lda.id2word[i] for i in range(lda.num_terms)])
+
+    data = {
+        "topic_term_dists": lda.get_topics(),
+        "doc_topic_dists": tmp_a,
+        "vocab": vocab,
+        "term_frequency": term_freqs,
+        "doc_lengths": doc_lens,
+    }
+    pyLDAvis._prepare.__num_dist_rows__ = __num_dist_rows__
+    LOG.info("Preparing data for pyLDAvis")
+    viz_data = pyLDAvis.prepare(**data, sort_topics=False)
+
+    LOG.info(f"Writing visualization to {viz_loc}")
+    pyLDAvis.save_html(viz_data, str(viz_loc))
 
 
 def tmodel_to_tboard(X, model, doc_ids):
@@ -166,6 +191,45 @@ def cli():
 
 
 @cli.command()
+@click.option('--infile', default=Path)
+@click.option('--outfile', default=Path)
+def prepare_for_neural_lda(infile, outfile):
+    LOG.info(f'Writing titles and abstracts from {infile} to {outfile}.')
+    with open(infile, "r") as f_in, open(outfile, 'w') as f_out:
+        for in_line in tqdm(f_in.read().splitlines()):
+            record = json.loads(in_line)
+            out_txt = record['title'] + ". " + record['abstract']
+            f_out.write(out_txt.replace('\n', '').strip())
+            f_out.write('\n')
+    return outfile
+
+
+@cli.command()
+@click.option('--in_docs', default=Path)
+@click.option('--lda_model_loc', default=Path)
+def run_neural_lda(in_docs, lda_model_loc):
+    from contextualized_topic_models.models.ctm import CTM
+    from contextualized_topic_models.utils.data_preparation import TextHandler
+    from contextualized_topic_models.utils.data_preparation import bert_embeddings_from_file
+    from contextualized_topic_models.datasets.dataset import CTMDataset
+
+    LOG.info('Creating vocabulary.')
+    handler = TextHandler(in_docs)
+    handler.prepare() # create vocabulary and training data
+
+    LOG.info('Generating BERT embeddings.')
+    training_bert = bert_embeddings_from_file(in_docs, "distiluse-base-multilingual-cased")
+    training_dataset = CTMDataset(handler.bow, training_bert, handler.idx2token)
+
+    LOG.info("Training model")
+    ctm = CTM(input_size=len(handler.vocab), bert_input_size=512, inference_type="combined", n_components=50)
+    ctm.fit(training_dataset) # run the model
+
+    LOG.info(f"Writing model to {lda_model_loc}")
+    joblib.dump(ctm, lda_model_loc)
+
+
+@cli.command()
 @click.option("--norm_loc", type=Path)
 @click.option("--mat_loc", type=Path)
 @click.option("--mlb_loc", type=Path)
@@ -194,7 +258,7 @@ def prepare_features(norm_loc, mat_loc, mlb_loc, map_loc, dct_loc, corp_loc):
     LOG.info(f"Writing gensim dictionary to {dct_loc}")
     dct.save(str(dct_loc))
 
-    LOG.info(f'Writing gensim corpus to {corp_loc}')
+    LOG.info(f"Writing gensim corpus to {corp_loc}")
     MmCorpus.serialize(str(corp_loc), corpus)
 
 
@@ -230,19 +294,49 @@ def run_gensim_lda_mult(plot_loc, dct_loc, corp_loc, tmodels_dir):
     coherences = []
     pbar = tqdm(topic_range)
     for n_topics in pbar:
-        pbar.set_description(f'n_topics: {n_topics}')
+        pbar.set_description(f"n_topics: {n_topics}")
         lda = LdaMulticore(corpus, id2word=dct, num_topics=n_topics)
-        cm = CoherenceModel(model=lda, corpus=corpus, coherence='u_mass')
+        cm = CoherenceModel(model=lda, corpus=corpus, coherence="u_mass")
         coherence = cm.get_coherence()  # get coherence value
         coherences.append(coherence)
         # Save model to disk.
-        out_model = tmodels_dir / f'gensim_topic_model{n_topics}'
+        out_model = tmodels_dir / f"gensim_topic_model{n_topics}"
         lda.save(str(out_model))
     fig = plot_coherence(topic_range, coherences)
     LOG.info(f"Writing plot to {plot_loc}.")
     fig.savefig(str(plot_loc))
     return plot_loc
 
+
+@cli.command()
+@click.option("--plot_loc", type=Path)
+@click.option("--corp_loc", type=Path)
+@click.option("--tmodels_dir", type=Path)
+def get_gensim_coherences(plot_loc, corp_loc, tmodels_dir):
+    corpus = MmCorpus(str(corp_loc))
+
+    pattern = re.compile("gensim_topic_model*")
+    model_locs = set()
+    for l in tmodels_dir.iterdir():
+        s = l.stem
+        if pattern.search(s):
+            model_locs.add(tmodels_dir / s.split(".")[0])
+
+    topic_range = []
+    coherences = []
+    pbar = tqdm(model_locs)
+    for in_model in pbar:
+        pbar.set_description(f"in_model: {in_model}")
+        lda = LdaModel.load(str(in_model))
+        topic_range.append(lda.num_topics)
+        cm = CoherenceModel(model=lda, corpus=corpus, coherence="u_mass")
+        coherence = cm.get_coherence()  # get coherence value
+        coherences.append(coherence)
+        # Save model to disk.
+    fig = plot_coherence(topic_range, coherences)
+    LOG.info(f"Writing plot to {plot_loc}.")
+    fig.savefig(str(plot_loc))
+    return plot_loc
 
 
 @cli.command()
@@ -264,6 +358,28 @@ def visualize_topic_models(infile, tmodel_dir, n, mlb_loc, map_loc, tmodel_viz_l
     mat_id_to_doc_id = pd.read_csv(map_loc, index_col=0)
     mdoc_lens = [doc_lens[i] for i in mat_id_to_doc_id["matrix_row_index"]]
     topic_model_viz(tmodel, mlb, mdoc_lens, tmodel_viz_loc)
+
+
+@cli.command()
+@click.option("--infile", type=Path)
+@click.option("--tmodel_dir", type=Path)
+@click.option("--n", type=int, default=7)
+@click.option("--in_corpus", type=Path)
+@click.option("--dct_loc", type=Path)
+@click.option("--map_loc", type=Path)
+@click.option("--tmodel_viz_loc", type=Path)
+def visualize_gensim_topic_models(
+    infile, tmodel_dir, n, in_corpus, dct_loc, map_loc, tmodel_viz_loc
+):
+    LOG.info("Loading corpus, dictionary, lda model, and document map")
+    corpus = MmCorpus(str(in_corpus))
+    dct = Dictionary.load(str(dct_loc))
+    lda = LdaModel.load(str(tmodel_dir / f"gensim_topic_model{n}"))
+    mat_id_to_doc_id = pd.read_csv(map_loc, index_col=0)
+
+    doc_lens = get_doc_len_from_file(infile)
+    mdoc_lens = [doc_lens[i] for i in mat_id_to_doc_id["matrix_row_index"]]
+    topic_model_viz_gensim(corpus, dct, lda, mdoc_lens, tmodel_viz_loc)
 
 
 @cli.command()
@@ -297,11 +413,13 @@ def explore_topic_models(
     cols = df.columns[-2:].tolist() + df.columns[0:-2].tolist()
     df = df[cols]
 
-    LOG.info('Reorder by descending topic scores where given topic is max')
+    LOG.info("Reorder by descending topic scores where given topic is max")
     new_df = pd.DataFrame()
     top_topics = df.iloc[:, 2:].values.argmax(axis=1)
     for t in tqdm(range(tmodel.embedding_.shape[1])):
-        new_df = new_df.append(df.iloc[top_topics == t, :].sort_values(t, ascending=False))
+        new_df = new_df.append(
+            df.iloc[top_topics == t, :].sort_values(t, ascending=False)
+        )
 
     LOG.info(f"Writing bibcodes to {topic_to_bibcodes_loc}")
     new_df.to_csv(topic_to_bibcodes_loc)

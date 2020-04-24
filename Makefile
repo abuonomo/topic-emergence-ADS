@@ -28,6 +28,8 @@ $(DATA_DIR) $(MODEL_DIR) $(VIZ_DIR):
 ## Install packages to current environment with pip (venv recommended)
 requirements:
 	pip install -r requirements.txt && python -m spacy download en_core_web_sm
+	@echo "You need to install the rust compiler on your system to use contextualized embedding topic modeling."
+	@echo "If you are on a mac see here: https://sourabhbajaj.com/mac-setup/Rust/"
 
 ## Install the requirements for the app
 requirements-app:
@@ -183,6 +185,13 @@ run-gensim-lda-mult: #$(COH_PLT_LOC)
 		--corp_loc $(CORP_LOC) \
 		--tmodels_dir $(TMODEL_DIR)
 
+## Get coherences for gensim topic models
+get-gensim-coherences: #$(COH_PLT_LOC)
+	python src/topic_modeling.py get-gensim-coherences \
+		--plot_loc $(COH_PLT_LOC) \
+		--corp_loc $(CORP_LOC) \
+		--tmodels_dir $(TMODEL_DIR)
+
 TMODELS=$(shell find $(TMODEL_DIR) -type f -name '*')
 N_TOPICS=50
 TMODEL_VIZ_LOC=$(VIZ_DIR)/topic_model_viz$(N_TOPICS).html
@@ -198,6 +207,19 @@ $(TMODEL_VIZ_LOC): $(TMODELS)
 		--map_loc $(MAP_LOC) \
 		--tmodel_viz_loc $(TMODEL_VIZ_LOC)
 
+TMODEL_VIZ_GEN_LOC=$(VIZ_DIR)/gensim_topic_model_viz$(N_TOPICS).html
+## Visualize gensim topic models with pyLDAvis
+visualize-gensim-topic-models: $(TMODEL_VIZ_GEN_LOC)
+$(TMODEL_VIZ_GEN_LOC): $(TMODELS)
+	python src/topic_modeling.py visualize-gensim-topic-models \
+		--infile $(RECORDS_LOC) \
+		--tmodel_dir $(TMODEL_DIR) \
+		--n $(N_TOPICS) \
+		--in_corpus $(CORP_LOC) \
+		--dct_loc $(DCT_LOC) \
+		--map_loc $(MAP_LOC) \
+		--tmodel_viz_loc $(TMODEL_VIZ_GEN_LOC)
+
 TOPIC_TO_BIBCODES_LOC=$(VIZ_DIR)/topic_distribs_to_bibcodes.csv
 ## Explore topic models and how they connect to original dataset
 explore-topic-models: $(TOPIC_TO_BIBCODES_LOC)
@@ -209,6 +231,22 @@ $(TOPIC_TO_BIBCODES_LOC):  $(TMODELS)
 		--mlb_loc $(MULT_LAB_BIN_LOC) \
 		--map_loc $(MAP_LOC) \
 		--topic_to_bibcodes_loc $(TOPIC_TO_BIBCODES_LOC)
+
+DOC_TXTS=$(DATA_DIR)/documents.txt
+## Prepare data for neural LDA
+prepare-for-neural-lda: $(DOC_TXTS)
+$(DOC_TXTS): $(RECORDS_LOC)
+	python src/topic_modeling.py prepare-for-neural-lda \
+		--infile $(RECORDS_LOC) \
+		--outfile $(DOC_TXTS)
+
+NEURAL_LDA_MODEL_LOC=$(MODEL_DIR)/neural_lda.jbl
+## Run contextual neural lda with bert embeddings
+run-neural-lda: $(NEURAL_LDA_MODEL_LOC)
+$(NEURAL_LDA_MODEL_LOC): $(DOC_TXTS)
+	python src/topic_modeling.py run-neural-lda \
+		--in_docs $(DOC_TXTS) \
+		--lda_model_loc $(MODEL_DIR)
 
 #========= Docker =========#
 

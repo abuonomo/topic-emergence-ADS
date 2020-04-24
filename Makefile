@@ -239,6 +239,7 @@ $(DOC_TXTS): $(RECORDS_LOC)
 	python src/topic_modeling.py prepare-for-neural-lda \
 		--infile $(RECORDS_LOC) \
 		--outfile $(DOC_TXTS) \
+		--n_topics 10 \
 		--num_epochs 10
 
 NEURAL_LDA_MODEL_LOC=$(MODEL_DIR)/neural_lda.jbl

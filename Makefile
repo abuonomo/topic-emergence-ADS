@@ -238,7 +238,8 @@ prepare-for-neural-lda: $(DOC_TXTS)
 $(DOC_TXTS): $(RECORDS_LOC)
 	python src/topic_modeling.py prepare-for-neural-lda \
 		--infile $(RECORDS_LOC) \
-		--outfile $(DOC_TXTS)
+		--outfile $(DOC_TXTS) \
+		--num_epochs 10
 
 NEURAL_LDA_MODEL_LOC=$(MODEL_DIR)/neural_lda.jbl
 ## Run contextual neural lda with bert embeddings

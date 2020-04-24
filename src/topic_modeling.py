@@ -1,6 +1,6 @@
 import json
-import re
 import logging
+import re
 from pathlib import Path
 
 import click
@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pyLDAvis
+import torch
 from enstop import PLSA, EnsembleTopics
 from enstop.utils import coherence
 from gensim.corpora import Dictionary
@@ -65,7 +66,7 @@ def topic_model_viz(model, mlb, mdoc_lens, viz_loc):
 
 
 def topic_model_viz_gensim(corpus, dct, lda, doc_lens, viz_loc):
-    LOG.info('Getting documents topic distributions.')
+    LOG.info("Getting documents topic distributions.")
     tc = lda.get_document_topics(corpus, minimum_probability=0)
     tmp = [[v for t, v in r] for r in tqdm(tc)]
     tmp_a = np.vstack(tmp)
@@ -191,50 +192,62 @@ def cli():
 
 
 @cli.command()
-@click.option('--infile', default=Path)
-@click.option('--outfile', default=Path)
+@click.option("--infile", default=Path)
+@click.option("--outfile", default=Path)
 def prepare_for_neural_lda(infile, outfile):
-    LOG.info(f'Writing titles and abstracts from {infile} to {outfile}.')
-    with open(infile, "r") as f_in, open(outfile, 'w') as f_out:
+    LOG.info(f"Writing titles and abstracts from {infile} to {outfile}.")
+    with open(infile, "r") as f_in, open(outfile, "w") as f_out:
         for in_line in tqdm(f_in.read().splitlines()):
             record = json.loads(in_line)
-            out_txt = record['title'] + ". " + record['abstract']
-            f_out.write(out_txt.replace('\n', '').strip())
-            f_out.write('\n')
+            out_txt = record["title"] + ". " + record["abstract"]
+            f_out.write(out_txt.replace("\n", "").strip())
+            f_out.write("\n")
     return outfile
 
 
 @cli.command()
-@click.option('--in_docs', default=Path)
-@click.option('--lda_model_loc', default=Path)
-def run_neural_lda(in_docs, lda_model_loc):
+@click.option("--in_docs", type=Path)
+@click.option("--lda_model_loc", type=Path)
+@click.option("--num_epochs", tpye=int, default=10)
+def run_neural_lda(in_docs, lda_model_loc, num_epochs=10):
     from contextualized_topic_models.models.ctm import CTM
     from contextualized_topic_models.utils.data_preparation import TextHandler
-    from contextualized_topic_models.utils.data_preparation import bert_embeddings_from_file
+    from contextualized_topic_models.utils.data_preparation import (
+        bert_embeddings_from_file,
+    )
     from contextualized_topic_models.datasets.dataset import CTMDataset
     from contextualized_topic_models.evaluation.measures import CoherenceNPMI
 
-    LOG.info('Creating vocabulary.')
+    LOG.info("Creating vocabulary.")
     handler = TextHandler(in_docs)
-    handler.prepare() # create vocabulary and training data
+    handler.prepare()  # create vocabulary and training data
 
-    LOG.info('Generating BERT embeddings.')
-    training_bert = bert_embeddings_from_file(in_docs, "distiluse-base-multilingual-cased")
+    LOG.info("Generating BERT embeddings.")
+    training_bert = bert_embeddings_from_file(
+        in_docs, "distiluse-base-multilingual-cased"
+    )
     training_dataset = CTMDataset(handler.bow, training_bert, handler.idx2token)
 
     LOG.info("Training model")
-    ctm = CTM(input_size=len(handler.vocab), bert_input_size=512, inference_type="combined", n_components=50)
-    ctm.fit(training_dataset) # run the model
+    ctm = CTM(
+        input_size=len(handler.vocab),
+        bert_input_size=512,
+        inference_type="combined",
+        n_components=50,
+        num_epochs=num_epochs,
+    )
+    ctm.fit(training_dataset)  # run the model
 
     LOG.info(f"Writing model to {lda_model_loc}")
-    joblib.dump(ctm, lda_model_loc)
+    torch.save(ctm, lda_model_loc)
 
     with open(in_docs, "r") as fr:
         texts = [doc.split() for doc in fr.read().splitlines()]  # load text for NPMI
 
     npmi = CoherenceNPMI(texts=texts, topics=ctm.get_topic_lists(10))
     s = npmi.score()
-    LOG.info(f'Coherence: {s}')
+    LOG.info(f"Coherence: {s}")
+
 
 @cli.command()
 @click.option("--norm_loc", type=Path)

@@ -212,6 +212,7 @@ def run_neural_lda(in_docs, lda_model_loc):
     from contextualized_topic_models.utils.data_preparation import TextHandler
     from contextualized_topic_models.utils.data_preparation import bert_embeddings_from_file
     from contextualized_topic_models.datasets.dataset import CTMDataset
+    from contextualized_topic_models.evaluation.measures import CoherenceNPMI
 
     LOG.info('Creating vocabulary.')
     handler = TextHandler(in_docs)
@@ -228,6 +229,12 @@ def run_neural_lda(in_docs, lda_model_loc):
     LOG.info(f"Writing model to {lda_model_loc}")
     joblib.dump(ctm, lda_model_loc)
 
+    with open(in_docs, "r") as fr:
+        texts = [doc.split() for doc in fr.read().splitlines()]  # load text for NPMI
+
+    npmi = CoherenceNPMI(texts=texts, topics=ctm.get_topic_lists(10))
+    s = npmi.score()
+    LOG.info(f'Coherence: {s}')
 
 @cli.command()
 @click.option("--norm_loc", type=Path)

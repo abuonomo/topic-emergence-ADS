@@ -242,11 +242,11 @@ $(DOC_TXTS): $(RECORDS_LOC)
 
 NEURAL_LDA_MODEL_LOC=$(MODEL_DIR)/neural_lda.jbl
 ## Run contextual neural lda with bert embeddings
-run-neural-lda: $(NEURAL_LDA_MODEL_LOC)
-$(NEURAL_LDA_MODEL_LOC): $(DOC_TXTS)
+run-neural-lda: #$(NEURAL_LDA_MODEL_LOC)
 	python src/topic_modeling.py run-neural-lda \
 		--in_docs $(DOC_TXTS) \
 		--lda_model_loc $(MODEL_DIR)
+#$(NEURAL_LDA_MODEL_LOC): $(DOC_TXTS)
 
 #========= Docker =========#
 

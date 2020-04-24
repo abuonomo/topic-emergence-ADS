@@ -210,7 +210,7 @@ def prepare_for_neural_lda(infile, outfile):
 @click.option("--lda_model_loc", type=Path)
 @click.option("--n_topics", tpye=int, default=10)
 @click.option("--num_epochs", tpye=int, default=10)
-def run_neural_lda(in_docs, lda_model_loc, n_topics ,num_epochs=10):
+def run_neural_lda(in_docs, lda_model_loc, n_topics=10,num_epochs=10):
     from contextualized_topic_models.models.ctm import CTM
     from contextualized_topic_models.utils.data_preparation import TextHandler
     from contextualized_topic_models.utils.data_preparation import (

@@ -246,8 +246,8 @@ run-neural-lda: #$(NEURAL_LDA_MODEL_LOC)
 	python src/topic_modeling.py run-neural-lda \
 		--in_docs $(DOC_TXTS) \
 		--lda_model_loc $(MODEL_DIR) \
-		--n_topics 10 \
-		--num_epochs 10
+		--n_topics 50 \
+		--num_epochs 30
 #$(NEURAL_LDA_MODEL_LOC): $(DOC_TXTS)
 
 #========= Docker =========#

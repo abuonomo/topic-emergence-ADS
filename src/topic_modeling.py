@@ -264,19 +264,20 @@ def run_neural_lda(
     LOG.info(f"Writing model to {lda_model_loc}")
     torch.save(ctm, lda_model_loc)
 
-    # with open(in_docs, "r") as fr:
-    #     texts = [doc.split() for doc in fr.read().splitlines()]  # load text for NPMI
+    with open(in_docs, "r") as fr:
+        texts = [doc.split() for doc in fr.read().splitlines()]  # load text for NPMI
 
-    umass = CoherenceModel(
-        topics=ctm.get_topic_lists(10),
-        corpus=corpus,
-        dictionary=dct,
-        coherence="c_umass",
-        topn=10,
-    )
-    umass.get_coherence()
-    # npmi = CoherenceNPMI(texts=texts, topics=ctm.get_topic_lists(10))
-    s = umass.score()
+    import ipdb; ipdb.set_trace()
+    # coh = CoherenceModel(
+    #     topics=ctm.get_topic_lists(10),
+    #     corpus=corpus,
+    #     dictionary=dct,
+    #     coherence="c_umass",
+    #     topn=10,
+    # )
+    coh = CoherenceNPMI(texts=texts, topics=ctm.get_topic_lists(10))
+    coh.get_coherence()
+    s = coh.score()
     LOG.info(f"Coherence: {s}")
 
 

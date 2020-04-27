@@ -207,8 +207,8 @@ def prepare_for_neural_lda(infile, outfile):
 
 def get_bow_term_doc_matrix(dct, corpus):
     bows = []
-    for doc in tqdm(corpus):
-        bow_inds = dct.doc2bow(doc)
+    for bow_inds in tqdm(corpus):
+        # bow_inds = dct.doc2bow(doc)
         bow_array = np.zeros(len(dct), dtype=int)
         inds, vals = list(zip(*bow_inds))
         np.put(bow_array, inds, vals)

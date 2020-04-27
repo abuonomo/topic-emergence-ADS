@@ -222,7 +222,7 @@ def get_bow_term_doc_matrix(dct, corpus):
 @click.option("--lda_model_loc", type=Path)
 @click.option("--n_topics", type=int, default=10)
 @click.option("--num_epochs", type=int, default=10)
-def run_neural_lda(in_docs, lda_model_loc, n_topics=10,num_epochs=10):
+def run_neural_lda(in_docs, lda_model_loc, n_topics=10, num_epochs=10):
     from contextualized_topic_models.models.ctm import CTM
     from contextualized_topic_models.utils.data_preparation import TextHandler
     from contextualized_topic_models.utils.data_preparation import (
@@ -232,23 +232,17 @@ def run_neural_lda(in_docs, lda_model_loc, n_topics=10,num_epochs=10):
     from contextualized_topic_models.evaluation.measures import CoherenceNPMI
 
     LOG.info("Creating vocabulary.")
-    import ipdb; ipdb.set_trace()
-    with open(in_docs, 'r') as f0:
+    with open(in_docs, "r") as f0:
         corpus = [l.split() for l in f0.read().splitlines()]
     dct = Dictionary(corpus)
     idx2token = {i: dct[i] for i in range(len(dct))}
-    LOG.info('Making bow term doc matrix')
+    LOG.info("Making bow term doc matrix")
     bow = get_bow_term_doc_matrix(dct, corpus)
-
-    # handler = TextHandler(in_docs)
-    # handler.prepare()  # create vocabulary and training data
 
     LOG.info("Generating BERT embeddings.")
     training_bert = bert_embeddings_from_file(
         in_docs, "distiluse-base-multilingual-cased"
     )
-    # Bow --> docs by tokens, freq of term in doc
-    # idx2token --> dict col index of bow to the actual token
     training_dataset = CTMDataset(bow, training_bert, idx2token)
 
     LOG.info("Training model")

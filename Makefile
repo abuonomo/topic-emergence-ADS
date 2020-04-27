@@ -246,7 +246,7 @@ run-neural-lda: #$(NEURAL_LDA_MODEL_LOC)
 	python src/topic_modeling.py run-neural-lda \
 		--in_docs $(DOC_TXTS) \
 		--dct_loc $(DCT_LOC) \
-		--map_loc $(MAP_LOC) \
+		--corp_loc $(CORP_LOC) \
 		--lda_model_loc $(MODEL_DIR) \
 		--n_topics 50 \
 		--num_epochs 30

@@ -253,7 +253,7 @@ def run_neural_lda(in_docs, lda_model_loc, n_topics=10,num_epochs=10):
 
     LOG.info("Training model")
     ctm = CTM(
-        input_size=len(handler.vocab),
+        input_size=len(dct),
         bert_input_size=512,
         inference_type="combined",
         n_components=n_topics,

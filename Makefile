@@ -240,14 +240,14 @@ $(DOC_TXTS): $(RECORDS_LOC)
 		--infile $(RECORDS_LOC) \
 		--outfile $(DOC_TXTS)
 
-NEURAL_LDA_MODEL_LOC=$(MODEL_DIR)/neural_lda.jbl
+NEURAL_LDA_MODEL_LOC=$(MODEL_DIR)/neural_lda.pkl
 ## Run contextual neural lda with bert embeddings
 run-neural-lda: #$(NEURAL_LDA_MODEL_LOC)
 	python src/topic_modeling.py run-neural-lda \
 		--in_docs $(DOC_TXTS) \
 		--dct_loc $(DCT_LOC) \
 		--corp_loc $(CORP_LOC) \
-		--lda_model_loc $(MODEL_DIR) \
+		--lda_model_loc $(NEURAL_LDA_MODEL_LOC) \
 		--n_topics 50 \
 		--num_epochs 30
 #$(NEURAL_LDA_MODEL_LOC): $(DOC_TXTS)

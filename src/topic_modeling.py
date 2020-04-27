@@ -224,7 +224,9 @@ def get_bow_term_doc_matrix(dct, corpus):
 @click.option("--lda_model_loc", type=Path)
 @click.option("--n_topics", type=int, default=10)
 @click.option("--num_epochs", type=int, default=10)
-def run_neural_lda(in_docs, dct_loc, corp_loc, lda_model_loc, n_topics=10, num_epochs=10):
+def run_neural_lda(
+    in_docs, dct_loc, corp_loc, lda_model_loc, n_topics=10, num_epochs=10
+):
     from contextualized_topic_models.models.ctm import CTM
     from contextualized_topic_models.utils.data_preparation import (
         bert_embeddings_from_file,
@@ -262,11 +264,19 @@ def run_neural_lda(in_docs, dct_loc, corp_loc, lda_model_loc, n_topics=10, num_e
     LOG.info(f"Writing model to {lda_model_loc}")
     torch.save(ctm, lda_model_loc)
 
-    with open(in_docs, "r") as fr:
-        texts = [doc.split() for doc in fr.read().splitlines()]  # load text for NPMI
+    # with open(in_docs, "r") as fr:
+    #     texts = [doc.split() for doc in fr.read().splitlines()]  # load text for NPMI
 
-    npmi = CoherenceNPMI(texts=texts, topics=ctm.get_topic_lists(10))
-    s = npmi.score()
+    umass = CoherenceModel(
+        topics=ctm.get_topic_lists(10),
+        corpus=corpus,
+        dictionary=dct,
+        coherence="c_umass",
+        topn=10,
+    )
+    umass.get_coherence()
+    # npmi = CoherenceNPMI(texts=texts, topics=ctm.get_topic_lists(10))
+    s = umass.score()
     LOG.info(f"Coherence: {s}")
 
 

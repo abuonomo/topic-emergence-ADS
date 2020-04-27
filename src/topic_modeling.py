@@ -275,7 +275,7 @@ def run_neural_lda(
     #     coherence="c_umass",
     #     topn=10,
     # )
-    coh = CoherenceNPMI(texts=texts, topics=ctm.get_topic_lists(10))
+    coh = CoherenceNPMI(texts=texts, topics=ctm.get_topic_lists(5))
     coh.get_coherence()
     s = coh.score()
     LOG.info(f"Coherence: {s}")

@@ -206,14 +206,10 @@ def prepare_for_neural_lda(infile, outfile):
 
 
 def get_bow_term_doc_matrix(dct, corpus):
-    bows = []
-    for bow_inds in tqdm(corpus):
-        # bow_inds = dct.doc2bow(doc)
-        bow_array = np.zeros(len(dct), dtype=int)
+    bow = np.zeros((len(corpus), len(dct)), dtype=int)
+    for i, bow_inds in enumerate(tqdm(corpus)):
         inds, vals = list(zip(*bow_inds))
-        np.put(bow_array, inds, vals)
-        bows.append(bow_array)
-    bow = np.vstack(bows)
+        bow[i, inds] = np.array(vals)
     return bow
 
 
@@ -264,9 +260,6 @@ def run_neural_lda(
     LOG.info(f"Writing model to {lda_model_loc}")
     torch.save(ctm, lda_model_loc)
 
-    # with open(in_docs, "r") as fr:
-    #     texts = [doc.split() for doc in fr.read().splitlines()]  # load text for NPMI
-
     coh = CoherenceModel(
         topics=ctm.get_topic_lists(10),
         corpus=corpus,
@@ -274,8 +267,6 @@ def run_neural_lda(
         coherence="u_mass",
         topn=10,
     )
-    # coh = CoherenceNPMI(texts=texts, topics=ctm.get_topic_lists(5))
-    # s = coh.score()
     s = coh.get_coherence()
     LOG.info(f"Coherence: {s}")
 

@@ -205,6 +205,18 @@ def prepare_for_neural_lda(infile, outfile):
     return outfile
 
 
+def get_bow_term_doc_matrix(dct, corpus):
+    bows = []
+    for doc in tqdm(corpus):
+        bow_inds = dct.doc2bow(doc)
+        bow_array = np.zeros(len(dct), dtype=int)
+        inds, vals = list(zip(*bow_inds))
+        np.put(bow_array, inds, vals)
+        bows.append(bow_array)
+    bow = np.vstack(bow_array)
+    return bow
+
+
 @cli.command()
 @click.option("--in_docs", type=Path)
 @click.option("--lda_model_loc", type=Path)
@@ -221,14 +233,23 @@ def run_neural_lda(in_docs, lda_model_loc, n_topics=10,num_epochs=10):
 
     LOG.info("Creating vocabulary.")
     import ipdb; ipdb.set_trace()
-    handler = TextHandler(in_docs)
-    handler.prepare()  # create vocabulary and training data
+    with open(in_docs, 'r') as f0:
+        corpus = [l.split() for l in f0.read().splitlines()]
+    dct = Dictionary(corpus)
+    idx2token = {i: dct[i] for i in range(len(dct))}
+    LOG.info('Making bow term doc matrix')
+    bow = get_bow_term_doc_matrix(dct, corpus)
+
+    # handler = TextHandler(in_docs)
+    # handler.prepare()  # create vocabulary and training data
 
     LOG.info("Generating BERT embeddings.")
     training_bert = bert_embeddings_from_file(
         in_docs, "distiluse-base-multilingual-cased"
     )
-    training_dataset = CTMDataset(handler.bow, training_bert, handler.idx2token)
+    # Bow --> docs by tokens, freq of term in doc
+    # idx2token --> dict col index of bow to the actual token
+    training_dataset = CTMDataset(bow, training_bert, idx2token)
 
     LOG.info("Training model")
     ctm = CTM(

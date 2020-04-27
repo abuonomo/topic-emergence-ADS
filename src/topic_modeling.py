@@ -219,23 +219,26 @@ def get_bow_term_doc_matrix(dct, corpus):
 
 @cli.command()
 @click.option("--in_docs", type=Path)
+@click.option("--dct_loc", type=Path)
+@click.option("--corp_loc", type=Path)
 @click.option("--lda_model_loc", type=Path)
 @click.option("--n_topics", type=int, default=10)
 @click.option("--num_epochs", type=int, default=10)
-def run_neural_lda(in_docs, lda_model_loc, n_topics=10, num_epochs=10):
+def run_neural_lda(in_docs, dct_loc, corp_loc, lda_model_loc, n_topics=10, num_epochs=10):
     from contextualized_topic_models.models.ctm import CTM
-    from contextualized_topic_models.utils.data_preparation import TextHandler
     from contextualized_topic_models.utils.data_preparation import (
         bert_embeddings_from_file,
     )
     from contextualized_topic_models.datasets.dataset import CTMDataset
     from contextualized_topic_models.evaluation.measures import CoherenceNPMI
 
-    LOG.info("Creating vocabulary.")
-    with open(in_docs, "r") as f0:
-        corpus = [l.split() for l in f0.read().splitlines()]
-    dct = Dictionary(corpus)
-    dct.filter_extremes(no_below=100, no_above=0.5, keep_n=50_000)
+    LOG.info("Loading dictionary and corpus.")
+    dct = Dictionary.load(str(dct_loc))
+    corpus = MmCorpus(str(corp_loc))
+    # with open(in_docs, "r") as f0:
+    #     corpus = [l.split() for l in f0.read().splitlines()]
+    # dct = Dictionary(corpus)
+    # dct.filter_extremes(no_below=100, no_above=0.5, keep_n=50_000)
     idx2token = {i: dct[i] for i in range(len(dct))}
     LOG.info("Making bow term doc matrix")
     bow = get_bow_term_doc_matrix(dct, corpus)

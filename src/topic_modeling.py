@@ -268,11 +268,11 @@ def run_neural_lda(
     #     texts = [doc.split() for doc in fr.read().splitlines()]  # load text for NPMI
 
     coh = CoherenceModel(
-        topics=ctm.get_topic_lists(4),
+        topics=ctm.get_topic_lists(10),
         corpus=corpus,
         dictionary=dct,
         coherence="u_mass",
-        topn=4,
+        topn=10,
     )
     # coh = CoherenceNPMI(texts=texts, topics=ctm.get_topic_lists(5))
     # s = coh.score()

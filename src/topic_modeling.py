@@ -220,6 +220,7 @@ def run_neural_lda(in_docs, lda_model_loc, n_topics=10,num_epochs=10):
     from contextualized_topic_models.evaluation.measures import CoherenceNPMI
 
     LOG.info("Creating vocabulary.")
+    import ipdb; ipdb.set_trace()
     handler = TextHandler(in_docs)
     handler.prepare()  # create vocabulary and training data
 

@@ -213,7 +213,7 @@ def get_bow_term_doc_matrix(dct, corpus):
         inds, vals = list(zip(*bow_inds))
         np.put(bow_array, inds, vals)
         bows.append(bow_array)
-    bow = np.vstack(bow_array)
+    bow = np.vstack(bows)
     return bow
 
 

@@ -235,6 +235,7 @@ def run_neural_lda(in_docs, lda_model_loc, n_topics=10, num_epochs=10):
     with open(in_docs, "r") as f0:
         corpus = [l.split() for l in f0.read().splitlines()]
     dct = Dictionary(corpus)
+    dct.filter_extremes(no_below=100, no_above=0.5, keep_n=50_000)
     idx2token = {i: dct[i] for i in range(len(dct))}
     LOG.info("Making bow term doc matrix")
     bow = get_bow_term_doc_matrix(dct, corpus)

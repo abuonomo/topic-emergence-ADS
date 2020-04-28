@@ -129,7 +129,7 @@ def main(
     df = df.dropna(subset=["abstract", "year", "nasa_afil", "title"])
     allowed_db = "astronomy"
     df = df[df["database"].apply(lambda x: allowed_db in x)]
-    df = df[df['abstract'].apply(lambda x: len(x) < min_text_len)]
+    df = df[df['abstract'].apply(lambda x: len(x) >= min_text_len)]
     LOG.info(f"Limited to documents in database {allowed_db}. {df.shape}")
     text = df["title"] + ". " + df["abstract"]
     text = text.apply(unescape).astype(str)

@@ -249,7 +249,7 @@ run-neural-lda: #$(NEURAL_LDA_MODEL_LOC)
 		--dct_loc $(DCT_LOC) \
 		--corp_loc $(CORP_LOC) \
 		--lda_model_loc $(NEURAL_LDA_MODEL_LOC) \
-		--n_topics 50 \
+		--n_topics 250 \
 		--num_epochs 30
 #$(NEURAL_LDA_MODEL_LOC): $(DOC_TXTS)
 

@@ -10,8 +10,8 @@ import numpy as np
 import pandas as pd
 import pyLDAvis
 import torch
-from enstop import PLSA, EnsembleTopics
-from enstop.utils import coherence
+# from enstop import PLSA, EnsembleTopics
+# from enstop.utils import coherence
 from gensim.corpora import Dictionary
 from gensim.corpora import MmCorpus
 from gensim.models import LdaMulticore, LdaModel
@@ -120,11 +120,13 @@ def run_topic_models_inner(
     labels = mat_doc_id_map["doc_id"].tolist()
     # TODO: add train and test? But its clustering so maybe no?
     if alg == "plsa":
-        TopicModel = PLSA
+        # TopicModel = PLSA
+        ValueError(f'Enstop deprecated')
     elif alg == "lda":
         TopicModel = LatentDirichletAllocation
     elif alg == "enstop":
-        TopicModel = EnsembleTopics
+        # TopicModel = EnsembleTopics
+        ValueError(f'Enstop deprecated')
     else:
         ValueError(f'Must choose algorithm from "plsa", "lda", and "enstop".')
 
@@ -146,7 +148,9 @@ def run_topic_models_inner(
         elif alg == "enstop":
             c = model.coherence()
         elif alg == "lda":
-            c = coherence(model.components_, n, X, n_words=20)
+            # TODO: add new coherence metric here.
+            ValueError(f'Enstop deprecated')
+            # c = coherence(model.components_, n, X, n_words=20)
         else:
             ValueError(f'Must choose algorithm from "plsa", "lda", and "enstop".')
         coherences.append(c)

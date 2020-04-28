@@ -250,6 +250,7 @@ def run_neural_lda(
         inference_type="combined",
         n_components=n_topics,
         num_epochs=num_epochs,
+        num_data_loader_workers=1,
     )
     ctm.fit(training_dataset)  # run the model
 

@@ -4,6 +4,7 @@ import logging
 from pathlib import Path
 from typing import List
 from xml.sax.saxutils import unescape
+from html.parser import HTMLParser
 
 import RAKE
 import numpy as np
@@ -23,6 +24,25 @@ NLP = spacy.load("en_core_web_sm")
 TR = pytextrank.TextRank()
 NLP.add_pipe(TR.PipelineComponent, name="textrank", last=True)
 pandarallel.initialize()
+
+
+class MLStripper(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.reset()
+        self.fed = []
+
+    def handle_data(self, d):
+        self.fed.append(d)
+
+    def get_data(self):
+        return ''.join(self.fed)
+
+
+def strip_tags(html):
+    s = MLStripper()
+    s.feed(html)
+    return s.get_data()
 
 
 def load_records_to_dataframe(data_dir: Path, limit=None) -> pd.DataFrame:
@@ -103,14 +123,17 @@ def main(
     strategy="rake",
     batch_size=1000,
     n_process=1,
+    min_text_len=100,
 ):
     df = load_records_to_dataframe(in_records_dir, limit=record_limit)
     df = df.dropna(subset=["abstract", "year", "nasa_afil", "title"])
     allowed_db = "astronomy"
     df = df[df["database"].apply(lambda x: allowed_db in x)]
+    df = df[df['abstract'].apply(lambda x: len(x) < min_text_len)]
     LOG.info(f"Limited to documents in database {allowed_db}. {df.shape}")
     text = df["title"] + ". " + df["abstract"]
     text = text.apply(unescape).astype(str)
+    text = text.apply(strip_tags).astype(str)
     strats = ["rake", "textrank"]
     if strategy not in strats:
         raise ValueError(f"{strategy} not in {strats}.")

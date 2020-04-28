@@ -247,6 +247,7 @@ def run_neural_lda(
     ctm = CTM(
         input_size=len(dct),
         bert_input_size=512,
+        batch_size=32,
         inference_type="combined",
         n_components=n_topics,
         num_epochs=num_epochs,

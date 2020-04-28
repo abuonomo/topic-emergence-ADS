@@ -65,18 +65,14 @@ def topic_model_viz(model, mlb, mdoc_lens, viz_loc):
     return viz_loc
 
 
-def topic_model_viz_gensim(corpus, dct, lda, doc_lens, viz_loc):
-    LOG.info("Getting documents topic distributions.")
-    tc = lda.get_document_topics(corpus, minimum_probability=0)
-    tmp = [[v for t, v in r] for r in tqdm(tc)]
-    tmp_a = np.vstack(tmp)
+def topic_model_viz_gensim(embedding, dct, lda, doc_lens, viz_loc):
 
     term_freqs = np.array([dct.cfs[i] for i in range(lda.num_terms)])
     vocab = np.array([lda.id2word[i] for i in range(lda.num_terms)])
 
     data = {
         "topic_term_dists": lda.get_topics(),
-        "doc_topic_dists": tmp_a,
+        "doc_topic_dists": embedding,
         "vocab": vocab,
         "term_frequency": term_freqs,
         "doc_lengths": doc_lens,
@@ -410,8 +406,16 @@ def visualize_topic_models(infile, tmodel_dir, n, mlb_loc, map_loc, tmodel_viz_l
 @click.option("--dct_loc", type=Path)
 @click.option("--map_loc", type=Path)
 @click.option("--tmodel_viz_loc", type=Path)
+@click.option("--topic_to_bibcodes_loc", type=Path)
 def visualize_gensim_topic_models(
-    infile, tmodel_dir, n, in_corpus, dct_loc, map_loc, tmodel_viz_loc
+    infile,
+    tmodel_dir,
+    n,
+    in_corpus,
+    dct_loc,
+    map_loc,
+    tmodel_viz_loc,
+    topic_to_bibcodes_loc,
 ):
     LOG.info("Loading corpus, dictionary, lda model, and document map")
     corpus = MmCorpus(str(in_corpus))
@@ -421,7 +425,38 @@ def visualize_gensim_topic_models(
 
     doc_lens = get_doc_len_from_file(infile)
     mdoc_lens = [doc_lens[i] for i in mat_id_to_doc_id["matrix_row_index"]]
-    topic_model_viz_gensim(corpus, dct, lda, mdoc_lens, tmodel_viz_loc)
+
+    LOG.info("Getting documents topic distributions.")
+    tc = lda.get_document_topics(corpus, minimum_probability=0)
+    embedding = np.vstack([[v for t, v in r] for r in tqdm(tc)])
+
+    topic_model_viz_gensim(embedding, dct, lda, mdoc_lens, tmodel_viz_loc)
+    new_df = get_bibcodes_with_embedding(infile, embedding, mat_id_to_doc_id)
+
+    LOG.info(f"Writing bibcodes to {topic_to_bibcodes_loc}")
+    new_df.to_csv(topic_to_bibcodes_loc)
+
+
+def get_bibcodes_with_embedding(infile, embedding, mat_id_to_doc_id):
+    LOG.info(f"Getting document bibcodes from {infile}.")
+    bibcodes, titles = get_bibcodes_from_file(infile)
+    mdoc_bibs = [bibcodes[i] for i in mat_id_to_doc_id["doc_id"]]
+    mdoc_titles = [titles[i] for i in mat_id_to_doc_id["doc_id"]]
+
+    df = pd.DataFrame(embedding)
+    df["bibcode"] = mdoc_bibs
+    df["titles"] = mdoc_titles
+    cols = df.columns[-2:].tolist() + df.columns[0:-2].tolist()
+    df = df[cols]
+
+    LOG.info("Reorder by descending topic scores where given topic is max")
+    new_df = pd.DataFrame()
+    top_topics = df.iloc[:, 2:].values.argmax(axis=1)
+    for t in tqdm(range(embedding.shape[1])):
+        new_df = new_df.append(
+            df.iloc[top_topics == t, :].sort_values(t, ascending=False)
+        )
+    return new_df
 
 
 @cli.command()
@@ -444,25 +479,7 @@ def explore_topic_models(
     LOG.info(f"Reading matrix to doc id mapping from {map_loc}")
     mat_id_to_doc_id = pd.read_csv(map_loc, index_col=0)
 
-    LOG.info(f"Getting document bibcodes from {infile}.")
-    bibcodes, titles = get_bibcodes_from_file(infile)
-    mdoc_bibs = [bibcodes[i] for i in mat_id_to_doc_id["doc_id"]]
-    mdoc_titles = [titles[i] for i in mat_id_to_doc_id["doc_id"]]
-
-    df = pd.DataFrame(tmodel.embedding_)
-    df["bibcode"] = mdoc_bibs
-    df["titles"] = mdoc_titles
-    cols = df.columns[-2:].tolist() + df.columns[0:-2].tolist()
-    df = df[cols]
-
-    LOG.info("Reorder by descending topic scores where given topic is max")
-    new_df = pd.DataFrame()
-    top_topics = df.iloc[:, 2:].values.argmax(axis=1)
-    for t in tqdm(range(tmodel.embedding_.shape[1])):
-        new_df = new_df.append(
-            df.iloc[top_topics == t, :].sort_values(t, ascending=False)
-        )
-
+    new_df = get_bibcodes_with_embedding(infile, tmodel.embedding_, mat_id_to_doc_id)
     LOG.info(f"Writing bibcodes to {topic_to_bibcodes_loc}")
     new_df.to_csv(topic_to_bibcodes_loc)
 

@@ -219,6 +219,7 @@ $(TMODEL_VIZ_GEN_LOC): $(TMODELS)
 		--dct_loc $(DCT_LOC) \
 		--map_loc $(MAP_LOC) \
 		--tmodel_viz_loc $(TMODEL_VIZ_GEN_LOC)
+		--topic_to_bibcodes_loc $(TOPIC_TO_BIBCODES_LOC)
 
 TOPIC_TO_BIBCODES_LOC=$(VIZ_DIR)/topic_distribs_to_bibcodes.csv
 ## Explore topic models and how they connect to original dataset

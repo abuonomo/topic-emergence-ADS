@@ -20,6 +20,7 @@ add_semnet_path.sh
 runs/*
 .idea/*
 notebook/*
+!notebook/arb*.ipynb
 references/*
 venv/
 !.gitkeep

@@ -114,3 +114,6 @@ zipp==3.0.0
 pytextrank==2.0.1
 pandarallel==1.4.6
 gensim==3.8.2
+torch==1.5.0
+torchvision==0.6.0
+tslearn==0.3.0

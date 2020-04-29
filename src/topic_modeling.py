@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import pyLDAvis
 import torch
+
 # from enstop import PLSA, EnsembleTopics
 # from enstop.utils import coherence
 from gensim.corpora import Dictionary
@@ -121,12 +122,12 @@ def run_topic_models_inner(
     # TODO: add train and test? But its clustering so maybe no?
     if alg == "plsa":
         # TopicModel = PLSA
-        ValueError(f'Enstop deprecated')
+        ValueError(f"Enstop deprecated")
     elif alg == "lda":
         TopicModel = LatentDirichletAllocation
     elif alg == "enstop":
         # TopicModel = EnsembleTopics
-        ValueError(f'Enstop deprecated')
+        ValueError(f"Enstop deprecated")
     else:
         ValueError(f'Must choose algorithm from "plsa", "lda", and "enstop".')
 
@@ -149,7 +150,7 @@ def run_topic_models_inner(
             c = model.coherence()
         elif alg == "lda":
             # TODO: add new coherence metric here.
-            ValueError(f'Enstop deprecated')
+            ValueError(f"Enstop deprecated")
             # c = coherence(model.components_, n, X, n_words=20)
         else:
             ValueError(f'Must choose algorithm from "plsa", "lda", and "enstop".')
@@ -330,13 +331,20 @@ def run_topic_models(plot_loc, mat_loc, mlb_loc, map_loc, tmodels_dir, alg="plsa
 @click.option("--plot_loc", type=Path)
 @click.option("--dct_loc", type=Path)
 @click.option("--corp_loc", type=Path)
+@click.option("--topic_range_loc", type=Path)
 @click.option("--tmodels_dir", type=Path)
-def run_gensim_lda_mult(plot_loc, dct_loc, corp_loc, tmodels_dir):
+@click.option("--coherence_loc", type=Path)
+def run_gensim_lda_mult(
+    plot_loc, dct_loc, corp_loc, topic_range_loc, tmodels_dir, coherence_loc
+):
     dct = Dictionary.load(str(dct_loc))
     corpus = MmCorpus(str(corp_loc))
 
-    topic_range = list(range(10, 2000, 10))
-    # topic_range = [20, 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1500]
+    with open(topic_range_loc, "r") as f0:
+        topic_range = json.load(f0)
+    if len(topic_range) == 0:
+        ValueError('Topic range is an empty list.')
+
     coherences = []
     pbar = tqdm(topic_range)
     for n_topics in pbar:
@@ -345,12 +353,24 @@ def run_gensim_lda_mult(plot_loc, dct_loc, corp_loc, tmodels_dir):
         cm = CoherenceModel(model=lda, corpus=corpus, coherence="u_mass")
         coherence = cm.get_coherence()  # get coherence value
         coherences.append(coherence)
-        # Save model to disk.
+
         out_model = tmodels_dir / f"gensim_topic_model{n_topics}"
         lda.save(str(out_model))
+    df = pd.DataFrame(
+        {
+            "model": f"{lda.__class__.__module__}.{lda.__class__.__name__}",
+            "n_topics": topic_range,
+            "coherence": coherences,
+        }
+    )
     fig = plot_coherence(topic_range, coherences)
+
+    LOG.info(f"Writing coherences to {coherence_loc}.")
+    df.to_csv(coherence_loc)
+
     LOG.info(f"Writing plot to {plot_loc}.")
     fig.savefig(str(plot_loc))
+
     return plot_loc
 
 

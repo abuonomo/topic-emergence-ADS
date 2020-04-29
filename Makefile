@@ -1,4 +1,4 @@
-BUCKET=hq-ocio-ci-bigdata/home/DataSquad/topic-emergence-ADS/
+BUCKET=datasquad-low/home/DataSquad/topic-emergence-ADS/
 PROFILE=moderate
 RECIPES=python recipes.py
 
@@ -8,6 +8,8 @@ N_PROCESS=1
 MIN_THRESH=100
 RAW_DIR=data/raw
 CONFIG_FILE=config/example_small.mk
+TOPIC_RANGE_FILE=config/topic_range.json
+TIMESTAMP=$$(date +%Y-%m-%d_%H:%M:%S)
 include $(CONFIG_FILE) # This file may overwrite some defaults variables above
 
 DATA_DIR=data/$(EXP_NAME)
@@ -176,6 +178,7 @@ $(COH_PLT_LOC): $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC)
 
 ## Make topic models using gensim's LdaMulticore
 #PHONY: $(COH_PLT_LOC)
+COHERENCE_LOC=$(VIZ_DIR)/coherence$(TIMESTAMP).csv
 $(COH_PLT_LOC): # $(DCT_LOC) $(CORP_LOC) $(MAP_LOC)
 run-gensim-lda-mult: #$(COH_PLT_LOC)
 	mkdir -p $(TMODEL_DIR); \
@@ -183,7 +186,9 @@ run-gensim-lda-mult: #$(COH_PLT_LOC)
 		--plot_loc $(COH_PLT_LOC) \
 		--dct_loc $(DCT_LOC) \
 		--corp_loc $(CORP_LOC) \
-		--tmodels_dir $(TMODEL_DIR)
+		--topic_range_loc $(TOPIC_RANGE_FILE) \
+		--tmodels_dir $(TMODEL_DIR) \
+		--coherence_loc $(COHERENCE_LOC)
 
 ## Get coherences for gensim topic models
 get-gensim-coherences: #$(COH_PLT_LOC)

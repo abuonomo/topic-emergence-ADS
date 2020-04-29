@@ -260,7 +260,9 @@ def run_neural_lda(
     ctm.fit(training_dataset)  # run the model
 
     LOG.info(f"Writing model to {lda_model_loc}")
-    torch.save(ctm, lda_model_loc)
+    # TODO: save a state dict instead and then load back in
+    # pickle protocol 4 might work but still not ideal solution
+    torch.save(ctm, lda_model_loc, pickle_protocol=4)
 
     coh = CoherenceModel(
         topics=ctm.get_topic_lists(10),
@@ -447,11 +449,9 @@ def get_bibcodes_with_embedding(infile, embedding, mat_id_to_doc_id):
     LOG.info(f"Getting document bibcodes from {infile}.")
     bibcodes, titles = get_bibcodes_from_file(infile)
     mdoc_bibs = [bibcodes[i] for i in mat_id_to_doc_id["doc_id"]]
-    mdoc_titles = [titles[i] for i in mat_id_to_doc_id["doc_id"]]
 
     df = pd.DataFrame(embedding)
     df["bibcode"] = mdoc_bibs
-    df["titles"] = mdoc_titles
     cols = df.columns[-2:].tolist() + df.columns[0:-2].tolist()
     df = df[cols]
 

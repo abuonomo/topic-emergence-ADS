@@ -223,7 +223,7 @@ $(TMODEL_VIZ_GEN_LOC): $(TMODELS)
 		--in_corpus $(CORP_LOC) \
 		--dct_loc $(DCT_LOC) \
 		--map_loc $(MAP_LOC) \
-		--tmodel_viz_loc $(TMODEL_VIZ_GEN_LOC)
+		--tmodel_viz_loc $(TMODEL_VIZ_GEN_LOC) \
 		--topic_to_bibcodes_loc $(TOPIC_TO_BIBCODES_LOC)
 
 TOPIC_TO_BIBCODES_LOC=$(VIZ_DIR)/topic_distribs_to_bibcodes.csv
@@ -246,16 +246,17 @@ $(DOC_TXTS): $(RECORDS_LOC)
 		--infile $(RECORDS_LOC) \
 		--outfile $(DOC_TXTS)
 
-NEURAL_LDA_MODEL_LOC=$(MODEL_DIR)/neural_lda.pkl
+NEURAL_LDA_MODEL_DIR=$(MODEL_DIR)/neural_lda
 ## Run contextual neural lda with bert embeddings
 run-neural-lda: #$(NEURAL_LDA_MODEL_LOC)
 	python src/topic_modeling.py run-neural-lda \
 		--in_docs $(DOC_TXTS) \
 		--dct_loc $(DCT_LOC) \
 		--corp_loc $(CORP_LOC) \
-		--lda_model_loc $(NEURAL_LDA_MODEL_LOC) \
-		--n_topics 250 \
-		--num_epochs 30
+		--lda_model_dir $(NEURAL_LDA_MODEL_DIR) \
+		--n_topics 10 \
+		--num_epochs 3
+
 #$(NEURAL_LDA_MODEL_LOC): $(DOC_TXTS)
 
 #========= Docker =========#

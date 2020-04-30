@@ -32,6 +32,17 @@ LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
 
 
+class NumPyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.int64) or isinstance(obj, np.int32):
+            return int(obj)
+        if isinstance(obj, np.float64) or isinstance(obj, np.float32):
+            return float(obj)
+        if np.iscomplexobj(obj):
+            return abs(obj)
+        return json.JSONEncoder.default(self, obj)
+
+
 def get_feature_matrix(lim_kwds_df):
     LOG.info("Making feature matrix...")
     doc_to_kwd = (
@@ -506,11 +517,13 @@ def visualize_gensim_topic_models(
     tc = lda.get_document_topics(corpus, minimum_probability=0)
     embedding = np.vstack([[v for t, v in r] for r in tqdm(tc)])
 
-    topic_model_viz_gensim(embedding, dct, lda, mdoc_lens, tmodel_viz_loc)
     new_df = get_bibcodes_with_embedding(infile, embedding, mat_id_to_doc_id)
 
     LOG.info(f"Writing bibcodes to {topic_to_bibcodes_loc}")
     new_df.to_csv(topic_to_bibcodes_loc)
+
+    pyLDAvis.utils.NumPyEncoder = NumPyEncoder
+    topic_model_viz_gensim(embedding, dct, lda, mdoc_lens, tmodel_viz_loc)
 
 
 def get_bibcodes_with_embedding(infile, embedding, mat_id_to_doc_id):

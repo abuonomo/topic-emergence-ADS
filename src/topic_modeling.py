@@ -303,6 +303,7 @@ def run_neural_lda(
     LOG.info(f"Writing model to {lda_model_dir}")
     ctm_save(ctm, lda_model_dir)
 
+    ctm.model.gpu()
     embedding = ctm.predict(training_dataset)
     embedding_loc = lda_model_dir / "embedding.pt"
     LOG.info(f"Writing embedding to {embedding_loc}")

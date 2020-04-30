@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import re
 from pathlib import Path
 
@@ -12,9 +13,8 @@ import pyLDAvis
 import torch
 from contextualized_topic_models.datasets.dataset import CTMDataset
 from contextualized_topic_models.models.ctm import CTM
-from contextualized_topic_models.utils.data_preparation import (
-    bert_embeddings_from_file,
-)
+from contextualized_topic_models.utils.data_preparation import bert_embeddings_from_file
+
 # from enstop import PLSA, EnsembleTopics
 # from enstop.utils import coherence
 from gensim.corpora import Dictionary
@@ -226,20 +226,42 @@ def load_ctm(model_file):
         model_dir: directory where models are saved.
         epoch: epoch of model to load.
     """
-    with open(model_file, 'rb') as model_dict:
+    with open(model_file, "rb") as model_dict:
         checkpoint = torch.load(model_dict)
     ctm = CTM(
-        input_size=checkpoint['dcue_dict']['input_size'],
-        bert_input_size=checkpoint['dcue_dict']['bert_size'],
-        batch_size=checkpoint['dcue_dict']['batch_size'],
+        input_size=checkpoint["dcue_dict"]["input_size"],
+        bert_input_size=checkpoint["dcue_dict"]["bert_size"],
+        batch_size=checkpoint["dcue_dict"]["batch_size"],
         inference_type="combined",
     )
-    for (k, v) in checkpoint['dcue_dict'].items():
+    for (k, v) in checkpoint["dcue_dict"].items():
         setattr(ctm, k, v)
 
     # self._init_nn() #TODO: figure out what this does and implement?
-    ctm.model.load_state_dict(checkpoint['state_dict'])
+    ctm.model.load_state_dict(checkpoint["state_dict"])
     return ctm
+
+
+def ctm_save(ctm, models_dir=None):
+    """
+    Save model.
+
+    Args
+        models_dir: path to directory for saving NN models.
+    """
+    if (ctm.model is not None) and (models_dir is not None):
+
+        model_dir = ctm._format_file()
+        if not os.path.isdir(os.path.join(models_dir, model_dir)):
+            os.makedirs(os.path.join(models_dir, model_dir))
+
+        filename = "epoch_{}".format(ctm.nn_epoch) + ".pth"
+        fileloc = os.path.join(models_dir, model_dir, filename)
+        torch.save(
+            {"state_dict": ctm.model.state_dict(), "dcue_dict": ctm.__dict__},
+            fileloc,
+            pickle_protocol=4,
+        )
 
 
 @cli.command()
@@ -277,12 +299,12 @@ def run_neural_lda(
         num_data_loader_workers=1,
     )
     ctm.fit(training_dataset)  # run the model
-
+    ctm.model.cpu()
     LOG.info(f"Writing model to {lda_model_dir}")
-    ctm.save(lda_model_dir)
-    import ipdb; ipdb.set_trace()
+    ctm_save(ctm, lda_model_dir)
+
     embedding = ctm.predict(training_dataset)
-    embedding_loc = lda_model_dir / 'embedding.pt'
+    embedding_loc = lda_model_dir / "embedding.pt"
     LOG.info(f"Writing embedding to {embedding_loc}")
     torch.save(embedding, embedding_loc)
 
@@ -364,7 +386,7 @@ def run_gensim_lda_mult(
     with open(topic_range_loc, "r") as f0:
         topic_range = json.load(f0)
     if len(topic_range) == 0:
-        ValueError('Topic range is an empty list.')
+        ValueError("Topic range is an empty list.")
 
     coherences = []
     pbar = tqdm(topic_range)
@@ -492,7 +514,7 @@ def get_bibcodes_with_embedding(infile, embedding, mat_id_to_doc_id):
     mdoc_bibs = [bibcodes[i] for i in mat_id_to_doc_id["doc_id"]]
 
     df = pd.DataFrame(embedding)
-    df.insert(0, 'bibcode', mdoc_bibs)
+    df.insert(0, "bibcode", mdoc_bibs)
 
     LOG.info("Reorder by descending topic scores where given topic is max")
     new_df = pd.DataFrame()

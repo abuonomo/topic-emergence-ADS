@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pyLDAvis
+import pyLDAvis.gensim
 import torch
 from contextualized_topic_models.datasets.dataset import CTMDataset
 from contextualized_topic_models.models.ctm import CTM
@@ -34,6 +35,7 @@ LOG.setLevel(logging.INFO)
 
 class NumPyEncoder(json.JSONEncoder):
     def default(self, obj):
+        import ipdb; ipdb.set_trace()
         if isinstance(obj, np.int64) or isinstance(obj, np.int32):
             return int(obj)
         if isinstance(obj, np.float64) or isinstance(obj, np.float32):
@@ -93,9 +95,11 @@ def topic_model_viz_gensim(embedding, dct, lda, doc_lens, viz_loc):
         "term_frequency": term_freqs,
         "doc_lengths": doc_lens,
     }
+    pyLDAvis.utils.NumPyEncoder = NumPyEncoder
     pyLDAvis._prepare.__num_dist_rows__ = __num_dist_rows__
     LOG.info("Preparing data for pyLDAvis")
-    viz_data = pyLDAvis.prepare(**data, sort_topics=False)
+    # viz_data = pyLDAvis.prepare(**data, sort_topics=False)
+    viz_data = pyLDAvis.gensim.prepare(**data, sort_topics=False, mds='mmds')
 
     LOG.info(f"Writing visualization to {viz_loc}")
     pyLDAvis.save_html(viz_data, str(viz_loc))
@@ -314,7 +318,7 @@ def run_neural_lda(
     LOG.info(f"Writing model to {lda_model_dir}")
     ctm_save(ctm, lda_model_dir)
 
-    ctm.model.gpu()
+    ctm.model.cuda()
     embedding = ctm.predict(training_dataset)
     embedding_loc = lda_model_dir / "embedding.pt"
     LOG.info(f"Writing embedding to {embedding_loc}")
@@ -521,9 +525,11 @@ def visualize_gensim_topic_models(
 
     LOG.info(f"Writing bibcodes to {topic_to_bibcodes_loc}")
     new_df.to_csv(topic_to_bibcodes_loc)
+    # topic_model_viz_gensim(embedding, dct, lda, mdoc_lens, tmodel_viz_loc)
+    viz_data = pyLDAvis.gensim.prepare(lda, corpus, dct, sort_topics=False, mds='mmds')
+    LOG.info(f"Writing visualization to {tmodel_viz_loc}")
+    pyLDAvis.save_html(viz_data, str(tmodel_viz_loc))
 
-    pyLDAvis.utils.NumPyEncoder = NumPyEncoder
-    topic_model_viz_gensim(embedding, dct, lda, mdoc_lens, tmodel_viz_loc)
 
 
 def get_bibcodes_with_embedding(infile, embedding, mat_id_to_doc_id):

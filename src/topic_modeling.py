@@ -495,8 +495,12 @@ def visualize_gensim_topic_models(
     lda = LdaModel.load(str(tmodel_dir / f"gensim_topic_model{n}"))
     mat_id_to_doc_id = pd.read_csv(map_loc, index_col=0)
 
-    doc_lens = get_doc_len_from_file(infile)
-    mdoc_lens = [doc_lens[i] for i in mat_id_to_doc_id["matrix_row_index"]]
+    # Just counting number of terms which appear, not the frequency of them
+    # Do this because we are only counting occurence for LDA, not using frequency
+    # This could be a problem. Might need to change that.
+    # Counting freq would be like:
+    # mdoc_lens = [sum([v[1] for v in corpus[i]]) for i in mat_id_to_doc_id["matrix_row_index"]]
+    mdoc_lens = [len(corpus[i]) for i in mat_id_to_doc_id["matrix_row_index"]]
 
     LOG.info("Getting documents topic distributions.")
     tc = lda.get_document_topics(corpus, minimum_probability=0)

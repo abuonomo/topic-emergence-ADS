@@ -29,6 +29,8 @@ logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
 
+P_JOURNALS = ["Natu", 'Sci.']
+
 
 @click.group()
 def cli():
@@ -40,7 +42,8 @@ def cli():
 @click.option("--outfile", type=Path)
 @click.option("--out_years", type=Path)
 @click.option("--min_thresh", type=int, default=100)
-def docs_to_keywords_df(infile, outfile, out_years, min_thresh):
+@click.option('--only_nature_and_sci/--no_only_nature_and_sci', default=False)
+def docs_to_keywords_df(infile, outfile, out_years, min_thresh, only_nature_and_sci):
     """
     Get dataframe of keyword frequencies over the years
     """
@@ -52,7 +55,6 @@ def docs_to_keywords_df(infile, outfile, out_years, min_thresh):
         [
             "arxiv_class",
             "alternate_bibcode",
-            "bibcode",
             "keyword",
             "ack",
             "aff",
@@ -65,6 +67,13 @@ def docs_to_keywords_df(infile, outfile, out_years, min_thresh):
     df['title'] = df['title'].astype(str)
     df['abstract'] = df['abstract'].astype(str)
     df['year'] = df['year'].astype(int)
+    if only_nature_and_sci:
+        LOG.info(f'Only looking at papers in {P_JOURNALS}')
+        s0 = df.shape[0]
+        df = df[df['bibcode'].apply(lambda x: x[4:8] in P_JOURNALS)]
+        s1 = df.shape[0]
+        LOG.info(f"Removed {s0 - s1} papers.")
+    import ipdb; ipdb.set_trace()
     kwd_df, year_counts = flatten_to_keywords(df, min_thresh)
     LOG.info(f"Writing out all keywords to {outfile}.")
     kwd_df.to_json(outfile, orient="records", lines=True)

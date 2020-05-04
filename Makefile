@@ -7,8 +7,9 @@ BATCH_SIZE=1000
 N_PROCESS=1
 MIN_THRESH=100
 RAW_DIR=data/raw
-CONFIG_FILE=config/example_small.mk
+JOURNAL_LIMIT=--no_only_nature_and_sci
 TOPIC_RANGE_FILE=config/topic_range.json
+CONFIG_FILE=config/example_small.mk
 TIMESTAMP=$$(date +%Y-%m-%d_%H:%M:%S)
 include $(CONFIG_FILE) # This file may overwrite some defaults variables above
 
@@ -60,7 +61,8 @@ $(ALL_KWDS_LOC) $(YEAR_COUNT_LOC): $(RECORDS_LOC)
 		--infile $(RECORDS_LOC) \
 		--outfile $(ALL_KWDS_LOC) \
 		--out_years $(YEAR_COUNT_LOC) \
-		--min_thresh $(MIN_THRESH)
+		--min_thresh $(MIN_THRESH) \
+		$(JOURNAL_LIMIT)
 
 OUT_AFFIL=$(DATA_DIR)/nasa_affiliation.csv
 ## Get overall nasa affiliation

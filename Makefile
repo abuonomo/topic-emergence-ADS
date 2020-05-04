@@ -40,6 +40,7 @@ requirements-app:
 
 RAW_FILES=$(shell find $(RAW_DIR) -type f -name '*')
 RECORDS_LOC=$(DATA_DIR)/kwds.jsonl
+.PHONY: $(RECORDS_LOC)
 ## Join all years and and use rake to extract keywords.
 join-and-clean: $(RECORDS_LOC)
 $(RECORDS_LOC): $(RAW_FILES)

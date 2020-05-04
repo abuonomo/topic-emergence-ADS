@@ -192,5 +192,5 @@ if __name__ == "__main__":
         args.strategy,
         args.batch_size,
         args.n_process,
-        args.only_nature_and_sci,
+        only_nature_and_sci=args.only_nature_and_sci,
     )

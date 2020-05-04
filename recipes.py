@@ -73,7 +73,6 @@ def docs_to_keywords_df(infile, outfile, out_years, min_thresh, only_nature_and_
         df = df[df['bibcode'].apply(lambda x: x[4:8] in P_JOURNALS)]
         s1 = df.shape[0]
         LOG.info(f"Removed {s0 - s1} papers.")
-    import ipdb; ipdb.set_trace()
     kwd_df, year_counts = flatten_to_keywords(df, min_thresh)
     LOG.info(f"Writing out all keywords to {outfile}.")
     kwd_df.to_json(outfile, orient="records", lines=True)

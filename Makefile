@@ -50,7 +50,8 @@ $(RECORDS_LOC): $(RAW_FILES)
 		$(RAW_DIR) \
 		$(RECORDS_LOC) \
 		--limit $(LIMIT) --strategy $(STRATEGY) --batch_size $(BATCH_SIZE) \
-		--n_process $(N_PROCESS)
+		--n_process $(N_PROCESS) \
+		$(JOURNAL_LIMIT)
 
 ALL_KWDS_LOC=$(DATA_DIR)/all_keywords.jsonl
 YEAR_COUNT_LOC=$(DATA_DIR)/year_counts.csv
@@ -61,8 +62,7 @@ $(ALL_KWDS_LOC) $(YEAR_COUNT_LOC): $(RECORDS_LOC)
 		--infile $(RECORDS_LOC) \
 		--outfile $(ALL_KWDS_LOC) \
 		--out_years $(YEAR_COUNT_LOC) \
-		--min_thresh $(MIN_THRESH) \
-		$(JOURNAL_LIMIT)
+		--min_thresh $(MIN_THRESH)
 
 OUT_AFFIL=$(DATA_DIR)/nasa_affiliation.csv
 ## Get overall nasa affiliation

@@ -29,7 +29,6 @@ logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
 
-P_JOURNALS = ["Natu", 'Sci.']
 
 
 @click.group()
@@ -67,12 +66,6 @@ def docs_to_keywords_df(infile, outfile, out_years, min_thresh, only_nature_and_
     df['title'] = df['title'].astype(str)
     df['abstract'] = df['abstract'].astype(str)
     df['year'] = df['year'].astype(int)
-    if only_nature_and_sci:
-        LOG.info(f'Only looking at papers in {P_JOURNALS}')
-        s0 = df.shape[0]
-        df = df[df['bibcode'].apply(lambda x: x[4:8] in P_JOURNALS)]
-        s1 = df.shape[0]
-        LOG.info(f"Removed {s0 - s1} papers.")
     kwd_df, year_counts = flatten_to_keywords(df, min_thresh)
     LOG.info(f"Writing out all keywords to {outfile}.")
     kwd_df.to_json(outfile, orient="records", lines=True)

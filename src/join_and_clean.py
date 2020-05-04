@@ -25,6 +25,8 @@ TR = pytextrank.TextRank()
 NLP.add_pipe(TR.PipelineComponent, name="textrank", last=True)
 pandarallel.initialize()
 
+P_JOURNALS = ["Natu", "Sci."]
+
 
 class MLStripper(HTMLParser):
     def __init__(self):
@@ -36,7 +38,7 @@ class MLStripper(HTMLParser):
         self.fed.append(d)
 
     def get_data(self):
-        return ''.join(self.fed)
+        return "".join(self.fed)
 
 
 def strip_tags(html):
@@ -124,13 +126,20 @@ def main(
     batch_size=1000,
     n_process=1,
     min_text_len=100,
+    only_nature_and_sci=False,
 ):
     df = load_records_to_dataframe(in_records_dir, limit=record_limit)
     df = df.dropna(subset=["abstract", "year", "nasa_afil", "title"])
     allowed_db = "astronomy"
     df = df[df["database"].apply(lambda x: allowed_db in x)]
-    df = df[df['abstract'].apply(lambda x: len(x) >= min_text_len)]
+    df = df[df["abstract"].apply(lambda x: len(x) >= min_text_len)]
     LOG.info(f"Limited to documents in database {allowed_db}. {df.shape}")
+    if only_nature_and_sci:
+        LOG.info(f"Only looking at papers in {P_JOURNALS}")
+        s0 = df.shape[0]
+        df = df[df["bibcode"].apply(lambda x: x[4:8] in P_JOURNALS)]
+        s1 = df.shape[0]
+        LOG.info(f"Limited to documents in journals {P_JOURNALS}. {df.shape}")
     text = df["title"] + ". " + df["abstract"]
     text = text.apply(unescape).astype(str)
     text = text.apply(strip_tags).astype(str)
@@ -165,8 +174,23 @@ if __name__ == "__main__":
         type=int,
         default=1,
     )
+    parser.add_argument(
+        "--only_nature_and_sci", dest="only_nature_and_sci", action="store_true"
+    )
+    parser.add_argument(
+        "--no_only_nature_and_sci", dest="only_nature_and_sci", action="store_false"
+    )
+    parser.set_defaults(only_nature_and_sci=False)
     args = parser.parse_args()
     if args.limit == 0:
         LOG.debug("Received limit of 0. Setting to None.")
         args.limit = None
-    main(args.i, args.o, args.limit, args.strategy, args.batch_size, args.n_process)
+    main(
+        args.i,
+        args.o,
+        args.limit,
+        args.strategy,
+        args.batch_size,
+        args.n_process,
+        args.only_nature_and_sci,
+    )

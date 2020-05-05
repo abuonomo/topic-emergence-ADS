@@ -4,14 +4,12 @@ from pathlib import Path
 import click
 import joblib
 import pandas as pd
-from scipy.io import mmwrite
 
 from src.analyze_keyword_time_series import (
     slope_count_complexity,
     plot_slop_complex,
     dtw_to_manifold,
     yellow_plot_kmd,
-    plot_time,
     filter_kwds,
     dtw_to_tboard,
 )
@@ -20,15 +18,10 @@ from src.create_keyword_and_syn_lists import (
     normalize_by_perc,
 )
 from src.dtw_time_analysis import dtw_kwds
-from src.topic_modeling import (
-    topic_model_viz,
-    get_doc_len_from_file,
-)
 
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
-
 
 
 @click.group()

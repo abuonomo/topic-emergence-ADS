@@ -25,7 +25,7 @@ TR = pytextrank.TextRank()
 NLP.add_pipe(TR.PipelineComponent, name="textrank", last=True)
 pandarallel.initialize()
 
-P_JOURNALS = ["Natu", "Sci."]
+P_JOURNALS = ["Natur", "Sci"]
 
 
 class MLStripper(HTMLParser):
@@ -129,7 +129,9 @@ def main(
     only_nature_and_sci=False,
 ):
     df = load_records_to_dataframe(in_records_dir, limit=record_limit)
-    df = df.dropna(subset=["abstract", "year", "nasa_afil", "title"])
+    df = df.dropna(
+        subset=["abstract", "year", "nasa_afil", "title", "bibcode", "bibstem"]
+    )
     allowed_db = "astronomy"
     df = df[df["database"].apply(lambda x: allowed_db in x)]
     df = df[df["abstract"].apply(lambda x: len(x) >= min_text_len)]
@@ -137,7 +139,7 @@ def main(
     if only_nature_and_sci:
         LOG.info(f"Only looking at papers in {P_JOURNALS}")
         s0 = df.shape[0]
-        df = df[df["bibcode"].apply(lambda x: x[4:8] in P_JOURNALS)]
+        df = df[df['bibstem'].apply(lambda x: x[0] in P_JOURNALS)]
         s1 = df.shape[0]
         LOG.info(f"Limited to documents in journals {P_JOURNALS}. {df.shape}")
     text = df["title"] + ". " + df["abstract"]

@@ -8,6 +8,8 @@ import src.create_keyword_and_syn_lists as ck
 import src.dtw_time_analysis as ad
 from sklearn.utils import resample
 
+import src.extract_keywords
+
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
@@ -21,8 +23,8 @@ def get_resamples(df, min_thresh=100, n=10):
     na_years = df["year"].isna()
     LOG.info(f'Remove {sum(na_years)} rows with NaN years.')
     df = df[~na_years]
-    boot_df = df.pipe(ck.get_kwd_occurences, min_thresh)
-    kwd_df = boot_df.pipe(ck.binarize_years).pipe(ck.stem_kwds)
+    boot_df = df.pipe(src.extract_keywords.get_kwd_occurences, min_thresh)
+    kwd_df = boot_df.pipe(src.extract_keywords.binarize_years).pipe(src.extract_keywords.stem_kwds)
     LOG.info(f"Using {n} resamples for bootstrapping.")
     resampled_doc_ids = np.array([resample(kwd_df['doc_id'].unique()) for _ in range(n)])
     pbar = tqdm(resampled_doc_ids)
@@ -30,7 +32,7 @@ def get_resamples(df, min_thresh=100, n=10):
     year_counts_resamples = []
     for tmp_ind in pbar:
         kwd_df_boot = pd.concat([kwd_df[kwd_df['doc_id'] == i] for i in tmp_ind])
-        kwd_df_boot = kwd_df_boot.pipe(ck.get_stem_aggs)
+        kwd_df_boot = kwd_df_boot.pipe(src.extract_keywords.get_stem_aggs)
         kwd_df_resamples.append(kwd_df_boot)
 
         year_counts = df.loc[tmp_ind, "year"].value_counts().reset_index()

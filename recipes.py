@@ -14,9 +14,9 @@ from src.analyze_keyword_time_series import (
     dtw_to_tboard,
 )
 from src.create_keyword_and_syn_lists import (
-    flatten_to_keywords,
     normalize_by_perc,
 )
+from src.extract_keywords import flatten_to_keywords
 from src.dtw_time_analysis import dtw_kwds
 
 logging.basicConfig(level=logging.INFO)
@@ -27,43 +27,6 @@ LOG.setLevel(logging.INFO)
 @click.group()
 def cli():
     pass
-
-
-@cli.command()
-@click.option("--infile", type=Path)
-@click.option("--outfile", type=Path)
-@click.option("--out_years", type=Path)
-@click.option("--min_thresh", type=int, default=100)
-@click.option('--only_nature_and_sci/--no_only_nature_and_sci', default=False)
-def docs_to_keywords_df(infile, outfile, out_years, min_thresh, only_nature_and_sci):
-    """
-    Get dataframe of keyword frequencies over the years
-    """
-    # TODO: this file above should go in size folder so only one to be changed with exp
-
-    LOG.info(f"Reading keywords from {infile}.")
-    df = pd.read_json(infile, orient="records", lines=True)
-    df = df.drop(
-        [
-            "arxiv_class",
-            "alternate_bibcode",
-            "keyword",
-            "ack",
-            "aff",
-            "bibstem",
-            "aff_id",
-            "citation_count",
-        ],
-        axis=1,
-    )
-    df['title'] = df['title'].astype(str)
-    df['abstract'] = df['abstract'].astype(str)
-    df['year'] = df['year'].astype(int)
-    kwd_df, year_counts = flatten_to_keywords(df, min_thresh)
-    LOG.info(f"Writing out all keywords to {outfile}.")
-    kwd_df.to_json(outfile, orient="records", lines=True)
-    LOG.info(f"Writing year counts to {out_years}.")
-    year_counts.to_csv(out_years)
 
 
 @cli.command()

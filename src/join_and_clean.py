@@ -2,49 +2,18 @@ import argparse
 import json
 import logging
 from pathlib import Path
-from typing import List
-from xml.sax.saxutils import unescape
-from html.parser import HTMLParser
 
-import RAKE
-import numpy as np
 import pandas as pd
-import pytextrank
-import spacy
 from pandarallel import pandarallel
-from spacy.lang.en.stop_words import STOP_WORDS
-from sqlalchemy import create_engine
 from tqdm import tqdm
 
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
 
-NLP = spacy.load("en_core_web_sm")
-TR = pytextrank.TextRank()
-NLP.add_pipe(TR.PipelineComponent, name="textrank", last=True)
 pandarallel.initialize()
 
 P_JOURNALS = ["Natur", "Sci"]
-
-
-class MLStripper(HTMLParser):
-    def __init__(self):
-        super().__init__()
-        self.reset()
-        self.fed = []
-
-    def handle_data(self, d):
-        self.fed.append(d)
-
-    def get_data(self):
-        return "".join(self.fed)
-
-
-def strip_tags(html):
-    s = MLStripper()
-    s.feed(html)
-    return s.get_data()
 
 
 def load_records_to_dataframe(data_dir: Path, limit=None) -> pd.DataFrame:
@@ -82,49 +51,10 @@ def load_records_to_dataframe(data_dir: Path, limit=None) -> pd.DataFrame:
     return df
 
 
-def get_keywords_from_text(text: pd.Series) -> List:
-    LOG.info(f"Extracting keywords from {text.shape[0]} documents.")
-    tqdm.pandas()
-    rake = RAKE.Rake(list(STOP_WORDS))
-
-    def f(x):
-        if type(x) == str:
-            val = rake.run(x, minFrequency=1, minCharacters=3)
-        else:
-            val = np.nan
-        return val
-
-    rake_kwds = text.parallel_apply(f)
-    return rake_kwds
-
-
-def get_text_rank_kwds(text: pd.Series, batch_size=1000, n_process=1) -> List:
-    LOG.info(f"Extracting keywords from {text.shape[0]} documents.")
-    kwd_lists = []
-    pbar = tqdm(
-        NLP.pipe(text.replace(np.nan, ""), batch_size=batch_size, n_process=n_process),
-        total=len(text),
-    )
-    for doc in pbar:
-        kwds = [(p.text, p.rank) for p in doc._.phrases]
-        kwd_lists.append(kwds)
-        pbar.update(1)
-    return kwd_lists
-
-
-def write_records_to_db(df):
-    db_loc = "astro2020.db"
-    engine = create_engine(f"sqlite:///{db_loc}", echo=False)
-    df.to_sql("ADS_records", con=engine, index=False)
-
-
 def main(
     in_records_dir,
     out_records,
     record_limit=None,
-    strategy="rake",
-    batch_size=1000,
-    n_process=1,
     min_text_len=100,
     only_nature_and_sci=False,
 ):
@@ -134,24 +64,12 @@ def main(
     )
     allowed_db = "astronomy"
     df = df[df["database"].apply(lambda x: allowed_db in x)]
-    df = df[df["abstract"].apply(lambda x: len(x) >= min_text_len)]
     LOG.info(f"Limited to documents in database {allowed_db}. {df.shape}")
+    df = df[df["abstract"].apply(lambda x: len(x) >= min_text_len)]
+    LOG.info(f"Limited to documents with length >= {min_text_len}. {df.shape}")
     if only_nature_and_sci:
-        LOG.info(f"Only looking at papers in {P_JOURNALS}")
-        s0 = df.shape[0]
-        df = df[df['bibstem'].apply(lambda x: x[0] in P_JOURNALS)]
-        s1 = df.shape[0]
+        df = df[df["bibstem"].apply(lambda x: x[0] in P_JOURNALS)]
         LOG.info(f"Limited to documents in journals {P_JOURNALS}. {df.shape}")
-    text = df["title"] + ". " + df["abstract"]
-    text = text.apply(unescape).astype(str)
-    text = text.apply(strip_tags).astype(str)
-    strats = ["rake", "textrank"]
-    if strategy not in strats:
-        raise ValueError(f"{strategy} not in {strats}.")
-    if strategy == "rake":
-        df["rake_kwds"] = get_keywords_from_text(text)
-    elif strategy == "textrank":
-        df["rake_kwds"] = get_text_rank_kwds(text, batch_size, n_process)
     LOG.info(f"Writing {len(df)} records to {out_records}.")
     df.to_json(out_records, orient="records", lines=True)
 
@@ -161,21 +79,6 @@ if __name__ == "__main__":
     parser.add_argument("i", help="input raw records dir", type=Path)
     parser.add_argument("o", help="output jsonslines collected keywords", type=Path)
     parser.add_argument("--limit", help="limit size of dataframe for testing", type=int)
-    parser.add_argument(
-        "--strategy", help="choose either rake or textrank keyword extraction", type=str
-    )
-    parser.add_argument(
-        "--batch_size",
-        help="If textrank, choose nlp.pipe batch size",
-        type=int,
-        default=1000,
-    )
-    parser.add_argument(
-        "--n_process",
-        help="If textrank, choose nlp.pipe number of processes",
-        type=int,
-        default=1,
-    )
     parser.add_argument(
         "--only_nature_and_sci", dest="only_nature_and_sci", action="store_true"
     )
@@ -191,8 +94,5 @@ if __name__ == "__main__":
         args.i,
         args.o,
         args.limit,
-        args.strategy,
-        args.batch_size,
-        args.n_process,
         only_nature_and_sci=args.only_nature_and_sci,
     )

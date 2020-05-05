@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 import src.create_keyword_and_syn_lists as ks
+import src.extract_keywords
 
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
@@ -60,6 +61,6 @@ class Test(TestCase):
         self.df = df
 
     def test_flatten_to_keywords(self):
-        self.kwd_df, self.year_counts = ks.flatten_to_keywords(self.df, self.min_thresh)
+        self.kwd_df, self.year_counts = src.extract_keywords.flatten_to_keywords(self.df, self.min_thresh)
         self.assertNotEqual(self.kwd_df.shape[0], 0)
         self.assertNotEqual(len(self.year_counts), 0)

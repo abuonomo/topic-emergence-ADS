@@ -196,17 +196,6 @@ def plot_slop_complex(se_df, viz_dir, x_measure="slope", y_measure="complexity")
     ipv.save(out_vol_viz)
 
 
-def filter_kwds(kwd_df, threshold=50, score_thresh=1.3, hard_limit=10_000):
-    LOG.info(f"Only getting keywords which occur in more than {threshold} docs.")
-    lim_kwd_df = (
-        kwd_df.query(f"doc_id_count > {threshold}")
-        .query(f"rake_score_mean > {score_thresh}")
-        .sort_values("rake_score_mean", ascending=False)
-        .iloc[0:hard_limit]
-    )
-    return lim_kwd_df
-
-
 def cagr(x):
     x = x[~x.isna()]
     return (x[-1] / x[0]) ** (1 / len(x)) - 1

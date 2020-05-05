@@ -1,6 +1,7 @@
 BUCKET=datasquad-low/home/DataSquad/topic-emergence-ADS/
 PROFILE=moderate
 RECIPES=python recipes.py
+export LOGLEVEL=INFO
 
 # Set parameters depending on whether running test or full data
 BATCH_SIZE=1000
@@ -42,7 +43,7 @@ RAW_FILES=$(shell find $(RAW_DIR) -type f -name '*')
 RECORDS_LOC=$(DATA_DIR)/kwds.jsonl
 ## Join all years and and use rake to extract keywords.
 join-and-clean: $(RECORDS_LOC)
-.PHONY: $(RECORDS_LOC)
+#.PHONY: $(RECORDS_LOC)
 $(RECORDS_LOC): $(RAW_FILES)
 	mkdir -p $(DATA_DIR); \
 	mkdir -p $(MODEL_DIR); \
@@ -50,8 +51,7 @@ $(RECORDS_LOC): $(RAW_FILES)
 	python src/join_and_clean.py \
 		$(RAW_DIR) \
 		$(RECORDS_LOC) \
-		--limit $(LIMIT) --strategy $(STRATEGY) --batch_size $(BATCH_SIZE) \
-		--n_process $(N_PROCESS) \
+		--limit $(LIMIT) \
 		$(JOURNAL_LIMIT)
 
 ALL_KWDS_LOC=$(DATA_DIR)/all_keywords.jsonl
@@ -59,11 +59,14 @@ YEAR_COUNT_LOC=$(DATA_DIR)/year_counts.csv
 ## Get dataframe of keyword frequencies over the years
 docs-to-keywords-df: $(ALL_KWDS_LOC) $(YEAR_COUNT_LOC)
 $(ALL_KWDS_LOC) $(YEAR_COUNT_LOC): $(RECORDS_LOC)
-	$(RECIPES) docs-to-keywords-df \
+	python src/extract_keywords.py main \
 		--infile $(RECORDS_LOC) \
 		--outfile $(ALL_KWDS_LOC) \
 		--out_years $(YEAR_COUNT_LOC) \
-		--min_thresh $(MIN_THRESH)
+		--min_thresh $(MIN_THRESH) \
+		--strategy $(STRATEGY) \
+		--n_process $(BATCH_SIZE) \
+		--batch_size $(N_PROCESS)
 
 OUT_AFFIL=$(DATA_DIR)/nasa_affiliation.csv
 ## Get overall nasa affiliation

@@ -51,7 +51,7 @@ def main(infile):  #, outfile, out_years, min_thresh=100):
     # TODO: get time estimate on how long that would take, knowing how fast one is should be a good approximation.
     for kwd_df, year_counts in zip(kwd_df_resamples, year_counts_resamples):
         kwd_df = kwd_df.reset_index()
-        lim_kwd_df = ak.filter_kwds(
+        lim_kwd_df = src.extract_keywords.filter_kwds_inner(
             kwd_df, threshold=20, score_thresh=0.05, hard_limit=10_000
         )
         year_counts_tmp = year_counts.sort_values("year").set_index("year")

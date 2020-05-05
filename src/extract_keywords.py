@@ -2,6 +2,7 @@ import logging
 from html import unescape
 from html.parser import HTMLParser
 from pathlib import Path
+import os
 from typing import List
 
 import RAKE
@@ -15,11 +16,13 @@ from spacy.lang.en import STOP_WORDS
 from textacy.ke import textrank
 from tqdm import tqdm
 
-logging.basicConfig(level=logging.INFO)
+LOGLEVEL = os.environ.get('LOGLEVEL', 'WARNING').upper()
+logging.basicConfig(level=LOGLEVEL)
 LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
 
 NLP = spacy.load("en_core_web_sm")
+tqdm.pandas()
 
 
 class MLStripper(HTMLParser):
@@ -92,15 +95,15 @@ def flatten_to_keywords(df, min_thresh=5):
 
 
 def get_kwd_occurences(df, min_thresh=5, max_thresh=0.7):
-    LOG.info("Flattening along document rake_kwds.")
+    LOG.info("Flattening along document kwds.")
     df = df.copy()
     df = df.applymap(lambda x: np.nan if x is None else x)
-    kwd_inds = df["rake_kwds"].apply(lambda x: type(x) is list)
-    rake_kwds = df["rake_kwds"][kwd_inds]
-    all_kwds = [(i, k[0], k[1]) for i, r in zip(rake_kwds.index, rake_kwds) for k in r]
+    kwd_inds = df["kwds"].apply(lambda x: type(x) is list)
+    kwds = df["kwds"][kwd_inds]
+    all_kwds = [(i, k[0], k[1]) for i, r in zip(kwds.index, kwds) for k in r]
 
     kwd_df = pd.DataFrame(all_kwds)
-    kwd_df.columns = ["doc_id", "keyword", "rake_score"]
+    kwd_df.columns = ["doc_id", "keyword", "score"]
     kwd_df["year"] = df.loc[kwd_df["doc_id"], "year"].tolist()
     kwd_df["nasa_afil"] = df.loc[kwd_df["doc_id"], "nasa_afil"].tolist()
     ta = df["title"] + "||" + df["abstract"]  # pass this from join func
@@ -127,7 +130,7 @@ def get_kwd_occurences(df, min_thresh=5, max_thresh=0.7):
     doc_to_year = kwd_df.groupby("doc_id").agg(
         {"year": lambda x: x[0], "nasa_afil": lambda x: x[0]}
     )
-    dke["rake_score"] = np.nan
+    dke["score"] = np.nan
     dke["keyword"] = dke["keyword"].astype(str)
     ys = doc_to_year.reindex(dke["doc_id"])["year"].tolist()
     nasa_afil = doc_to_year.reindex(dke["doc_id"])["nasa_afil"].tolist()
@@ -192,7 +195,7 @@ def get_stem_aggs(df):
     df = df.groupby("stem").agg(
         {
             **{
-                "rake_score": "mean",
+                "score": "mean",
                 "doc_id": ["count", list],
                 "keyword": lambda x: list(set(x)),
                 "nasa_afil": lambda x: x.sum() / len(x),
@@ -207,6 +210,40 @@ def get_stem_aggs(df):
     return df
 
 
+def filter_kwds_inner(kwd_df, threshold=50, score_thresh=1.3, hard_limit=10_000):
+    LOG.info(f"Only getting keywords which occur in more than {threshold} docs.")
+    lim_kwd_df = (
+        kwd_df.query(f"doc_id_count > {threshold}")
+            .query(f"score_mean > {score_thresh}")
+            .sort_values("score_mean", ascending=False)
+            .iloc[0:hard_limit]
+    )
+    return lim_kwd_df
+
+
+@click.group()
+def cli():
+    pass
+
+
+@cli.command()
+@click.option("--infile", type=Path)
+@click.option("--out_loc", type=Path)
+@click.option("--threshold", type=int)
+@click.option("--score_thresh", type=float)
+@click.option("--hard_limit", type=int)
+def filter_kwds(infile, out_loc, threshold, score_thresh, hard_limit):
+    """
+    Filter keywords by total frequency and score. Also provide hard limit.
+    """
+    LOG.info(f"Reading from {infile}")
+    df = pd.read_json(infile, orient="records", lines=True)
+    lim_kwd_df = filter_kwds_inner(df, threshold, score_thresh, hard_limit)
+    LOG.info(f"Writing dataframe with size {lim_kwd_df.shape[0]} to {out_loc}.")
+    lim_kwd_df.to_json(out_loc, orient="records", lines=True)
+
+
+@cli.command()
 @click.option("--infile", type=Path)
 @click.option("--outfile", type=Path)
 @click.option("--out_years", type=Path)
@@ -229,9 +266,9 @@ def main(infile, outfile, out_years, min_thresh, strategy, batch_size, n_process
     if strategy not in strats:
         raise ValueError(f"{strategy} not in {strats}.")
     if strategy == "rake":
-        df["rake_kwds"] = get_keywords_from_text(text)
+        df["kwds"] = get_keywords_from_text(text)
     elif strategy == "singlerank":
-        df["rake_kwds"] = get_singlerank_kwds(text, batch_size, n_process)
+        df["kwds"] = get_singlerank_kwds(text, batch_size, n_process)
     df = df.drop(
         [
             "arxiv_class",
@@ -256,6 +293,5 @@ def main(infile, outfile, out_years, min_thresh, strategy, batch_size, n_process
 
 
 if __name__ == "__main__":
-    main()
-
+    cli()
 

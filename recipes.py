@@ -10,13 +10,11 @@ from src.analyze_keyword_time_series import (
     plot_slop_complex,
     dtw_to_manifold,
     yellow_plot_kmd,
-    filter_kwds,
     dtw_to_tboard,
 )
 from src.create_keyword_and_syn_lists import (
     normalize_by_perc,
 )
-from src.extract_keywords import flatten_to_keywords
 from src.dtw_time_analysis import dtw_kwds
 
 logging.basicConfig(level=logging.INFO)
@@ -27,23 +25,6 @@ LOG.setLevel(logging.INFO)
 @click.group()
 def cli():
     pass
-
-
-@cli.command()
-@click.option("--infile", type=Path)
-@click.option("--out_loc", type=Path)
-@click.option("--threshold", type=int)
-@click.option("--score_thresh", type=float)
-@click.option("--hard_limit", type=int)
-def get_filtered_kwds(infile, out_loc, threshold, score_thresh, hard_limit):
-    """
-    Filter keywords by total frequency and rake score. Also provide hard limit.
-    """
-    LOG.info(f"Reading from {infile}")
-    df = pd.read_json(infile, orient="records", lines=True)
-    lim_kwd_df = filter_kwds(df, threshold, score_thresh, hard_limit)
-    LOG.info(f"Writing dataframe with size {lim_kwd_df.shape[0]} to {out_loc}.")
-    lim_kwd_df.to_json(out_loc, orient="records", lines=True)
 
 
 @cli.command()

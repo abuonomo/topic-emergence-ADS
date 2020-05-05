@@ -13,7 +13,7 @@ LOG.setLevel(logging.INFO)
 
 pandarallel.initialize()
 
-P_JOURNALS = ["Natur", "Sci"]
+P_JOURNALS = ["Natur", "Sci"]  # TODO: load in config
 
 
 def load_records_to_dataframe(data_dir: Path, limit=None) -> pd.DataFrame:

@@ -355,9 +355,15 @@ docker-run-app: | $(APP_DATA_FILES)
 
 ## sync data from s3 bucket
 sync-from-s3:
+ifeq (default,$(PROFILE))
+	aws s3 sync s3://$(BUCKET)models/$(EXP_NAME) models/$(EXP_NAME)
+	aws s3 sync s3://$(BUCKET)data/$(EXP_NAME) data/$(EXP_NAME)
+	aws s3 sync s3://$(BUCKET)reports/viz/$(EXP_NAME) reports/viz/$(EXP_NAME)
+else
 	aws s3 sync s3://$(BUCKET)models/$(EXP_NAME) models/$(EXP_NAME) --profile $(PROFILE)
 	aws s3 sync s3://$(BUCKET)data/$(EXP_NAME) data/$(EXP_NAME) --profile $(PROFILE)
 	aws s3 sync s3://$(BUCKET)reports/viz/$(EXP_NAME) reports/viz/$(EXP_NAME) --profile $(PROFILE)
+endif
 
 ## sync data and models to s3 bucket
 sync-to-s3:

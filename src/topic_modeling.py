@@ -410,7 +410,7 @@ def make_tmodel_n(pbar, corpus, dct, n_topics, c_measures, texts, tmodels_dir):
     )
     coherences = {}
     for c in c_measures:
-        cm = CoherenceModel(model=lda, texts=texts, coherence=c)
+        cm = CoherenceModel(model=lda, texts=texts, coherence=c, processes=1)
         coherence = cm.get_coherence()  # get coherence value
         coherences[c] = coherence
 

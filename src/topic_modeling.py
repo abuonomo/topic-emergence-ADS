@@ -136,6 +136,7 @@ def plot_coherence(df, c_measures, show=False):
     plt.xlabel("n_topics")
     plt.ylabel("coherence")
     plt.title("Model Coherence vs Number of Topics")
+    plt.legend()
     if show:
         plt.show()
     return plt.gcf()

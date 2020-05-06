@@ -1,4 +1,5 @@
 import json
+import dask
 from collections import defaultdict
 import logging
 import os
@@ -131,7 +132,7 @@ def tmodel_to_tboard(X, model, doc_ids):
 def plot_coherence(df, c_measures, show=False):
     LOG.info("Plotting coherences.")
     for c in c_measures:
-        plt.plot(df['n_topics'], df[c], label=c)
+        plt.plot(df["n_topics"], df[c], label=c)
     plt.xlabel("n_topics")
     plt.ylabel("coherence")
     plt.title("Model Coherence vs Number of Topics")
@@ -392,38 +393,57 @@ def run_topic_models(plot_loc, mat_loc, mlb_loc, map_loc, tmodels_dir, alg="plsa
     run_topic_models_inner(X, mat_doc_id_map, plot_loc, tmodels_dir, alg=alg)
 
 
+def make_tmodel_n(pbar, corpus, dct, n_topics, c_measures, texts, tmodels_dir):
+    pbar.set_description(f"n_topics: {n_topics}")
+    lda = LdaModel(
+        corpus,
+        id2word=dct,
+        num_topics=n_topics,
+        passes=10,
+        iterations=200,
+        # passes=1,
+        # iterations=50,
+        eval_every=1,
+        # eval_every=10,
+        alpha="auto",
+        eta="auto",
+    )
+    coherences = {}
+    for c in c_measures:
+        cm = CoherenceModel(model=lda, texts=texts, coherence=c)
+        coherence = cm.get_coherence()  # get coherence value
+        coherences[c] = coherence
+
+    out_model = tmodels_dir / f"gensim_topic_model{n_topics}"
+    lda.save(str(out_model))
+    pbar.update(1)
+    return lda, coherences
+
+
+# TODO: this code is getting messy. Looking like there should be a class
 def run_gensim_lda_mult_inner(
     topic_range, dct, tmodels_dir, c_measures, corpus=None, texts=None
 ):
-    coherences = defaultdict(list)
+    jobs = []
     pbar = tqdm(topic_range)
-    for n_topics in pbar:
-        pbar.set_description(f"n_topics: {n_topics}")
-        # lda = LdaMulticore(corpus, id2word=dct, num_topics=n_topics, eval_every=1)
-        lda = LdaMulticore(
-            corpus,
-            id2word=dct,
-            num_topics=n_topics,
-            passes=10,
-            iterations=200,
-            eval_every=1,
+    for n_topics in topic_range:
+        j = dask.delayed(make_tmodel_n)(
+            pbar, corpus, dct, n_topics, c_measures, texts, tmodels_dir
         )
-        for c in c_measures:
-            cm = CoherenceModel(model=lda, texts=texts, coherence=c)
-            coherence = cm.get_coherence()  # get coherence value
-            coherences[c].append(coherence)
+        jobs.append(j)
+    vals = dask.compute(jobs)[0]
+    lda = vals[0][0]
+    coherences = [c[1] for c in vals]
 
-        out_model = tmodels_dir / f"gensim_topic_model{n_topics}"
-        lda.save(str(out_model))
     df = pd.DataFrame(
         {
             **{
                 "model": f"{lda.__class__.__module__}.{lda.__class__.__name__}",
                 "n_topics": topic_range,
             },
-            **coherences,
         }
     )
+    df = pd.concat([df, pd.DataFrame(coherences)], axis=1)
     return df
 
 

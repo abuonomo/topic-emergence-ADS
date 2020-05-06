@@ -399,25 +399,19 @@ def make_tmodel_n(pbar, corpus, dct, n_topics, c_measures, texts, tmodels_dir):
         corpus,
         id2word=dct,
         num_topics=n_topics,
-        passes=10,
-        iterations=200,
-        # passes=1,
-        # iterations=50,
-        eval_every=1,
-        # eval_every=10,
+        # passes=10,
+        # iterations=200,
+        passes=1,
+        iterations=50,
+        # eval_every=1,
+        eval_every=10,
         alpha="auto",
         eta="auto",
     )
-    coherences = {}
-    for c in c_measures:
-        cm = CoherenceModel(model=lda, texts=texts, coherence=c, processes=1)
-        coherence = cm.get_coherence()  # get coherence value
-        coherences[c] = coherence
-
     out_model = tmodels_dir / f"gensim_topic_model{n_topics}"
     lda.save(str(out_model))
     pbar.update(1)
-    return lda, coherences
+    return lda
 
 
 # TODO: this code is getting messy. Looking like there should be a class
@@ -431,9 +425,16 @@ def run_gensim_lda_mult_inner(
             pbar, corpus, dct, n_topics, c_measures, texts, tmodels_dir
         )
         jobs.append(j)
-    vals = dask.compute(jobs)[0]
-    lda = vals[0][0]
-    coherences = [c[1] for c in vals]
+    ldas = dask.compute(jobs)[0]
+
+    coherences = defaultdict(list)
+    coh_pbar = tqdm(zip(ldas, topic_range), total=len(ldas))
+    for lda, n in coh_pbar:
+        for c in c_measures:
+            coh_pbar.set_description(f'n_topics={n} | measure={c}')
+            cm = CoherenceModel(model=lda, texts=texts, coherence=c)
+            coherence = cm.get_coherence()  # get coherence value
+            coherences[c].append(coherence)
 
     df = pd.DataFrame(
         {
@@ -441,9 +442,9 @@ def run_gensim_lda_mult_inner(
                 "model": f"{lda.__class__.__module__}.{lda.__class__.__name__}",
                 "n_topics": topic_range,
             },
+            **coherences,
         }
     )
-    df = pd.concat([df, pd.DataFrame(coherences)], axis=1)
     return df
 
 

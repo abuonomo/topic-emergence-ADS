@@ -1,4 +1,5 @@
 import json
+from collections import defaultdict
 import logging
 import os
 import re
@@ -7,6 +8,7 @@ from pathlib import Path
 import click
 import joblib
 import matplotlib.pyplot as plt
+import gensim
 import numpy as np
 import pandas as pd
 import pyLDAvis
@@ -28,14 +30,17 @@ from sklearn.preprocessing import MultiLabelBinarizer
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
 
-logging.basicConfig(level=logging.INFO)
+# LOGLEVEL = os.environ.get('LOGLEVEL', 'WARNING').upper()
+logging.basicConfig(level=logging.DEBUG)
 LOG = logging.getLogger(__name__)
-LOG.setLevel(logging.INFO)
+LOG.setLevel(logging.DEBUG)
 
 
 class NumPyEncoder(json.JSONEncoder):
     def default(self, obj):
-        import ipdb; ipdb.set_trace()
+        import ipdb
+
+        ipdb.set_trace()
         if isinstance(obj, np.int64) or isinstance(obj, np.int32):
             return int(obj)
         if isinstance(obj, np.float64) or isinstance(obj, np.float32):
@@ -99,7 +104,7 @@ def topic_model_viz_gensim(embedding, dct, lda, doc_lens, viz_loc):
     pyLDAvis._prepare.__num_dist_rows__ = __num_dist_rows__
     LOG.info("Preparing data for pyLDAvis")
     # viz_data = pyLDAvis.prepare(**data, sort_topics=False)
-    viz_data = pyLDAvis.gensim.prepare(**data, sort_topics=False, mds='mmds')
+    viz_data = pyLDAvis.gensim.prepare(**data, sort_topics=False, mds="mmds")
 
     LOG.info(f"Writing visualization to {viz_loc}")
     pyLDAvis.save_html(viz_data, str(viz_loc))
@@ -123,9 +128,10 @@ def tmodel_to_tboard(X, model, doc_ids):
     return model
 
 
-def plot_coherence(topic_range, coherences, show=False):
+def plot_coherence(df, c_measures, show=False):
     LOG.info("Plotting coherences.")
-    plt.plot(topic_range, coherences)
+    for c in c_measures:
+        plt.plot(df['n_topics'], df[c], label=c)
     plt.xlabel("n_topics")
     plt.ylabel("coherence")
     plt.title("Model Coherence vs Number of Topics")
@@ -386,43 +392,75 @@ def run_topic_models(plot_loc, mat_loc, mlb_loc, map_loc, tmodels_dir, alg="plsa
     run_topic_models_inner(X, mat_doc_id_map, plot_loc, tmodels_dir, alg=alg)
 
 
+def run_gensim_lda_mult_inner(
+    topic_range, dct, tmodels_dir, c_measures, corpus=None, texts=None
+):
+    coherences = defaultdict(list)
+    pbar = tqdm(topic_range)
+    for n_topics in pbar:
+        pbar.set_description(f"n_topics: {n_topics}")
+        # lda = LdaMulticore(corpus, id2word=dct, num_topics=n_topics, eval_every=1)
+        lda = LdaMulticore(
+            corpus,
+            id2word=dct,
+            num_topics=n_topics,
+            passes=10,
+            iterations=200,
+            eval_every=1,
+        )
+        for c in c_measures:
+            cm = CoherenceModel(model=lda, texts=texts, coherence=c)
+            coherence = cm.get_coherence()  # get coherence value
+            coherences[c].append(coherence)
+
+        out_model = tmodels_dir / f"gensim_topic_model{n_topics}"
+        lda.save(str(out_model))
+    df = pd.DataFrame(
+        {
+            **{
+                "model": f"{lda.__class__.__module__}.{lda.__class__.__name__}",
+                "n_topics": topic_range,
+            },
+            **coherences,
+        }
+    )
+    return df
+
+
 @cli.command()
 @click.option("--plot_loc", type=Path)
-@click.option("--dct_loc", type=Path)
-@click.option("--corp_loc", type=Path)
+@click.option("--docs_loc", type=Path)
 @click.option("--topic_range_loc", type=Path)
 @click.option("--tmodels_dir", type=Path)
 @click.option("--coherence_loc", type=Path)
 def run_gensim_lda_mult(
-    plot_loc, dct_loc, corp_loc, topic_range_loc, tmodels_dir, coherence_loc
+    plot_loc, docs_loc, topic_range_loc, tmodels_dir, coherence_loc
 ):
-    dct = Dictionary.load(str(dct_loc))
-    corpus = MmCorpus(str(corp_loc))
+    df = pd.read_json(docs_loc, orient="records", lines=True)
+    texts = df["title"] + ". " + df["abstract"]
+    tokens = texts.apply(
+        lambda x: [v for v in gensim.summarization.textcleaner.tokenize_by_word(x)]
+    )
+
+    dct = gensim.corpora.Dictionary(tokens)
+    dct.filter_extremes(no_below=5, no_above=0.5)
+    corpus = [dct.doc2bow(t) for t in tokens]
 
     with open(topic_range_loc, "r") as f0:
         topic_range = json.load(f0)
     if len(topic_range) == 0:
         ValueError("Topic range is an empty list.")
 
-    coherences = []
-    pbar = tqdm(topic_range)
-    for n_topics in pbar:
-        pbar.set_description(f"n_topics: {n_topics}")
-        lda = LdaMulticore(corpus, id2word=dct, num_topics=n_topics)
-        cm = CoherenceModel(model=lda, corpus=corpus, coherence="u_mass")
-        coherence = cm.get_coherence()  # get coherence value
-        coherences.append(coherence)
-
-        out_model = tmodels_dir / f"gensim_topic_model{n_topics}"
-        lda.save(str(out_model))
-    df = pd.DataFrame(
-        {
-            "model": f"{lda.__class__.__module__}.{lda.__class__.__name__}",
-            "n_topics": topic_range,
-            "coherence": coherences,
-        }
+    c_measures = ["u_mass", "c_v"]
+    df = run_gensim_lda_mult_inner(
+        topic_range,
+        dct,
+        tmodels_dir,
+        c_measures=c_measures,
+        corpus=corpus,
+        texts=tokens,
     )
-    fig = plot_coherence(topic_range, coherences)
+    fig = plot_coherence(df, c_measures)
 
     LOG.info(f"Writing coherences to {coherence_loc}.")
     df.to_csv(coherence_loc)
@@ -526,10 +564,9 @@ def visualize_gensim_topic_models(
     LOG.info(f"Writing bibcodes to {topic_to_bibcodes_loc}")
     new_df.to_csv(topic_to_bibcodes_loc)
     # topic_model_viz_gensim(embedding, dct, lda, mdoc_lens, tmodel_viz_loc)
-    viz_data = pyLDAvis.gensim.prepare(lda, corpus, dct, sort_topics=False, mds='mmds')
+    viz_data = pyLDAvis.gensim.prepare(lda, corpus, dct, sort_topics=False, mds="mmds")
     LOG.info(f"Writing visualization to {tmodel_viz_loc}")
     pyLDAvis.save_html(viz_data, str(tmodel_viz_loc))
-
 
 
 def get_bibcodes_with_embedding(infile, embedding, mat_id_to_doc_id):

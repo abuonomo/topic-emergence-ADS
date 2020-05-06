@@ -65,8 +65,8 @@ $(ALL_KWDS_LOC) $(YEAR_COUNT_LOC): $(RECORDS_LOC)
 		--out_years $(YEAR_COUNT_LOC) \
 		--min_thresh $(MIN_THRESH) \
 		--strategy $(STRATEGY) \
-		--n_process $(BATCH_SIZE) \
-		--batch_size $(N_PROCESS)
+		--n_process $(N_PROCESS) \
+		--batch_size $(BATCH_SIZE)
 
 OUT_AFFIL=$(DATA_DIR)/nasa_affiliation.csv
 ## Get overall nasa affiliation
@@ -77,12 +77,12 @@ $(OUT_AFFIL): $(RECORDS_LOC) src/get_overall_nasa_affil.py
 bootstrap: $(RECORDS_LOC)
 	python src/bootstrapping.py $(RECORDS_LOC)
 
-
 FILT_KWDS_LOC=$(DATA_DIR)/all_keywords_threshold_$(FREQ)_$(SCORE)_$(HARD).jsonl
 ## Filter keywords by total frequency and rake score. Also provide hard limit.
 get-filtered-kwds: $(FILT_KWDS_LOC)
 $(FILT_KWDS_LOC): $(ALL_KWDS_LOC)
-	$(RECIPES) get-filtered-kwds \
+	@echo "See notebook/arb-10-look-at-textacy-kwds.ipynb to see code for selecting filter params."
+	python src/extract_keywords.py filter-kwds \
 		--infile $(ALL_KWDS_LOC) \
 		--out_loc $(FILT_KWDS_LOC) \
 		--threshold $(FREQ) --score_thresh=$(SCORE) --hard_limit $(HARD)
@@ -190,8 +190,7 @@ run-gensim-lda-mult: #$(COH_PLT_LOC)
 	mkdir -p $(TMODEL_DIR); \
 	python src/topic_modeling.py run-gensim-lda-mult \
 		--plot_loc $(COH_PLT_LOC) \
-		--dct_loc $(DCT_LOC) \
-		--corp_loc $(CORP_LOC) \
+		--docs_loc $(RECORDS_LOC) \
 		--topic_range_loc $(TOPIC_RANGE_FILE) \
 		--tmodels_dir $(TMODEL_DIR) \
 		--coherence_loc $(COHERENCE_LOC)

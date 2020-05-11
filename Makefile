@@ -156,7 +156,6 @@ MAP_LOC=$(MODEL_DIR)/mat_doc_mapping.csv
 DCT_LOC=$(MODEL_DIR)/gensim_dct.mm
 CORP_LOC=$(MODEL_DIR)/gensim_corpus.mm
 ## Create document term matrix
-#.PHONY: $(MAP_LOC)
 prepare-features: $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC)
 $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC): $(NORM_KWDS_LOC)
 	python src/topic_modeling.py prepare-features \
@@ -166,6 +165,18 @@ $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC): $(NORM_KWDS_LOC)
 		--map_loc $(MAP_LOC) \
 		--dct_loc $(DCT_LOC) \
 		--corp_loc $(CORP_LOC)
+
+TOKENS_LOC=$(MODEL_DIR)/gensim_tokens.jsonl
+## Prepare corpus, dictionary, and matrix id to doc id mapping for gensim topic modeling
+#prepare-gensim-features: $(CORP_TOK_LOC) $(DCT_TOK_LOC) $(MAP_LOC)
+#$(CORP_TOK_LOC) $(DCT_TOK_LOC) $(MAP_LOC): $(RECORDS_LOC)
+prepare-gensim-features:
+	python src/topic_modeling.py prepare-gensim-features \
+		--docs_loc $(RECORDS_LOC) \
+		--dct_loc $(DCT_TOK_LOC) \
+		--corp_loc $(CORP_TOK_LOC) \
+		--map_loc $(MAP_LOC) \
+		--token_loc $(TOKENS_LOC)
 
 COH_PLT_LOC=$(VIZ_DIR)/coherence.png
 TMODEL_DIR=$(MODEL_DIR)/topic_models
@@ -183,17 +194,20 @@ $(COH_PLT_LOC): $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC)
 		--alg $(ALG)
 
 ## Make topic models using gensim's LdaMulticore
-#PHONY: $(COH_PLT_LOC)
 COHERENCE_LOC=$(VIZ_DIR)/coherence$(TIMESTAMP).csv
+DCT_TOK_LOC=$(MODEL_DIR)/gensim_tok_dct.mm
+CORP_TOK_LOC=$(MODEL_DIR)/gensim_tok_corpus.mm
 $(COH_PLT_LOC): # $(DCT_LOC) $(CORP_LOC) $(MAP_LOC)
 run-gensim-lda-mult: #$(COH_PLT_LOC)
 	mkdir -p $(TMODEL_DIR); \
 	python src/topic_modeling.py run-gensim-lda-mult \
 		--plot_loc $(COH_PLT_LOC) \
-		--docs_loc $(RECORDS_LOC) \
+		--tokens_loc $(TOKENS_LOC) \
 		--topic_range_loc $(TOPIC_RANGE_FILE) \
 		--tmodels_dir $(TMODEL_DIR) \
-		--coherence_loc $(COHERENCE_LOC)
+		--coherence_loc $(COHERENCE_LOC) \
+		--dct_loc $(DCT_TOK_LOC) \
+		--corp_loc $(CORP_TOK_LOC)
 
 ## Get coherences for gensim topic models
 get-gensim-coherences: #$(COH_PLT_LOC)
@@ -220,13 +234,13 @@ $(TMODEL_VIZ_LOC): $(TMODELS)
 TMODEL_VIZ_GEN_LOC=$(VIZ_DIR)/gensim_topic_model_viz$(N_TOPICS).html
 ## Visualize gensim topic models with pyLDAvis
 visualize-gensim-topic-models: $(TMODEL_VIZ_GEN_LOC)
-$(TMODEL_VIZ_GEN_LOC): $(TMODELS)
+$(TMODEL_VIZ_GEN_LOC): $(TMODELS) $(MAP_LOC)
 	python src/topic_modeling.py visualize-gensim-topic-models \
 		--infile $(RECORDS_LOC) \
 		--tmodel_dir $(TMODEL_DIR) \
 		--n $(N_TOPICS) \
-		--in_corpus $(CORP_LOC) \
-		--dct_loc $(DCT_LOC) \
+		--in_corpus $(CORP_TOK_LOC) \
+		--dct_loc $(DCT_TOK_LOC) \
 		--map_loc $(MAP_LOC) \
 		--tmodel_viz_loc $(TMODEL_VIZ_GEN_LOC) \
 		--topic_to_bibcodes_loc $(TOPIC_TO_BIBCODES_LOC)

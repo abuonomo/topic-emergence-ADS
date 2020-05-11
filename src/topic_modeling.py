@@ -39,9 +39,6 @@ LOG.setLevel(logging.DEBUG)
 
 class NumPyEncoder(json.JSONEncoder):
     def default(self, obj):
-        import ipdb
-
-        ipdb.set_trace()
         if isinstance(obj, np.int64) or isinstance(obj, np.int32):
             return int(obj)
         if isinstance(obj, np.float64) or isinstance(obj, np.float32):
@@ -199,7 +196,7 @@ def get_bib_titles(line):
     record = json.loads(line)
     b = record["bibcode"]
     t = record["title"]
-    return (b, t)
+    return b, t
 
 
 def get_bibcodes_from_file(infile):
@@ -344,6 +341,46 @@ def run_neural_lda(
 
 
 @cli.command()
+@click.option("--docs_loc", type=Path)
+@click.option("--dct_loc", type=Path)
+@click.option("--corp_loc", type=Path)
+@click.option("--map_loc", type=Path)
+@click.option("--token_loc", type=Path)
+def prepare_gensim_features(docs_loc, dct_loc, corp_loc, map_loc, token_loc):
+    # TODO: save the corpus and dictionary
+    df = pd.read_json(docs_loc, orient="records", lines=True)
+    df = df.dropna(subset=["bibcode", "title", "abstract"])
+    texts = df["title"] + ". " + df["abstract"]
+    tokens = texts.apply(
+        lambda x: [v for v in gensim.summarization.textcleaner.tokenize_by_word(x)]
+    )
+
+    dct = gensim.corpora.Dictionary(tokens)
+    dct.filter_extremes(no_below=5, no_above=0.5)
+    corpus = [dct.doc2bow(t) for t in tokens]
+    mat_id_to_bibcode = df.reset_index().reset_index().iloc[:, :2]
+    mat_id_to_bibcode.columns = ["matrix_row_index", "doc_id"]
+
+    LOG.info(f"Writing dictionary to {dct_loc}")
+    dct.save(str(dct_loc))
+
+    LOG.info(f"Writing corpus to {corp_loc}")
+    MmCorpus.serialize(str(corp_loc), corpus)
+
+    LOG.info(f"Writing matrix id to df id to {map_loc}")
+    mat_id_to_bibcode.to_csv(map_loc)
+
+    LOG.info(f"Writing tokens to {token_loc}")
+    with open(token_loc, 'w') as f0:
+        for token_set in tokens:
+            f0.write(json.dumps(token_set))
+            f0.write('\n')
+    mat_id_to_bibcode.to_csv(map_loc)
+
+    return dct_loc, corp_loc, map_loc
+
+
+@cli.command()
 @click.option("--norm_loc", type=Path)
 @click.option("--mat_loc", type=Path)
 @click.option("--mlb_loc", type=Path)
@@ -354,7 +391,6 @@ def prepare_features(norm_loc, mat_loc, mlb_loc, map_loc, dct_loc, corp_loc):
     """
     Create document term matrix
     """
-    LOG.info(f"Reading normalized keywords years from {norm_loc}.")
     lim_kwds_df = pd.read_json(norm_loc, orient="records", lines=True)
     X, mlb, mat_doc_id_map, dct, corpus = get_feature_matrix(lim_kwds_df)
 
@@ -432,7 +468,7 @@ def run_gensim_lda_mult_inner(
     coh_pbar = tqdm(zip(ldas, topic_range), total=len(ldas))
     for lda, n in coh_pbar:
         for c in c_measures:
-            coh_pbar.set_description(f'n_topics={n} | measure={c}')
+            coh_pbar.set_description(f"n_topics={n} | measure={c}")
             cm = CoherenceModel(model=lda, texts=texts, coherence=c)
             coherence = cm.get_coherence()  # get coherence value
             coherences[c].append(coherence)
@@ -451,22 +487,22 @@ def run_gensim_lda_mult_inner(
 
 @cli.command()
 @click.option("--plot_loc", type=Path)
-@click.option("--docs_loc", type=Path)
+@click.option("--tokens_loc", type=Path)
 @click.option("--topic_range_loc", type=Path)
 @click.option("--tmodels_dir", type=Path)
 @click.option("--coherence_loc", type=Path)
+@click.option("--dct_loc", type=Path)
+@click.option("--corp_loc", type=Path)
 def run_gensim_lda_mult(
-    plot_loc, docs_loc, topic_range_loc, tmodels_dir, coherence_loc
+    plot_loc, tokens_loc, topic_range_loc, tmodels_dir, coherence_loc, dct_loc, corp_loc
 ):
-    df = pd.read_json(docs_loc, orient="records", lines=True)
-    texts = df["title"] + ". " + df["abstract"]
-    tokens = texts.apply(
-        lambda x: [v for v in gensim.summarization.textcleaner.tokenize_by_word(x)]
-    )
-
-    dct = gensim.corpora.Dictionary(tokens)
-    dct.filter_extremes(no_below=5, no_above=0.5)
-    corpus = [dct.doc2bow(t) for t in tokens]
+    LOG.info(f"Loading dictionary from {dct_loc}")
+    dct = Dictionary.load(str(dct_loc))
+    LOG.info(f"Loading corpus from {corp_loc}")
+    corpus = MmCorpus(str(corp_loc))
+    with open(tokens_loc, 'r') as f0:
+        tokens = [json.loads(line) for line in f0.read().splitlines()]
+    import ipdb; ipdb.set_trace()
 
     with open(topic_range_loc, "r") as f0:
         topic_range = json.load(f0)
@@ -580,7 +616,6 @@ def visualize_gensim_topic_models(
     LOG.info("Getting documents topic distributions.")
     tc = lda.get_document_topics(corpus, minimum_probability=0)
     embedding = np.vstack([[v for t, v in r] for r in tqdm(tc)])
-
     new_df = get_bibcodes_with_embedding(infile, embedding, mat_id_to_doc_id)
 
     LOG.info(f"Writing bibcodes to {topic_to_bibcodes_loc}")

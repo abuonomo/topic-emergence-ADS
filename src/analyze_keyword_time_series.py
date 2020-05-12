@@ -231,7 +231,7 @@ def slope_count_complexity(lim_kwd_df, overall_affil):
 
     features["mean_change_nan_before_exist"] = only_years.apply(f2, axis=1)
     features["cagr"] = only_years.apply(cagr, axis=1)
-    features["rake_score_mean"] = lim_kwd_df["rake_score_mean"]
+    features["score_mean"] = lim_kwd_df["score_mean"]
     return features
 
 

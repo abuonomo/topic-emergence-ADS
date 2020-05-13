@@ -506,10 +506,6 @@ def run_gensim_lda_mult(
     corpus = MmCorpus(str(corp_loc))
     with open(tokens_loc, "r") as f0:
         tokens = [json.loads(line) for line in f0.read().splitlines()]
-    import ipdb
-
-    ipdb.set_trace()
-
     with open(topic_range_loc, "r") as f0:
         topic_range = json.load(f0)
     if len(topic_range) == 0:

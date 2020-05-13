@@ -7,6 +7,8 @@ export LOGLEVEL=INFO
 BATCH_SIZE=1000
 N_PROCESS=1
 MIN_THRESH=100
+NO_BELOW=300
+NO_ABOVE=0.25
 RAW_DIR=data/raw
 JOURNAL_LIMIT=--no_only_nature_and_sci
 TOPIC_RANGE_FILE=config/topic_range.json
@@ -167,16 +169,18 @@ $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC): $(NORM_KWDS_LOC)
 		--corp_loc $(CORP_LOC)
 
 TOKENS_LOC=$(MODEL_DIR)/gensim_tokens.jsonl
-## Prepare corpus, dictionary, and matrix id to doc id mapping for gensim topic modeling
 #prepare-gensim-features: $(CORP_TOK_LOC) $(DCT_TOK_LOC) $(MAP_LOC)
 #$(CORP_TOK_LOC) $(DCT_TOK_LOC) $(MAP_LOC): $(RECORDS_LOC)
+## Prepare corpus, dictionary, and matrix id to doc id mapping for gensim topic modeling
 prepare-gensim-features:
 	python src/topic_modeling.py prepare-gensim-features \
 		--docs_loc $(RECORDS_LOC) \
 		--dct_loc $(DCT_TOK_LOC) \
 		--corp_loc $(CORP_TOK_LOC) \
 		--map_loc $(MAP_LOC) \
-		--token_loc $(TOKENS_LOC)
+		--token_loc $(TOKENS_LOC) \
+		--no_below $(NO_BELOW) \
+		--no_above $(NO_ABOVE)
 
 COH_PLT_LOC=$(VIZ_DIR)/coherence.png
 TMODEL_DIR=$(MODEL_DIR)/topic_models

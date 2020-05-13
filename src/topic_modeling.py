@@ -346,7 +346,11 @@ def run_neural_lda(
 @click.option("--corp_loc", type=Path)
 @click.option("--map_loc", type=Path)
 @click.option("--token_loc", type=Path)
-def prepare_gensim_features(docs_loc, dct_loc, corp_loc, map_loc, token_loc):
+@click.option("--no_below", type=int)
+@click.option("--no_above", type=float)
+def prepare_gensim_features(
+    docs_loc, dct_loc, corp_loc, map_loc, token_loc, no_below=300, no_above=0.25
+):
     # TODO: save the corpus and dictionary
     df = pd.read_json(docs_loc, orient="records", lines=True)
     df = df.dropna(subset=["bibcode", "title", "abstract"])
@@ -356,7 +360,7 @@ def prepare_gensim_features(docs_loc, dct_loc, corp_loc, map_loc, token_loc):
     )
 
     dct = gensim.corpora.Dictionary(tokens)
-    dct.filter_extremes(no_below=5, no_above=0.5)
+    dct.filter_extremes(no_below=no_below, no_above=no_above)
     corpus = [dct.doc2bow(t) for t in tokens]
     mat_id_to_bibcode = df.reset_index().reset_index().iloc[:, :2]
     mat_id_to_bibcode.columns = ["matrix_row_index", "doc_id"]
@@ -371,10 +375,10 @@ def prepare_gensim_features(docs_loc, dct_loc, corp_loc, map_loc, token_loc):
     mat_id_to_bibcode.to_csv(map_loc)
 
     LOG.info(f"Writing tokens to {token_loc}")
-    with open(token_loc, 'w') as f0:
+    with open(token_loc, "w") as f0:
         for token_set in tokens:
             f0.write(json.dumps(token_set))
-            f0.write('\n')
+            f0.write("\n")
     mat_id_to_bibcode.to_csv(map_loc)
 
     return dct_loc, corp_loc, map_loc
@@ -500,9 +504,11 @@ def run_gensim_lda_mult(
     dct = Dictionary.load(str(dct_loc))
     LOG.info(f"Loading corpus from {corp_loc}")
     corpus = MmCorpus(str(corp_loc))
-    with open(tokens_loc, 'r') as f0:
+    with open(tokens_loc, "r") as f0:
         tokens = [json.loads(line) for line in f0.read().splitlines()]
-    import ipdb; ipdb.set_trace()
+    import ipdb
+
+    ipdb.set_trace()
 
     with open(topic_range_loc, "r") as f0:
         topic_range = json.load(f0)

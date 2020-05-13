@@ -210,8 +210,8 @@ run-gensim-lda-mult: #$(COH_PLT_LOC)
 		--topic_range_loc $(TOPIC_RANGE_FILE) \
 		--tmodels_dir $(TMODEL_DIR) \
 		--coherence_loc $(COHERENCE_LOC) \
-		--dct_loc $(DCT_TOK_LOC) \
-		--corp_loc $(CORP_TOK_LOC)
+		--dct_loc $(DCT_LOC) \
+		--corp_loc $(CORP_LOC)
 
 ## Get coherences for gensim topic models
 get-gensim-coherences: #$(COH_PLT_LOC)

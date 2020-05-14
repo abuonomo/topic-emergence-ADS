@@ -455,19 +455,7 @@ def make_tmodel_n(pbar, corpus, dct, n_topics, c_measures, texts, tmodels_dir):
     return lda
 
 
-# TODO: this code is getting messy. Looking like there should be a class
-def run_gensim_lda_mult_inner(
-    topic_range, dct, tmodels_dir, c_measures, corpus=None, texts=None
-):
-    jobs = []
-    pbar = tqdm(topic_range)
-    for n_topics in topic_range:
-        j = dask.delayed(make_tmodel_n)(
-            pbar, corpus, dct, n_topics, c_measures, texts, tmodels_dir
-        )
-        jobs.append(j)
-    ldas = dask.compute(jobs)[0]
-
+def get_coherence_df(ldas, topic_range, c_measures, texts=None):
     coherences = defaultdict(list)
     coh_pbar = tqdm(zip(ldas, topic_range), total=len(ldas))
     for lda, n in coh_pbar:
@@ -489,9 +477,25 @@ def run_gensim_lda_mult_inner(
     return df
 
 
+# TODO: this code is getting messy. Looking like there should be a class
+def run_gensim_lda_mult_inner(
+    topic_range, dct, tmodels_dir, c_measures, corpus=None, texts=None
+):
+    jobs = []
+    pbar = tqdm(topic_range)
+    for n_topics in topic_range:
+        j = dask.delayed(make_tmodel_n)(
+            pbar, corpus, dct, n_topics, c_measures, texts, tmodels_dir
+        )
+        jobs.append(j)
+    ldas = dask.compute(jobs)[0]
+    df = get_coherence_df(ldas, topic_range, c_measures, texts)
+    return df
+
+
 @cli.command()
 @click.option("--plot_loc", type=Path)
-@click.option("--tokens_loc", type=Path)
+@click.option("--tokens_loc", type=Path, default='')
 @click.option("--topic_range_loc", type=Path)
 @click.option("--tmodels_dir", type=Path)
 @click.option("--coherence_loc", type=Path)
@@ -504,8 +508,11 @@ def run_gensim_lda_mult(
     dct = Dictionary.load(str(dct_loc))
     LOG.info(f"Loading corpus from {corp_loc}")
     corpus = MmCorpus(str(corp_loc))
-    with open(tokens_loc, "r") as f0:
-        tokens = [json.loads(line) for line in f0.read().splitlines()]
+    if tokens_loc != Path('.'):
+        with open(tokens_loc, "r") as f0:
+            tokens = [json.loads(line) for line in f0.read().splitlines()]
+    else:
+        tokens = None
     with open(topic_range_loc, "r") as f0:
         topic_range = json.load(f0)
     if len(topic_range) == 0:

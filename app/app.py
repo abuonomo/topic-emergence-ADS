@@ -76,6 +76,12 @@ def index():
     return render_template("index.html", version=VERSION, git_url=GIT_URL)
 
 
+@app.route("/lda")
+def lda():
+    LOG.info("Serving LDA viz.")
+    return render_template("lda.html", version=VERSION, git_url=GIT_URL)
+
+
 @app.route("/get-scatter-data", methods=["GET", "POST"])
 def get_scatter_data():
     in_data = request.json

@@ -59,8 +59,9 @@ $(RECORDS_LOC): $(RAW_FILES)
 ALL_KWDS_LOC=$(DATA_DIR)/all_keywords.jsonl
 YEAR_COUNT_LOC=$(DATA_DIR)/year_counts.csv
 ## Get dataframe of keyword frequencies over the years
-docs-to-keywords-df: $(ALL_KWDS_LOC) $(YEAR_COUNT_LOC)
-$(ALL_KWDS_LOC) $(YEAR_COUNT_LOC): $(RECORDS_LOC)
+docs-to-keywords-df:
+#docs-to-keywords-df: $(ALL_KWDS_LOC) $(YEAR_COUNT_LOC)
+#$(ALL_KWDS_LOC) $(YEAR_COUNT_LOC): $(RECORDS_LOC)
 	python src/extract_keywords.py main \
 		--infile $(RECORDS_LOC) \
 		--outfile $(ALL_KWDS_LOC) \
@@ -145,6 +146,7 @@ link-data-to-app:
 	ln -f $(MANIF_POINTS_LOC) app/data
 	ln -f $(KM_MODEL_LOC) app/data
 	ln -f $(TS_FEATURES_LOC) app/data
+	ln -f $(TMODEL_VIZ_GEN_LOC) app/data
 
 ## Run app for visualize results
 app: | $(APP_DATA_FILES)
@@ -243,8 +245,8 @@ $(TMODEL_VIZ_GEN_LOC): $(TMODELS) $(MAP_LOC)
 		--infile $(RECORDS_LOC) \
 		--tmodel_dir $(TMODEL_DIR) \
 		--n $(N_TOPICS) \
-		--in_corpus $(CORP_TOK_LOC) \
-		--dct_loc $(DCT_TOK_LOC) \
+		--in_corpus $(CORP_LOC) \
+		--dct_loc $(DCT_LOC) \
 		--map_loc $(MAP_LOC) \
 		--tmodel_viz_loc $(TMODEL_VIZ_GEN_LOC) \
 		--topic_to_bibcodes_loc $(TOPIC_TO_BIBCODES_LOC)

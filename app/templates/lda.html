@@ -1,0 +1,63 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Keyword Emergence Study for AI/ML Strategic Planning</title>
+    <style href="style.css"></style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.0/jquery.min.js"></script>
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+  </head>
+  <script>
+    var page_url = window.location.protocol + "//" + window.location.host + window.location.pathname;
+  </script>
+  <body>
+    <iframe id="pyLDAvis" src="static/topic_model_viz.html" style="position:fixed; top:0; left:0; bottom:0; right:0; width:100%; height:100%; border:none; margin:0; padding:0; overflow:hidden; z-index:999999;">
+      Your browser doesn't support iframes
+    </iframe>
+  <script>document.getElementById("pyLDAvis").src = page_url + "static/html/topic_model_viz.html"</script>
+  </body>
+  <script>
+
+    function exportToJsonFile(jsonData) {
+      let dataStr = JSON.stringify(jsonData);
+      let dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+
+      let exportFileDefaultName = 'data.json';
+
+      let linkElement = document.createElement('a');
+      linkElement.setAttribute('href', dataUri);
+      linkElement.setAttribute('download', exportFileDefaultName);
+      linkElement.click();
+    }
+
+    d3.csv('../data/topics_to_bibcodes.csv').then(function(data){
+      $('#pyLDAvis').on( 'load', function() {
+        var iframeElementx = document.getElementById("pyLDAvis"),
+                iframeElementy = (iframeElementx.contentWindow || iframeElementx.contentDocument),
+                iframeElementz = iframeElementy.document.body;
+        var svg = d3.select(iframeElementz);
+        var nTopics = svg.selectAll('.dot').size();
+        console.log(nTopics);
+        svg.selectAll(".dot").each(function(d, i) {
+
+          d3.select(this).on("click",  function() {
+            console.log(d);
+            var topic = +d['topics'];
+
+            console.log(`I did a thing! ${d['topics']}`);
+            var topicData = [];
+            for (i = 0; i < data.length; i++) {
+              if (+data[i]['topic'] + 1 === topic) {
+                topicData.push(data[i])
+              }
+            }
+            console.log(topicData.length);
+            exportToJsonFile(topicData);
+
+            },
+          );
+
+        })
+      });
+    });
+  </script>
+</html>

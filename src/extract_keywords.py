@@ -1,4 +1,5 @@
 import logging
+import re
 from html import unescape
 from html.parser import HTMLParser
 from pathlib import Path
@@ -77,6 +78,7 @@ def get_singlerank_kwds(text: pd.Series, batch_size=1000, n_process=1) -> List:
             edge_weighting="count",
             position_bias=False,
         )
+        import ipdb; ipdb.set_trace()
         kwd_lists.append(kwds)
         pbar.update(1)
     return kwd_lists

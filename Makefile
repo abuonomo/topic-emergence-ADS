@@ -208,7 +208,6 @@ run-gensim-lda-mult: #$(COH_PLT_LOC)
 	mkdir -p $(TMODEL_DIR); \
 	python src/topic_modeling.py run-gensim-lda-mult \
 		--plot_loc $(COH_PLT_LOC) \
-		--tokens_loc $(TOKENS_LOC) \
 		--topic_range_loc $(TOPIC_RANGE_FILE) \
 		--tmodels_dir $(TMODEL_DIR) \
 		--coherence_loc $(COHERENCE_LOC) \

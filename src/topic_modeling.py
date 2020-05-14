@@ -440,8 +440,9 @@ def make_tmodel_n(pbar, corpus, dct, n_topics, c_measures, texts, tmodels_dir):
         corpus,
         id2word=dct,
         num_topics=n_topics,
-        passes=10,
+        passes=5,
         iterations=200,
+        chunksize=10_000,
         # passes=1,
         # iterations=50,
         # eval_every=1,
@@ -518,7 +519,7 @@ def run_gensim_lda_mult(
     if len(topic_range) == 0:
         ValueError("Topic range is an empty list.")
 
-    c_measures = ["u_mass", "c_v"]
+    c_measures = ["u_mass"]
     df = run_gensim_lda_mult_inner(
         topic_range,
         dct,

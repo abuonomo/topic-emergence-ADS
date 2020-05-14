@@ -455,13 +455,13 @@ def make_tmodel_n(pbar, corpus, dct, n_topics, c_measures, texts, tmodels_dir):
     return lda
 
 
-def get_coherence_df(ldas, topic_range, c_measures, texts=None, corpus=None):
+def get_coherence_df(ldas, topic_range, c_measures, texts=None, corpus=None, dct=None):
     coherences = defaultdict(list)
     coh_pbar = tqdm(zip(ldas, topic_range), total=len(ldas))
     for lda, n in coh_pbar:
         for c in c_measures:
             coh_pbar.set_description(f"n_topics={n} | measure={c}")
-            cm = CoherenceModel(model=lda, texts=texts, corpus=corpus, coherence=c)
+            cm = CoherenceModel(model=lda, texts=texts, corpus=corpus, coherence=c, dictionary=dct)
             coherence = cm.get_coherence()  # get coherence value
             coherences[c].append(coherence)
 

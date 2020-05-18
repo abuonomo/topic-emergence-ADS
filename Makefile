@@ -59,9 +59,9 @@ $(RECORDS_LOC): $(RAW_FILES)
 ALL_KWDS_LOC=$(DATA_DIR)/all_keywords.jsonl
 YEAR_COUNT_LOC=$(DATA_DIR)/year_counts.csv
 ## Get dataframe of keyword frequencies over the years
-docs-to-keywords-df:
 #docs-to-keywords-df: $(ALL_KWDS_LOC) $(YEAR_COUNT_LOC)
 #$(ALL_KWDS_LOC) $(YEAR_COUNT_LOC): $(RECORDS_LOC)
+docs-to-keywords-df:
 	python src/extract_keywords.py main \
 		--infile $(RECORDS_LOC) \
 		--outfile $(ALL_KWDS_LOC) \
@@ -227,6 +227,7 @@ get-gensim-coherences: #$(COH_PLT_LOC)
 TMODELS=$(shell find $(TMODEL_DIR) -type f -name '*')
 N_TOPICS=50
 TMODEL_VIZ_LOC=$(VIZ_DIR)/topic_model_viz$(N_TOPICS).html
+TOPIC_COHS_LOC=$(VIZ_DIR)/topic_coherences$(N_TOPICS).csv
 # Above line collects all files in dir for command prerequisite
 ## Visualize topic models with pyLDAviz
 visualize-topic-models: $(TMODEL_VIZ_LOC)
@@ -237,12 +238,14 @@ $(TMODEL_VIZ_LOC): $(TMODELS)
 		--n $(N_TOPICS) \
 		--mlb_loc $(MULT_LAB_BIN_LOC) \
 		--map_loc $(MAP_LOC) \
-		--tmodel_viz_loc $(TMODEL_VIZ_LOC)
+		--tmodel_viz_loc $(TMODEL_VIZ_LOC) \
+		--topic_cohs_loc $(TOPIC_COHS_LOC)
 
 TMODEL_VIZ_GEN_LOC=$(VIZ_DIR)/gensim_topic_model_viz$(N_TOPICS).html
 ## Visualize gensim topic models with pyLDAvis
 visualize-gensim-topic-models: $(TMODEL_VIZ_GEN_LOC)
 $(TMODEL_VIZ_GEN_LOC): $(TMODELS) $(MAP_LOC)
+#visualize-gensim-topic-models:
 	python src/topic_modeling.py visualize-gensim-topic-models \
 		--infile $(RECORDS_LOC) \
 		--tmodel_dir $(TMODEL_DIR) \
@@ -265,14 +268,74 @@ $(TOPIC_TO_BIBCODES_LOC):  $(TMODELS)
 		--map_loc $(MAP_LOC) \
 		--topic_to_bibcodes_loc $(TOPIC_TO_BIBCODES_LOC)
 
-TOPIC_TO_YEARS_LOC=$(VIZ_DIR)/topic_years$(N_TOPICS).csv
+TOPIC_TO_YEARS_LOC=$(VIZ_DIR)/topic_years$(N_TOPICS).jsonl
 ## Get year time series for topics
-get-topic-years: $(TOPIC_TO_YEARS_LOC)
-$(TOPIC_TO_YEARS_LOC): $(TOPIC_TO_BIBCODES_LOC) $(RECORDS_LOC)
+#get-topic-years: $(TOPIC_TO_YEARS_LOC)
+#$(TOPIC_TO_YEARS_LOC): $(TOPIC_TO_BIBCODES_LOC) $(RECORDS_LOC)
+get-topic-years:
 	python src/topic_modeling.py get-topic-years \
 		--records_loc $(RECORDS_LOC) \
 		--in_bib $(TOPIC_TO_BIBCODES_LOC) \
+		--topic_cohs_loc $(TOPIC_COHS_LOC) \
+		--map_loc $(MAP_LOC) \
 		--out_years $(TOPIC_TO_YEARS_LOC)
+
+NORM_TOPICS_LOC=$(VIZ_DIR)/topic_years_norm$(N_TOPICS).jsonl
+## Normalize topic frequencies by year totals and percent of baselines.
+normalize-topic-freqs: $(TOPIC_TO_YEARS_LOC)
+$(NORM_TOPICS_LOC): $(TOPIC_TO_YEARS_LOC) $(YEAR_COUNT_LOC)
+	$(RECIPES) normalize-keyword-freqs \
+		--kwds_loc $(TOPIC_TO_YEARS_LOC) \
+		--in_years $(YEAR_COUNT_LOC) \
+		--out_norm $(NORM_TOPICS_LOC)
+
+TOPIC_TS_FEATURES_LOC=$(DATA_DIR)/topic_time_series_measures$(N_TOPICS).csv
+## Get various measures for topics time series
+topics-time-series-measures: $(TOPIC_TS_FEATURES_LOC)
+$(TOPIC_TS_FEATURES_LOC): $(NORM_TOPICS_LOC) $(OUT_AFFIL)
+	$(RECIPES) slope-complexity \
+		--norm_loc $(NORM_TOPICS_LOC) \
+		--affil_loc $(OUT_AFFIL) \
+		--out_df $(TOPIC_TS_FEATURES_LOC)
+
+TOPIC_DTW_DISTS_LOC=$(DATA_DIR)/topic_dynamic_time_warp_distances.csv
+## Compute pairwise dynamic time warp between topics
+topic-dtw: $(TOPIC_DTW_DISTS_LOC)
+$(TOPIC_DTW_DISTS_LOC): $(NORM_TOPICS_LOC)
+	$(RECIPES) dtw \
+		--norm_loc $(NORM_TOPICS_LOC) \
+		--dtw_loc $(TOPIC_DTW_DISTS_LOC)
+
+ELBOW_PLT_LOC=$(VIZ_DIR)/topic_elbow.png
+## Try various numbers of clusters for kmeans topic time series clustering
+topic-cluster-tests: $(ELBOW_PLT_LOC)
+$(ELBOW_PLT_LOC): $(TOPIC_DTW_DISTS_LOC)
+	$(RECIPES) cluster-tests \
+		--dtw_loc $(TOPIC_DTW_DISTS_LOC) \
+		--out_elbow_plot $(ELBOW_PLT_LOC)
+
+TOPIC_KM_MODEL_LOC=$(MODEL_DIR)/topic_kmeans.jbl
+TOPIC_MANIF_PLT_LOC=$(VIZ_DIR)/topic_manifold.png
+TOPIC_MANIF_POINTS_LOC=$(MODEL_DIR)/topic_dtw_manifold_proj.jbl
+## Cluster topics by dynamic time warp values and plot in tensorboard.
+topic-dtw-viz: $(TOPIC_MANIF_PLT_LOC) $(TOPIC_MANIF_POINTS_LOC) $(TOPIC_KM_MODEL_LOC)
+$(TOPIC_MANIF_PLT_LOC) $(TOPIC_MANIF_POINTS_LOC) $(TOPIC_KM_MODEL_LOC): $(NORM_TOPICS_LOC) $(TOPIC_DTW_DISTS_LOC)
+	$(RECIPES) dtw-viz \
+		--norm_loc $(NORM_TOPICS_LOC) \
+		--dtw_loc $(TOPIC_DTW_DISTS_LOC) \
+		--kmeans_loc $(TOPIC_KM_MODEL_LOC) \
+		--out_man_plot $(TOPIC_MANIF_PLT_LOC) \
+		--out_man_points $(TOPIC_MANIF_POINTS_LOC)
+
+link-topic-data-to-app:
+	ln -f $(YEAR_COUNT_LOC) app/data/year_counts.csv
+	ln -f $(TOPIC_TO_YEARS_LOC) app/data/all_keywords_threshold.jsonl
+	ln -f $(TOPIC_MANIF_POINTS_LOC) app/data/dtw_manifold_proj.jbl
+	ln -f $(TOPIC_KM_MODEL_LOC) app/data/kmeans.jbl
+	ln -f $(TOPIC_TS_FEATURES_LOC) app/data/slope_complex.csv
+	ln -f $(TMODEL_VIZ_GEN_LOC) app/static/html/topic_model_viz.html
+	ln -f $(TOPIC_TO_BIBCODES_LOC) app/data/topic_distribs_to_bibcodes.csv
+	ln -f $(TOPIC_TO_YEARS_LOC) app/data/topic_years.jsonl
 
 
 DOC_TXTS=$(DATA_DIR)/documents.txt

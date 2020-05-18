@@ -31,6 +31,8 @@ from sklearn.preprocessing import MultiLabelBinarizer
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
 
+from extract_keywords import binarize_years, get_stem_aggs
+
 # LOGLEVEL = os.environ.get('LOGLEVEL', 'WARNING').upper()
 logging.basicConfig(level=logging.DEBUG)
 LOG = logging.getLogger(__name__)
@@ -600,6 +602,7 @@ def visualize_topic_models(infile, tmodel_dir, n, mlb_loc, map_loc, tmodel_viz_l
 @click.option("--map_loc", type=Path)
 @click.option("--tmodel_viz_loc", type=Path)
 @click.option("--topic_to_bibcodes_loc", type=Path)
+@click.option("--topic_cohs_loc", type=Path)
 def visualize_gensim_topic_models(
     infile,
     tmodel_dir,
@@ -609,6 +612,7 @@ def visualize_gensim_topic_models(
     map_loc,
     tmodel_viz_loc,
     topic_to_bibcodes_loc,
+    topic_cohs_loc,
 ):
     LOG.info("Loading corpus, dictionary, lda model, and document map")
     corpus = MmCorpus(str(in_corpus))
@@ -616,8 +620,11 @@ def visualize_gensim_topic_models(
     lda = LdaModel.load(str(tmodel_dir / f"gensim_topic_model{n}"))
     mat_id_to_doc_id = pd.read_csv(map_loc, index_col=0)
 
+    cm = CoherenceModel(model=lda, corpus=corpus, coherence='u_mass')
+    coh_per_topic = cm.get_coherence_per_topic()
+
     # Just counting number of terms which appear, not the frequency of them
-    # Do this because we are only counting occurence for LDA, not using frequency
+    # Do this because we are only counting occurrence for LDA, not using frequency
     # This could be a problem. Might need to change that.
     # Counting freq would be like:
     # mdoc_lens = [sum([v[1] for v in corpus[i]]) for i in mat_id_to_doc_id["matrix_row_index"]]
@@ -628,9 +635,12 @@ def visualize_gensim_topic_models(
     embedding = np.vstack([[v for t, v in r] for r in tqdm(tc)])
     new_df = get_bibcodes_with_embedding(infile, embedding, mat_id_to_doc_id)
 
+    LOG.info(f"Writing topic coherences to {topic_cohs_loc}")
+    pd.DataFrame(coh_per_topic).to_csv(topic_cohs_loc)
+
     LOG.info(f"Writing bibcodes to {topic_to_bibcodes_loc}")
     new_df.to_csv(topic_to_bibcodes_loc)
-    # topic_model_viz_gensim(embedding, dct, lda, mdoc_lens, tmodel_viz_loc)
+
     viz_data = pyLDAvis.gensim.prepare(lda, corpus, dct, sort_topics=False, mds="mmds")
     LOG.info(f"Writing visualization to {tmodel_viz_loc}")
     pyLDAvis.save_html(viz_data, str(tmodel_viz_loc))
@@ -657,23 +667,36 @@ def get_bibcodes_with_embedding(infile, embedding, mat_id_to_doc_id):
 @cli.command()
 @click.option("--records_loc", type=Path)
 @click.option("--in_bib", type=Path)
+@click.option("--topic_cohs_loc", type=Path)
+@click.option("--map_loc", type=Path)
 @click.option("--out_years", type=Path)
-def get_topic_years(records_loc, in_bib, out_years):
-    LOG.info("Reading data")
+def get_topic_years(records_loc, in_bib, topic_cohs_loc, map_loc, out_years):
+    LOG.info("Reading data...")
     df = pd.read_json(records_loc, orient='records', lines=True)
     bib_df = pd.read_csv(in_bib, index_col=0)
-    LOG.info("Transforming")
-    jdf = bib_df.set_index('bibcode').join(df.set_index('bibcode')['year'])
-    year = jdf.pop('year')
-    topics = jdf.values.argmax(axis=1)
-    # Could potentially add a limit here. Only take when topic prob is over 0.7 or something.
+    map_df = pd.read_csv(map_loc, index_col=0)
+    coh_df = pd.read_csv(topic_cohs_loc, index_col=0)
 
-    ty_df = pd.DataFrame({'year': year, 'topic': topics})
-    ty_df['n'] = 1
-    cdf = ty_df.groupby(['topic', 'year']).sum().unstack()
-    cdf = cdf['n']
+    LOG.info("Transforming...")
+    topics = bib_df.set_index('bibcode').values.argmax(axis=1)  # Could add thresh
+    ndf = pd.DataFrame(topics)
+    ndf.index = bib_df.index
+    ndf.columns = ['stem']
+    ndf = ndf.join(map_df.set_index('matrix_row_index'))
+    ndf = ndf.sort_values('doc_id')
+    ndf['year'] = df.loc[ndf['doc_id'], 'year']
+    ndf['nasa_afil'] = df.loc[ndf['doc_id'], "nasa_afil"]
+    ndf = ndf.dropna().copy()
+    ndf['year'] = ndf['year'].astype(int)
+    ndf['score'] = coh_df.loc[ndf['stem'].tolist()].iloc[:, 0].tolist()
+    ndf['keyword'] = ['' for _ in range(ndf.shape[0])]
+
+    bndf = binarize_years(ndf)
+    agg_df = get_stem_aggs(bndf).reset_index()
+    agg_df['stem'] = agg_df['stem'].astype(str)
+
     LOG.info(f"Writing to {out_years}")
-    cdf.to_csv(out_years)
+    agg_df.to_json(out_years, orient='records', lines=True)
 
 
 @cli.command()

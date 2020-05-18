@@ -31,7 +31,7 @@
           <li>y: <select id="selectButtonY" class="selector"></select></li>
           <li>xScale: <select id="selectButtonXScale" class="selector"></select></li>
           <li>minimum count: <input id="minCountInput" value="0" type="number"></input></li>
-          <li>minimum rake score: <input id="minRakeInput" value="7" type="number"></input></li>
+          <li>minimum rake score: <input id="minRakeInput" value="0" type="number"></input></li>
           <li><button type="button" id="enterButton">Transform</button></li>
           <li><br></li>
           <li><button type="button" id="toggleNorm">Toggle Time Series Normalize</button></li>
@@ -106,8 +106,8 @@
       .timeChart(timeChart)
       .color(color);
 
-      var min_count = 0;
-      var minRake=0;
+      var min_count = -999;
+      var minRake=-999;
 
       d3.json(window.location.pathname + "get-scatter-data", {
             method:"POST",

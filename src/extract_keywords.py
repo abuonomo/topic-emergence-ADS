@@ -78,7 +78,6 @@ def get_singlerank_kwds(text: pd.Series, batch_size=1000, n_process=1) -> List:
             edge_weighting="count",
             position_bias=False,
         )
-        import ipdb; ipdb.set_trace()
         kwd_lists.append(kwds)
         pbar.update(1)
     return kwd_lists
@@ -90,10 +89,8 @@ def flatten_to_keywords(df, min_thresh=5):
     df = df.pipe(stem_reduce, min_thresh)
     df = df.pipe(binarize_years)
     kwd_df = df.pipe(get_stem_aggs)
-    year_counts = df["year"].value_counts().reset_index()
-    year_counts.columns = ["year", "count"]
     kwd_df = kwd_df.reset_index()
-    return kwd_df, year_counts
+    return kwd_df
 
 
 def get_kwd_occurences(df, min_thresh=5, max_thresh=0.7):
@@ -170,6 +167,7 @@ def binarize_years(df):
     df['year'] = df['year'].astype(np.int16)
     year_binary = lb.fit_transform(df["year"])  # there should not be NAs.
     year_binary_df = pd.DataFrame(year_binary)
+    year_binary_df.index = df.index
     year_binary_df.columns = lb.classes_
     # Write both to h5py, load in chunks and write concat to another h5py?
     df = pd.concat([df, year_binary_df], axis=1)
@@ -287,7 +285,9 @@ def main(infile, outfile, out_years, min_thresh, strategy, batch_size, n_process
     df['title'] = df['title'].astype(str)
     df['abstract'] = df['abstract'].astype(str)
     df['year'] = df['year'].astype(int)
-    kwd_df, year_counts = flatten_to_keywords(df, min_thresh)
+    year_counts = df["year"].value_counts().reset_index()
+    year_counts.columns = ["year", "count"]
+    kwd_df = flatten_to_keywords(df, min_thresh)
     LOG.info(f"Writing out all keywords to {outfile}.")
     kwd_df.to_json(outfile, orient="records", lines=True)
     LOG.info(f"Writing year counts to {out_years}.")

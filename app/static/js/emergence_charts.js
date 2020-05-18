@@ -193,7 +193,7 @@ function scatterChart() {
         .style('left', (absoluteMousePos[0] + 10)+'px')
         .style('top', (absoluteMousePos[1] - 40)+'px');
 
-        var kwd = pD['stem'].replace('<', '&lt;').replace('>', '&gt;');
+        var kwd = pD['stem'].toString().replace('<', '&lt;').replace('>', '&gt;');
         var line1 = '<p><strong>' + kwd + '</strong></p>';
         var line2 = `<p>${xName}: ` + pD[xName].toFixed(2) + '</p>';
         var line3 = `<p>${yName}: ` + pD[yName].toFixed(2) + '</p>';

@@ -259,16 +259,6 @@ def main(infile, outfile, out_years, min_thresh, strategy, batch_size, n_process
 
     LOG.info(f"Reading keywords from {infile}.")
     df = pd.read_json(infile, orient="records", lines=True)
-    text = df["title"] + ". " + df["abstract"]
-    text = text.apply(unescape).astype(str)
-    text = text.apply(strip_tags).astype(str)
-    strats = ["rake", "singlerank"]
-    if strategy not in strats:
-        raise ValueError(f"{strategy} not in {strats}.")
-    if strategy == "rake":
-        df["kwds"] = get_keywords_from_text(text)
-    elif strategy == "singlerank":
-        df["kwds"] = get_singlerank_kwds(text, batch_size, n_process)
     df = df.drop(
         [
             "arxiv_class",
@@ -287,11 +277,22 @@ def main(infile, outfile, out_years, min_thresh, strategy, batch_size, n_process
     df['year'] = df['year'].astype(int)
     year_counts = df["year"].value_counts().reset_index()
     year_counts.columns = ["year", "count"]
+    LOG.info(f"Writing year counts to {out_years}.")
+    year_counts.to_csv(out_years)
+
+    text = df["title"] + ". " + df["abstract"]
+    text = text.apply(unescape).astype(str)
+    text = text.apply(strip_tags).astype(str)
+    strats = ["rake", "singlerank"]
+    if strategy not in strats:
+        raise ValueError(f"{strategy} not in {strats}.")
+    if strategy == "rake":
+        df["kwds"] = get_keywords_from_text(text)
+    elif strategy == "singlerank":
+        df["kwds"] = get_singlerank_kwds(text, batch_size, n_process)
     kwd_df = flatten_to_keywords(df, min_thresh)
     LOG.info(f"Writing out all keywords to {outfile}.")
     kwd_df.to_json(outfile, orient="records", lines=True)
-    LOG.info(f"Writing year counts to {out_years}.")
-    year_counts.to_csv(out_years)
 
 
 if __name__ == "__main__":

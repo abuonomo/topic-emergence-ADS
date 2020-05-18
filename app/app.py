@@ -29,10 +29,14 @@ app.config.update(
     YC_LOC=DATA_DIR / "year_counts.csv",
     KMEANS_LOC=DATA_DIR / "kmeans.jbl",
     MAN_LOC=DATA_DIR / "dtw_manifold_proj.jbl",
+    TOPIC_DISTRIB_LOC=DATA_DIR / "topic_distribs_to_bibcodes.csv",
+    TOPIC_YEARS_LOC=DATA_DIR / "topic_years.csv",
     SC_DF=None,
     N_DF=None,
     YEAR_COUNTS=None,
     KMEANS=None,
+    TOPIC_DISTRIB_DF=None,
+    TOPIC_YEARS_DF=None,
     LOAD_COLS=[
         "stem",
         "count",
@@ -67,6 +71,15 @@ def init():
     )
     app.config["SC_DF"]["manifold_x"] = manifold_data[:, 0]
     app.config["SC_DF"]["manifold_y"] = manifold_data[:, 1]
+
+    LOG.info(f'Reading topic distributions from {app.config["TOPIC_DISTRIB_LOC"]}')
+    app.config["TOPIC_DISTRIB_DF"] = pd.read_csv(
+        app.config["TOPIC_DISTRIB_LOC"], index_col=0
+    )
+
+    app.config["TOPIC_YEARS_DF"] = pd.read_csv(
+        app.config["TOPIC_YEARS_LOC"], index_col=0
+    )
     LOG.info(f"Ready")
 
 
@@ -80,6 +93,22 @@ def index():
 def lda():
     LOG.info("Serving LDA viz.")
     return render_template("lda.html", version=VERSION, git_url=GIT_URL)
+
+
+@app.route("/topic_bibcodes", methods=["GET", "POST"])
+def topic_bibcodes():
+    in_data = request.json
+    topic = in_data['topic'] - 1  # Frontend index starts at 1, here starts at 0
+    norm_counts = app.config['TOPIC_YEARS_DF'] / app.config['TOPIC_YEARS_DF'].sum()
+    ts = app.config['TOPIC_YEARS_DF'].loc[topic, :]
+    ts_norm = norm_counts.loc[topic, :]
+    df = pd.DataFrame({'count': ts, 'norm_count': ts_norm})
+    df['stem'] = str(topic)
+    df['kmeans_cluster'] = 1
+    df = df.reset_index().rename(columns={'index': 'year'})
+    df['year'] = df['year'].astype(int)
+    records = df.to_dict(orient='records')
+    return jsonify(records)
 
 
 @app.route("/get-scatter-data", methods=["GET", "POST"])

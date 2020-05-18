@@ -655,14 +655,37 @@ def get_bibcodes_with_embedding(infile, embedding, mat_id_to_doc_id):
 
 
 @cli.command()
+@click.option("--records_loc", type=Path)
+@click.option("--in_bib", type=Path)
+@click.option("--out_years", type=Path)
+def get_topic_years(records_loc, in_bib, out_years):
+    LOG.info("Reading data")
+    df = pd.read_json(records_loc, orient='records', lines=True)
+    bib_df = pd.read_csv(in_bib, index_col=0)
+    LOG.info("Transforming")
+    jdf = bib_df.set_index('bibcode').join(df.set_index('bibcode')['year'])
+    year = jdf.pop('year')
+    topics = jdf.values.argmax(axis=1)
+    # Could potentially add a limit here. Only take when topic prob is over 0.7 or something.
+
+    ty_df = pd.DataFrame({'year': year, 'topic': topics})
+    ty_df['n'] = 1
+    cdf = ty_df.groupby(['topic', 'year']).sum().unstack()
+    cdf = cdf['n']
+    LOG.info(f"Writing to {out_years}")
+    cdf.to_csv(out_years)
+
+
+@cli.command()
 @click.option("--infile", type=Path)
 @click.option("--tmodel_dir", type=Path)
 @click.option("--n", type=int)
 @click.option("--mlb_loc", type=Path)
 @click.option("--map_loc", type=Path)
 @click.option("--topic_to_bibcodes_loc", type=Path)
+@click.option("--topic_to_years_loc", type=Path)
 def explore_topic_models(
-    infile, tmodel_dir, n, mlb_loc, map_loc, topic_to_bibcodes_loc
+    infile, tmodel_dir, n, mlb_loc, map_loc, topic_to_bibcodes_loc, topic_to_years_loc,
 ):
     tmodel_loc = tmodel_dir / f"topics_{n}.jbl"
     LOG.info(f"Loading topic model from {tmodel_loc}")
@@ -674,9 +697,10 @@ def explore_topic_models(
     LOG.info(f"Reading matrix to doc id mapping from {map_loc}")
     mat_id_to_doc_id = pd.read_csv(map_loc, index_col=0)
 
-    new_df = get_bibcodes_with_embedding(infile, tmodel.embedding_, mat_id_to_doc_id)
+    bib_df = get_bibcodes_with_embedding(infile, tmodel.embedding_, mat_id_to_doc_id)
     LOG.info(f"Writing bibcodes to {topic_to_bibcodes_loc}")
-    new_df.to_csv(topic_to_bibcodes_loc)
+    bib_df.to_csv(topic_to_bibcodes_loc)
+
 
 
 if __name__ == "__main__":

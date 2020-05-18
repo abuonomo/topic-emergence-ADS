@@ -146,7 +146,10 @@ link-data-to-app:
 	ln -f $(MANIF_POINTS_LOC) app/data
 	ln -f $(KM_MODEL_LOC) app/data
 	ln -f $(TS_FEATURES_LOC) app/data
-	ln -f $(TMODEL_VIZ_GEN_LOC) app/data
+	ln -f $(TMODEL_VIZ_GEN_LOC) app/static/html/topic_model_viz.html
+	ln -f $(TOPIC_TO_BIBCODES_LOC) app/data/topic_distribs_to_bibcodes.csv
+	ln -f $(TOPIC_TO_YEARS_LOC) app/data/topic_years.csv
+
 
 ## Run app for visualize results
 app: | $(APP_DATA_FILES)
@@ -261,6 +264,16 @@ $(TOPIC_TO_BIBCODES_LOC):  $(TMODELS)
 		--mlb_loc $(MULT_LAB_BIN_LOC) \
 		--map_loc $(MAP_LOC) \
 		--topic_to_bibcodes_loc $(TOPIC_TO_BIBCODES_LOC)
+
+TOPIC_TO_YEARS_LOC=$(VIZ_DIR)/topic_years$(N_TOPICS).csv
+## Get year time series for topics
+get-topic-years: $(TOPIC_TO_YEARS_LOC)
+$(TOPIC_TO_YEARS_LOC): $(TOPIC_TO_BIBCODES_LOC) $(RECORDS_LOC)
+	python src/topic_modeling.py get-topic-years \
+		--records_loc $(RECORDS_LOC) \
+		--in_bib $(TOPIC_TO_BIBCODES_LOC) \
+		--out_years $(TOPIC_TO_YEARS_LOC)
+
 
 DOC_TXTS=$(DATA_DIR)/documents.txt
 ## Prepare data for neural LDA

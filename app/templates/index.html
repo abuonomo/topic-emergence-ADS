@@ -47,8 +47,8 @@
           <button id="changeComplex">mean change vs complexity</button>
         </div>
       </div>
-      <div id="plots" style="margin-left: 100px; height: 100%"></div>
-      <div class="resp-container">
+      <div id="plots" style="margin-left: 120px; height: 100%"></div>
+      <div class="resp-container" style="margin-left: 130px; height: 100%">
         <iframe class="resp-iframe" id="pyLDAvis" src="static/topic_model_viz.html" allowfullscreen>
           Your browser doesn't support iframes
         </iframe>
@@ -244,10 +244,14 @@
                 iframeElementy = (iframeElementx.contentWindow || iframeElementx.contentDocument),
                 iframeElementz = iframeElementy.document.body;
         var svg = d3.select(iframeElementz);
+        // svg.selectAll('.txt').text(function(d, i) {return (+d['topics'] - 1).toString()});
         var nTopics = svg.selectAll('.dot').size();
         console.log(nTopics);
         svg.selectAll(".dot").each(function(d, i) {
           d3.select(this).on("click", onTopicClick);
+        });
+        svg.selectAll('.terms').each(function (d, i) {
+          d3.select(this).on("click", onRectClick);
         })
       });
 

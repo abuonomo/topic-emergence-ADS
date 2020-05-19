@@ -26,15 +26,21 @@ DATA_DIR = Path(os.environ["APP_DATA_DIR"])
 app.config.update(
     SC_LOC=DATA_DIR / f"slope_complex.csv",
     N_LOC=DATA_DIR / f"all_keywords_threshold.jsonl",
+    KWD_SC_LOC=DATA_DIR / f"kwd_slope_complex.csv",
+    KWD_N_LOC=DATA_DIR / f"kwd_all_keywords_threshold.jsonl",
     YC_LOC=DATA_DIR / "year_counts.csv",
     KMEANS_LOC=DATA_DIR / "kmeans.jbl",
+    KWD_KMEANS_LOC=DATA_DIR / "kwd_kmeans.jbl",
     MAN_LOC=DATA_DIR / "dtw_manifold_proj.jbl",
     TOPIC_DISTRIB_LOC=DATA_DIR / "topic_distribs_to_bibcodes.csv",
     TOPIC_YEARS_LOC=DATA_DIR / "topic_years.csv",
     SC_DF=None,
     N_DF=None,
+    KWD_SC_DF=None,
+    KWD_N_DF=None,
     YEAR_COUNTS=None,
     KMEANS=None,
+    KWD_KMEANS=None,
     TOPIC_DISTRIB_DF=None,
     TOPIC_YEARS_DF=None,
     LOAD_COLS=[
@@ -56,14 +62,26 @@ def init():
     LOG.info(f'Reading full stem time series from {app.config["N_LOC"]}.')
     app.config["N_DF"] = pd.read_json(app.config["N_LOC"], orient="records", lines=True)
 
+    LOG.info(f'Reading derived time series measure from {app.config["KWD_SC_LOC"]}.')
+    app.config["KWD_SC_DF"] = pd.read_csv(app.config["KWD_SC_LOC"], index_col=0)
+
+    LOG.info(f'Reading full stem time series from {app.config["KWD_N_LOC"]}.')
+    app.config["KWD_N_DF"] = pd.read_json(app.config["KWD_N_LOC"], orient="records", lines=True)
+
     LOG.info(f"Reading kmeans model from {app.config['KMEANS_LOC']}")
     app.config["KMEANS"] = joblib.load(app.config["KMEANS_LOC"])
+
+    LOG.info(f"Reading kmeans model from {app.config['KWD_KMEANS_LOC']}")
+    app.config["KWD_KMEANS"] = joblib.load(app.config["KWD_KMEANS_LOC"])
 
     manifold_data = joblib.load(app.config["MAN_LOC"])
     app.config["YEAR_COUNTS"] = pd.read_csv(app.config["YC_LOC"], index_col=0)
 
     app.config["SC_DF"]["kmeans_cluster"] = app.config["KMEANS"].labels_
     log_count = np.log(app.config["SC_DF"]["count"])
+
+    app.config["KWD_SC_DF"]["kmeans_cluster"] = app.config["KWD_KMEANS"].labels_
+    # log_count = np.log(app.config["KWD_SC_DF"]["count"])
 
     scaler = MinMaxScaler(feature_range=(3, 10))
     app.config["SC_DF"]["scaled_counts"] = scaler.fit_transform(
@@ -145,15 +163,28 @@ def _trans_time(ts, kwd, clus):
     return ts_recs
 
 
+def get_time_data_inner(data, n_df, sc_df):
+    data = request.json
+    LOG.info(f"Getting time data for {data}.")
+    ts = n_df.query(f'stem == "{data["stem"]}"').iloc[:, 6:]
+    s = data['stem']
+    kmc = sc_df.query(f'stem == "{s}"')['kmeans_cluster'].iloc[0]
+    ts = ts.T
+    ts_recs = _trans_time(ts, s, kmc)
+    return ts_recs
+
+
 @app.route("/get-time-data", methods=["GET", "POST"])
 def get_time_data():
     data = request.json
-    LOG.info(f"Getting time data for {data}.")
-    ts = app.config["N_DF"].query(f'stem == "{data["stem"]}"').iloc[:, 6:]
-    s = data['stem']
-    kmc = app.config['SC_DF'].query(f'stem == "{s}"')['kmeans_cluster'].iloc[0]
-    ts = ts.T
-    ts_recs = _trans_time(ts, s, kmc)
+    ts_recs = get_time_data_inner(data, app.config["N_DF"], app.config["SC_DF"])
+    return jsonify(ts_recs)
+
+
+@app.route("/get-kwd-time-data", methods=["GET", "POST"])
+def get_kwd_time_data():
+    data = request.json
+    ts_recs = get_time_data_inner(data, app.config["KWD_N_DF"], app.config["KWD_SC_DF"])
     return jsonify(ts_recs)
 
 

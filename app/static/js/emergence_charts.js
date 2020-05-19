@@ -22,6 +22,23 @@ function onTopicClick(d, i) {
   )
 }
 
+function onRectClick(d, i) {
+  var colorName = 'kmeans_cluster';
+  var topic = d['Term'];
+  d3.json(page_url + 'get-kwd-time-data', {
+    method:"POST",
+    body: JSON.stringify({
+      stem: topic, kmeans_cluster: d[colorName]
+    }),
+    headers: {
+      "Content-type": "application/json; charset=UTF-8"
+    }
+  }).then(
+    function(data) {
+      timeChart.data(data);
+    }
+  )
+}
 
 function exportToJsonFile(jsonData) {
   let dataStr = JSON.stringify(jsonData);

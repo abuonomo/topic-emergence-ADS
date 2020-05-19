@@ -329,12 +329,14 @@ $(TOPIC_MANIF_PLT_LOC) $(TOPIC_MANIF_POINTS_LOC) $(TOPIC_KM_MODEL_LOC): $(NORM_T
 
 link-topic-data-to-app:
 	ln -f $(YEAR_COUNT_LOC) app/data/year_counts.csv
+	ln -f $(FILT_KWDS_LOC) app/data/kwd_all_keywords_threshold.jsonl
+	ln -f $(TS_FEATURES_LOC) app/data/kwd_slope_complex.csv
 	ln -f $(TOPIC_TO_YEARS_LOC) app/data/all_keywords_threshold.jsonl
 	ln -f $(TOPIC_MANIF_POINTS_LOC) app/data/dtw_manifold_proj.jbl
 	ln -f $(TOPIC_KM_MODEL_LOC) app/data/kmeans.jbl
+	ln -f $(KM_MODEL_LOC) app/data/kwd_kmeans.jbl
 	ln -f $(TOPIC_TS_FEATURES_LOC) app/data/slope_complex.csv
 	ln -f $(TMODEL_VIZ_GEN_LOC) app/static/html/topic_model_viz.html
-	ln -f $(TOPIC_TO_BIBCODES_LOC) app/data/topic_distribs_to_bibcodes.csv
 	ln -f $(TOPIC_TO_YEARS_LOC) app/data/topic_years.jsonl
 
 

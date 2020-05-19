@@ -222,7 +222,12 @@ function scatterChart() {
       function(data) {
         timeChart.data(data);
       }
-    )
+    );
+    var iframeElementx = document.getElementById("pyLDAvis"),
+      iframeElementy = (iframeElementx.contentWindow || iframeElementx.contentDocument),
+      iframeElementz = iframeElementy.document.body;
+    var vizSvg = d3.select(iframeElementz);
+    vizSvg.select('#ldavis_el5816652949919526245638977-topic').node().value = (+d[labelName] + 1).toString()
   }
 
   function tooltip() {

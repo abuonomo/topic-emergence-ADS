@@ -89,26 +89,27 @@ def index():
     return render_template("index.html", version=VERSION, git_url=GIT_URL)
 
 
-# @app.route("/lda")
-# def lda():
-#     LOG.info("Serving LDA viz.")
-#     return render_template("lda.html", version=VERSION, git_url=GIT_URL)
+@app.route("/lda")
+def lda():
+    LOG.info("Serving LDA viz.")
+    return render_template("lda.html", version=VERSION, git_url=GIT_URL)
 
 
-# @app.route("/topic_bibcodes", methods=["GET", "POST"])
-# def topic_bibcodes():
-#     in_data = request.json
-#     topic = in_data['topic'] - 1  # Frontend index starts at 1, here starts at 0
-#     norm_counts = app.config['TOPIC_YEARS_DF'] / app.config['TOPIC_YEARS_DF'].sum()
-#     ts = app.config['TOPIC_YEARS_DF'].loc[topic, :]
-#     ts_norm = norm_counts.loc[topic, :]
-#     df = pd.DataFrame({'count': ts, 'norm_count': ts_norm})
-#     df['stem'] = str(topic)
-#     df['kmeans_cluster'] = 1
-#     df = df.reset_index().rename(columns={'index': 'year'})
-#     df['year'] = df['year'].astype(int)
-#     records = df.to_dict(orient='records')
-#     return jsonify(records)
+@app.route("/topic_bibcodes", methods=["GET", "POST"])
+def topic_bibcodes():
+    import ipdb; ipdb.set_trace()
+    in_data = request.json
+    topic = in_data['topic'] - 1  # Frontend index starts at 1, here starts at 0
+    # norm_counts = app.config['TOPIC_YEARS_DF'] / app.config['TOPIC_YEARS_DF'].sum()
+    # ts = app.config['TOPIC_YEARS_DF'].loc[topic, :]
+    # ts_norm = norm_counts.loc[topic, :]
+    # df = pd.DataFrame({'count': ts, 'norm_count': ts_norm})
+    # df['stem'] = str(topic)
+    # df['kmeans_cluster'] = 1
+    # df = df.reset_index().rename(columns={'index': 'year'})
+    # df['year'] = df['year'].astype(int)
+    # records = df.to_dict(orient='records')
+    # return jsonify(records)
 
 
 @app.route("/get-scatter-data", methods=["GET", "POST"])
@@ -149,8 +150,10 @@ def get_time_data():
     data = request.json
     LOG.info(f"Getting time data for {data}.")
     ts = app.config["N_DF"].query(f'stem == "{data["stem"]}"').iloc[:, 6:]
+    s = data['stem']
+    kmc = app.config['SC_DF'].query(f'stem == "{s}"')['kmeans_cluster'].iloc[0]
     ts = ts.T
-    ts_recs = _trans_time(ts, data["stem"], data["kmeans_cluster"])
+    ts_recs = _trans_time(ts, s, kmc)
     return jsonify(ts_recs)
 
 

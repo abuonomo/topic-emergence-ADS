@@ -1,9 +1,8 @@
 import logging
-import re
+import os
 from html import unescape
 from html.parser import HTMLParser
 from pathlib import Path
-import os
 from typing import List
 
 import RAKE

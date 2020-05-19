@@ -442,6 +442,7 @@ docker-run-app: | $(APP_DATA_FILES)
 	cd app; \
 	docker run -it \
 		-p 5001:5000 \
+		-v $$(pwd)/static/html:/home/static/html/ \
 		-v $$(pwd)/data:/home/data/ \
 		$(IMAGE_NAME):$$VERSION
 

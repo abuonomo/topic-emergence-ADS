@@ -48,12 +48,18 @@
         </div>
       </div>
       <div id="plots" style="margin-left: 100px; height: 100%"></div>
+      <div class="resp-container">
+        <iframe class="resp-iframe" id="pyLDAvis" src="static/topic_model_viz.html" allowfullscreen>
+          Your browser doesn't support iframes
+        </iframe>
+        <script>document.getElementById("pyLDAvis").src = page_url + "static/html/topic_model_viz.html"</script>
+      </div>
     </div>
     <br>
 
     <script src="https://d3js.org/d3.v5.min.js"></script>
     <script id="emergenceScript" src="../static/js/emergence_charts.js"></script>
-    <script>document.getElementById("emergenceScript").src = page_url + "/static/js/emergence_charts.js"</script>
+    <script>document.getElementById("emergenceScript").src = page_url + "static/js/emergence_charts.js"</script>
     <script type="text/javascript">
       var margin = { top: 20, right: 70, bottom: 100, left: 20 };
       var width = 600 - margin.left - margin.right;
@@ -186,7 +192,7 @@
         }
       });
 
-      function scatterRequestPlot(d, selectedX, selectedY, min_count=0, minRake=0, xScale=d3.scaleLinear()) {
+      function scatterRequestPlot(d, selectedX, selectedY, min_count=-999, minRake=-999, xScale=d3.scaleLinear()) {
         scatterSvg.selectAll('*').remove();
         d3.json(window.location.pathname + "get-scatter-data", {
           method:"POST",
@@ -232,6 +238,18 @@
                 return scatterRequestPlot(d, x, y);
               }
       );
+
+      $('#pyLDAvis').on( 'load', function() {
+        var iframeElementx = document.getElementById("pyLDAvis"),
+                iframeElementy = (iframeElementx.contentWindow || iframeElementx.contentDocument),
+                iframeElementz = iframeElementy.document.body;
+        var svg = d3.select(iframeElementz);
+        var nTopics = svg.selectAll('.dot').size();
+        console.log(nTopics);
+        svg.selectAll(".dot").each(function(d, i) {
+          d3.select(this).on("click", onTopicClick);
+        })
+      });
 
 
     </script>

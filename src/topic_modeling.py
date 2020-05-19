@@ -684,8 +684,9 @@ def get_topic_years(records_loc, in_bib, topic_cohs_loc, map_loc, out_years):
     ndf.columns = ['stem']
     ndf = ndf.join(map_df.set_index('matrix_row_index'))
     ndf = ndf.sort_values('doc_id')
-    ndf['year'] = df.loc[ndf['doc_id'], 'year']
-    ndf['nasa_afil'] = df.loc[ndf['doc_id'], "nasa_afil"]
+    ndf['year'] = df.loc[ndf['doc_id'], 'year'].values
+    # why wrong if I don't use values? Because automatically setting index?
+    ndf['nasa_afil'] = df.loc[ndf['doc_id'], "nasa_afil"].values
     ndf = ndf.dropna().copy()
     ndf['year'] = ndf['year'].astype(int)
     ndf['score'] = coh_df.loc[ndf['stem'].tolist()].iloc[:, 0].tolist()

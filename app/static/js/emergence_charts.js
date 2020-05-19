@@ -3,6 +3,39 @@ function update(selectedX, selectedY) {
   console.log(selectedY);
 }
 
+
+function onTopicClick(d, i) {
+  var colorName = 'kmeans_cluster';
+  var topic = (+d['topics'] - 1).toString();
+  d3.json(page_url + 'get-time-data', {
+    method:"POST",
+    body: JSON.stringify({
+      stem: topic, kmeans_cluster: d[colorName]
+    }),
+    headers: {
+      "Content-type": "application/json; charset=UTF-8"
+    }
+  }).then(
+    function(data) {
+      timeChart.data(data);
+    }
+  )
+}
+
+
+function exportToJsonFile(jsonData) {
+  let dataStr = JSON.stringify(jsonData);
+  let dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+
+  let exportFileDefaultName = 'data.json';
+
+  let linkElement = document.createElement('a');
+  linkElement.setAttribute('href', dataUri);
+  linkElement.setAttribute('download', exportFileDefaultName);
+  linkElement.click();
+}
+
+
 // Input the data
 function scatterChart() {
   var margin = 50;

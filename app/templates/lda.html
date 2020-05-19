@@ -23,18 +23,6 @@
   </div>
   </body>
   <script>
-
-    function exportToJsonFile(jsonData) {
-      let dataStr = JSON.stringify(jsonData);
-      let dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-
-      let exportFileDefaultName = 'data.json';
-
-      let linkElement = document.createElement('a');
-      linkElement.setAttribute('href', dataUri);
-      linkElement.setAttribute('download', exportFileDefaultName);
-      linkElement.click();
-    }
     var margin = { top: 20, right: 70, bottom: 100, left: 20 };
     var width = 600 - margin.left - margin.right;
     var height = 450 - margin.top - margin.bottom;
@@ -46,10 +34,8 @@
 
     var svgScaler = 1;
 
-    // var iframeHeight = d3.select('#pyLDAvis').node().getBoundingClientRect()['height'];
     var timeSvg = d3.select("#plots")
     .append("svg")
-    // .style('top', `900px`)
     .attr('id', 'timeSvg')
     .attr('class', 'inner')
     .attr("width", swidth * svgScaler)
@@ -63,55 +49,22 @@
 
     d3.json(page_url + '/get-all-time-data')
     .then(
-            function(data) {
-              timeSvg.call(timeChart.data(data));
-            }
+      function(data) {
+        timeSvg.call(timeChart.data(data));
+      }
     );
+    var colorName = 'kmeans_cluster';
 
-    // d3.csv('/topic_bibcodes').then(function(data){
-      $('#pyLDAvis').on( 'load', function() {
-        var iframeElementx = document.getElementById("pyLDAvis"),
-                iframeElementy = (iframeElementx.contentWindow || iframeElementx.contentDocument),
-                iframeElementz = iframeElementy.document.body;
-        var svg = d3.select(iframeElementz);
-        var nTopics = svg.selectAll('.dot').size();
-        console.log(nTopics);
-        svg.selectAll(".dot").each(function(d, i) {
-
-          d3.select(this).on("click",  function() {
-            console.log(d);
-            var topic = +d['topics'];
-            d3.json(page_url + "/topic_bibcodes", {
-              method:"POST",
-              body: JSON.stringify({
-                topic: topic,
-                }),
-                headers: {
-                "Content-type": "application/json; charset=UTF-8"
-                }
-              })
-            .then(function(data) {
-              console.log(data);
-              timeChart.data(data);
-              // scatterSvg
-              //   .datum(data)
-              //   .call(chart0);
-            });
-            console.log(`I did a thing! ${d['topics']}`);
-            var topicData = [];
-            // for (i = 0; i < data.length; i++) {
-            //   if (+data[i]['topic'] + 1 === topic) {
-            //     topicData.push(data[i])
-            //   }
-            // }
-            // console.log(topicData.length);
-            // exportToJsonFile(topicData);
-
-            },
-          );
-
-        })
-      });
-    // });
+    $('#pyLDAvis').on( 'load', function() {
+      var iframeElementx = document.getElementById("pyLDAvis"),
+              iframeElementy = (iframeElementx.contentWindow || iframeElementx.contentDocument),
+              iframeElementz = iframeElementy.document.body;
+      var svg = d3.select(iframeElementz);
+      var nTopics = svg.selectAll('.dot').size();
+      console.log(nTopics);
+      svg.selectAll(".dot").each(function(d, i) {
+        d3.select(this).on("click", onTopicClick);
+      })
+    });
   </script>
 </html>

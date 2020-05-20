@@ -16,7 +16,9 @@ pandarallel.initialize()
 P_JOURNALS = ["Natur", "Sci"]  # TODO: load in config
 
 
-def load_records_to_dataframe(data_dir: Path, limit=None) -> pd.DataFrame:
+def load_records_to_dataframe(
+    data_dir: Path, limit: int = None, first_year: int = None
+) -> pd.DataFrame:
     """
     Load records from directory to dataframe.
 
@@ -24,6 +26,7 @@ def load_records_to_dataframe(data_dir: Path, limit=None) -> pd.DataFrame:
         data_dir: a directory with a records from ADS. 
             Each records file is a json with keys "year", "docs", "numFound".
         limit: limit amount of records per year for testing purposes
+        first_year: earliest year to get data for
 
     Returns:
         a pandas dataframe of all records from the directory
@@ -37,6 +40,9 @@ def load_records_to_dataframe(data_dir: Path, limit=None) -> pd.DataFrame:
         pbar.set_description(p.stem)
         with open(p, "r") as f0:
             r = json.load(f0)
+        if first_year is not None:
+            if int(r["year"]) < first_year:
+                continue
         if limit is not None:
             docs = pd.DataFrame(r["docs"][0:limit])
         else:
@@ -57,8 +63,11 @@ def main(
     record_limit=None,
     min_text_len=100,
     only_nature_and_sci=False,
+    first_year=None,
 ):
-    df = load_records_to_dataframe(in_records_dir, limit=record_limit)
+    df = load_records_to_dataframe(
+        in_records_dir, limit=record_limit, first_year=first_year
+    )
     df = df.dropna(
         subset=["abstract", "year", "nasa_afil", "title", "bibcode", "bibstem"]
     )
@@ -79,6 +88,7 @@ if __name__ == "__main__":
     parser.add_argument("i", help="input raw records dir", type=Path)
     parser.add_argument("o", help="output jsonslines collected keywords", type=Path)
     parser.add_argument("--limit", help="limit size of dataframe for testing", type=int)
+    parser.add_argument("--first_year", help="earliest year to use", type=int)
     parser.add_argument(
         "--only_nature_and_sci", dest="only_nature_and_sci", action="store_true"
     )
@@ -95,4 +105,5 @@ if __name__ == "__main__":
         args.o,
         args.limit,
         only_nature_and_sci=args.only_nature_and_sci,
+        first_year=args.first_year,
     )

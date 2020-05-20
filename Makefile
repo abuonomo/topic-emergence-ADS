@@ -44,9 +44,9 @@ requirements-app:
 RAW_FILES=$(shell find $(RAW_DIR) -type f -name '*')
 RECORDS_LOC=$(DATA_DIR)/kwds.jsonl
 ## Join all years and and use rake to extract keywords.
-join-and-clean: $(RECORDS_LOC)
-#.PHONY: $(RECORDS_LOC)
-$(RECORDS_LOC): $(RAW_FILES)
+join-and-clean:
+#join-and-clean: $(RECORDS_LOC)
+#$(RECORDS_LOC): $(RAW_FILES)
 	mkdir -p $(DATA_DIR); \
 	mkdir -p $(MODEL_DIR); \
 	mkdir -p $(VIZ_DIR); \
@@ -54,20 +54,30 @@ $(RECORDS_LOC): $(RAW_FILES)
 		$(RAW_DIR) \
 		$(RECORDS_LOC) \
 		--limit $(LIMIT) \
-		$(JOURNAL_LIMIT)
+		$(JOURNAL_LIMIT) \
+		$(YEAR_LIMIT)
 
 ALL_KWDS_LOC=$(DATA_DIR)/all_keywords.jsonl
 YEAR_COUNT_LOC=$(DATA_DIR)/year_counts.csv
 ## Get dataframe of keyword frequencies over the years
-#docs-to-keywords-df: $(ALL_KWDS_LOC) $(YEAR_COUNT_LOC)
-#$(ALL_KWDS_LOC) $(YEAR_COUNT_LOC): $(RECORDS_LOC)
-docs-to-keywords-df:
+docs-to-keywords-df: $(ALL_KWDS_LOC) $(YEAR_COUNT_LOC)
+$(ALL_KWDS_LOC) $(YEAR_COUNT_LOC): $(RECORDS_LOC)
+#docs-to-keywords-df:
 	python src/extract_keywords.py main \
 		--infile $(RECORDS_LOC) \
 		--outfile $(ALL_KWDS_LOC) \
 		--out_years $(YEAR_COUNT_LOC) \
 		--min_thresh $(MIN_THRESH) \
 		--strategy $(STRATEGY) \
+		--n_process $(N_PROCESS) \
+		--batch_size $(BATCH_SIZE)
+
+TOKENIZED_CORPUS_LOC=$(DATA_DIR)/tokens.jsonl
+## Tokenize the corpus using spacy and textacy
+tokenize:
+	python src/extract_keywords.py tokenize \
+		--infile $(RECORDS_LOC) \
+		--outfile $(TOKENIZED_CORPUS_LOC) \
 		--n_process $(N_PROCESS) \
 		--batch_size $(BATCH_SIZE)
 

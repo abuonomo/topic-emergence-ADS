@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 from html import unescape
@@ -16,7 +17,7 @@ from spacy.lang.en import STOP_WORDS
 from textacy.ke import textrank
 from tqdm import tqdm
 
-LOGLEVEL = os.environ.get('LOGLEVEL', 'WARNING').upper()
+LOGLEVEL = os.environ.get("LOGLEVEL", "WARNING").upper()
 logging.basicConfig(level=LOGLEVEL)
 LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
@@ -60,6 +61,36 @@ def get_keywords_from_text(text: pd.Series) -> List:
     return rake_kwds
 
 
+def tokenize_texts(
+    text: pd.Series, outfile: os.PathLike, batch_size=1000, n_process=1
+) -> os.PathLike:
+    LOG.info(f"Extracting tokens from {text.shape[0]} documents.")
+    pbar = tqdm(
+        NLP.pipe(text.replace(np.nan, ""), batch_size=batch_size, n_process=n_process),
+        total=len(text),
+    )
+    with open(outfile, "w") as f0:
+        for doc in pbar:
+            # SingleRank parameters
+            kwds = textrank(
+                doc,
+                normalize="lemma",
+                topn=999,
+                window_size=10,
+                edge_weighting="count",
+                position_bias=False,
+            )
+            text = ' '.join([t.lemma_ for t in doc])
+            t = [(i, text.find(k[0])) for i, k in enumerate(kwds)]
+            st = sorted(t, key=lambda x: x[1])
+            tokens = [kwds[i[0]] for i in st]
+            import ipdb; ipdb.set_trace()
+            f0.write(json.dumps(tokens))
+            f0.write("\n")
+            pbar.update(1)
+    return outfile
+
+
 def get_singlerank_kwds(text: pd.Series, batch_size=1000, n_process=1) -> List:
     LOG.info(f"Extracting keywords from {text.shape[0]} documents.")
     kwd_lists = []
@@ -71,13 +102,17 @@ def get_singlerank_kwds(text: pd.Series, batch_size=1000, n_process=1) -> List:
         # SingleRank parameters
         kwds = textrank(
             doc,
-            normalize='lemma',
+            normalize="lemma",
             topn=999,
             window_size=10,
             edge_weighting="count",
             position_bias=False,
         )
-        kwd_lists.append(kwds)
+        text = ' '.join([t.lemma_ for t in doc])
+        t = [(i, text.find(k[0])) for i, k in enumerate(kwds)]
+        st = sorted(t, key=lambda x: x[1])
+        kwds_sorted = [kwds[i[0]] for i in st]
+        kwd_lists.append(kwds_sorted)
         pbar.update(1)
     return kwd_lists
 
@@ -110,10 +145,10 @@ def get_kwd_occurences(df, min_thresh=5, max_thresh=0.7):
     max_thresh_int = np.ceil(max_thresh * n_docs)
     kwds = (
         kwd_df.groupby("keyword")
-            .count()
-            .query(f"doc_id > {min_thresh}")
-            .query(f"doc_id < {max_thresh_int}")
-            .index
+        .count()
+        .query(f"doc_id > {min_thresh}")
+        .query(f"doc_id < {max_thresh_int}")
+        .index
     )
 
     # Go back and string match the keywords against all titles and abstracts.
@@ -163,7 +198,7 @@ def binarize_years(df):
     LOG.info("Binarizing year columns.")
     df = df.copy()
     lb = LabelBinarizer()
-    df['year'] = df['year'].astype(np.int16)
+    df["year"] = df["year"].astype(np.int16)
     year_binary = lb.fit_transform(df["year"])  # there should not be NAs.
     year_binary_df = pd.DataFrame(year_binary)
     year_binary_df.index = df.index
@@ -175,13 +210,13 @@ def binarize_years(df):
 
 def stem_reduce(df, min_thresh):
     df = df.copy()
-    LOG.info('Filtering down by keyword stems.')
-    kwds_counts = df['stem'].value_counts()
+    LOG.info("Filtering down by keyword stems.")
+    kwds_counts = df["stem"].value_counts()
     valid_stems = kwds_counts[kwds_counts > min_thresh].index
     s0 = df.shape[0]
-    df = df.set_index('stem').loc[valid_stems, :].reset_index()
+    df = df.set_index("stem").loc[valid_stems, :].reset_index()
     s1 = df.shape[0]
-    LOG.info(f'Removed {s0-s1} rows from dataframe.')
+    LOG.info(f"Removed {s0-s1} rows from dataframe.")
     return df
 
 
@@ -213,9 +248,9 @@ def filter_kwds_inner(kwd_df, threshold=50, score_thresh=1.3, hard_limit=10_000)
     LOG.info(f"Only getting keywords which occur in more than {threshold} docs.")
     lim_kwd_df = (
         kwd_df.query(f"doc_id_count > {threshold}")
-            .query(f"score_mean > {score_thresh}")
-            .sort_values("score_mean", ascending=False)
-            .iloc[0:hard_limit]
+        .query(f"score_mean > {score_thresh}")
+        .sort_values("score_mean", ascending=False)
+        .iloc[0:hard_limit]
     )
     return lim_kwd_df
 
@@ -240,6 +275,40 @@ def filter_kwds(infile, out_loc, threshold, score_thresh, hard_limit):
     lim_kwd_df = filter_kwds_inner(df, threshold, score_thresh, hard_limit)
     LOG.info(f"Writing dataframe with size {lim_kwd_df.shape[0]} to {out_loc}.")
     lim_kwd_df.to_json(out_loc, orient="records", lines=True)
+
+
+@cli.command()
+@click.option("--infile", type=Path)
+@click.option("--outfile", type=Path)
+@click.option("--batch_size", type=int, default=1000)
+@click.option("--n_process", type=int, default=1)
+def tokenize(infile, outfile, batch_size, n_process):
+    """
+    Get dataframe of keyword frequencies over the years
+    """
+    # TODO: this file above should go in size folder so only one to be changed with exp
+
+    LOG.info(f"Reading records from {infile}.")
+    df = pd.read_json(infile, orient="records", lines=True)
+    df = df.drop(
+        [
+            "arxiv_class",
+            "alternate_bibcode",
+            "keyword",
+            "ack",
+            "aff",
+            "bibstem",
+            "aff_id",
+            "citation_count",
+        ],
+        axis=1,
+    )
+    df["title"] = df["title"].astype(str)
+    df["abstract"] = df["abstract"].astype(str)
+    text = df["title"] + ". " + df["abstract"]
+    text = text.apply(unescape).astype(str)
+    text = text.apply(strip_tags).astype(str)
+    tokenize_texts(text, outfile)
 
 
 @cli.command()
@@ -271,9 +340,9 @@ def main(infile, outfile, out_years, min_thresh, strategy, batch_size, n_process
         ],
         axis=1,
     )
-    df['title'] = df['title'].astype(str)
-    df['abstract'] = df['abstract'].astype(str)
-    df['year'] = df['year'].astype(int)
+    df["title"] = df["title"].astype(str)
+    df["abstract"] = df["abstract"].astype(str)
+    df["year"] = df["year"].astype(int)
     year_counts = df["year"].value_counts().reset_index()
     year_counts.columns = ["year", "count"]
     LOG.info(f"Writing year counts to {out_years}.")
@@ -296,4 +365,3 @@ def main(infile, outfile, out_years, min_thresh, strategy, batch_size, n_process
 
 if __name__ == "__main__":
     cli()
-

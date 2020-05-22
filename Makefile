@@ -59,14 +59,16 @@ join-and-clean:
 
 ALL_KWDS_LOC=$(DATA_DIR)/all_keywords.jsonl
 YEAR_COUNT_LOC=$(DATA_DIR)/year_counts.csv
+KWD_TOKENS_LOC=$(DATA_DIR)/kwd_tokens.jsonl
 ## Get dataframe of keyword frequencies over the years
-docs-to-keywords-df: $(ALL_KWDS_LOC) $(YEAR_COUNT_LOC)
-$(ALL_KWDS_LOC) $(YEAR_COUNT_LOC): $(RECORDS_LOC)
-#docs-to-keywords-df:
+#docs-to-keywords-df: $(ALL_KWDS_LOC) $(YEAR_COUNT_LOC)
+#$(ALL_KWDS_LOC) $(YEAR_COUNT_LOC): $(RECORDS_LOC)
+docs-to-keywords-df:
 	python src/extract_keywords.py main \
 		--infile $(RECORDS_LOC) \
 		--outfile $(ALL_KWDS_LOC) \
 		--out_years $(YEAR_COUNT_LOC) \
+		--out_tokens $(KWD_TOKENS_LOC) \
 		--min_thresh $(MIN_THRESH) \
 		--strategy $(STRATEGY) \
 		--n_process $(N_PROCESS) \
@@ -225,7 +227,8 @@ run-gensim-lda-mult: #$(COH_PLT_LOC)
 		--tmodels_dir $(TMODEL_DIR) \
 		--coherence_loc $(COHERENCE_LOC) \
 		--dct_loc $(DCT_LOC) \
-		--corp_loc $(CORP_LOC)
+		--corp_loc $(CORP_LOC) \
+		--tokens_loc $(KWD_TOKENS_LOC)
 
 ## Get coherences for gensim topic models
 get-gensim-coherences: #$(COH_PLT_LOC)

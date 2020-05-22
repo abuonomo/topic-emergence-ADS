@@ -315,11 +315,12 @@ def tokenize(infile, outfile, batch_size, n_process):
 @click.option("--infile", type=Path)
 @click.option("--outfile", type=Path)
 @click.option("--out_years", type=Path)
+@click.option("--out_tokens", type=Path)
 @click.option("--min_thresh", type=int, default=0)
 @click.option("--strategy", type=str, default="singlerank")
 @click.option("--batch_size", type=int, default=1000)
 @click.option("--n_process", type=int, default=1)
-def main(infile, outfile, out_years, min_thresh, strategy, batch_size, n_process):
+def main(infile, outfile, out_years, out_tokens, min_thresh, strategy, batch_size, n_process):
     """
     Get dataframe of keyword frequencies over the years
     """
@@ -343,6 +344,7 @@ def main(infile, outfile, out_years, min_thresh, strategy, batch_size, n_process
     df["title"] = df["title"].astype(str)
     df["abstract"] = df["abstract"].astype(str)
     df["year"] = df["year"].astype(int)
+
     year_counts = df["year"].value_counts().reset_index()
     year_counts.columns = ["year", "count"]
     LOG.info(f"Writing year counts to {out_years}.")
@@ -351,6 +353,7 @@ def main(infile, outfile, out_years, min_thresh, strategy, batch_size, n_process
     text = df["title"] + ". " + df["abstract"]
     text = text.apply(unescape).astype(str)
     text = text.apply(strip_tags).astype(str)
+
     strats = ["rake", "singlerank"]
     if strategy not in strats:
         raise ValueError(f"{strategy} not in {strats}.")
@@ -358,6 +361,14 @@ def main(infile, outfile, out_years, min_thresh, strategy, batch_size, n_process
         df["kwds"] = get_keywords_from_text(text)
     elif strategy == "singlerank":
         df["kwds"] = get_singlerank_kwds(text, batch_size, n_process)
+
+    tokens = df['kwds'].apply(lambda x: [t[0] for t in x])
+    LOG.info(f'Writing tokens to {out_tokens}')
+    with open(out_tokens, 'w') as f0:
+        for doc_toks in tokens:
+            f0.write(json.dumps(doc_toks))
+            f0.write('\n')
+
     kwd_df = flatten_to_keywords(df, min_thresh)
     LOG.info(f"Writing out all keywords to {outfile}.")
     kwd_df.to_json(outfile, orient="records", lines=True)

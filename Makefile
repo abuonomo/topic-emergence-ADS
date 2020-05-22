@@ -44,9 +44,9 @@ requirements-app:
 RAW_FILES=$(shell find $(RAW_DIR) -type f -name '*')
 RECORDS_LOC=$(DATA_DIR)/kwds.jsonl
 ## Join all years and and use rake to extract keywords.
-join-and-clean:
-#join-and-clean: $(RECORDS_LOC)
-#$(RECORDS_LOC): $(RAW_FILES)
+join-and-clean: $(RECORDS_LOC)
+$(RECORDS_LOC): $(RAW_FILES)
+#join-and-clean:
 	mkdir -p $(DATA_DIR); \
 	mkdir -p $(MODEL_DIR); \
 	mkdir -p $(VIZ_DIR); \
@@ -61,9 +61,9 @@ ALL_KWDS_LOC=$(DATA_DIR)/all_keywords.jsonl
 YEAR_COUNT_LOC=$(DATA_DIR)/year_counts.csv
 KWD_TOKENS_LOC=$(DATA_DIR)/kwd_tokens.jsonl
 ## Get dataframe of keyword frequencies over the years
-#docs-to-keywords-df: $(ALL_KWDS_LOC) $(YEAR_COUNT_LOC)
-#$(ALL_KWDS_LOC) $(YEAR_COUNT_LOC): $(RECORDS_LOC)
-docs-to-keywords-df:
+docs-to-keywords-df: $(ALL_KWDS_LOC) $(YEAR_COUNT_LOC)
+$(ALL_KWDS_LOC) $(YEAR_COUNT_LOC): $(RECORDS_LOC)
+#docs-to-keywords-df:
 	python src/extract_keywords.py main \
 		--infile $(RECORDS_LOC) \
 		--outfile $(ALL_KWDS_LOC) \
@@ -186,10 +186,10 @@ $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC): $(NORM_KWDS_LOC)
 		--corp_loc $(CORP_LOC)
 
 TOKENS_LOC=$(MODEL_DIR)/gensim_tokens.jsonl
-#prepare-gensim-features: $(CORP_TOK_LOC) $(DCT_TOK_LOC) $(MAP_LOC)
-#$(CORP_TOK_LOC) $(DCT_TOK_LOC) $(MAP_LOC): $(RECORDS_LOC)
 ## Prepare corpus, dictionary, and matrix id to doc id mapping for gensim topic modeling
-prepare-gensim-features:
+prepare-gensim-features: $(CORP_TOK_LOC) $(DCT_TOK_LOC) $(MAP_LOC)
+$(CORP_TOK_LOC) $(DCT_TOK_LOC) $(MAP_LOC): $(RECORDS_LOC)
+#prepare-gensim-features:
 	python src/topic_modeling.py prepare-gensim-features \
 		--docs_loc $(RECORDS_LOC) \
 		--dct_loc $(DCT_TOK_LOC) \
@@ -214,12 +214,12 @@ $(COH_PLT_LOC): $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC)
 		--tmodels_dir $(TMODEL_DIR) \
 		--alg $(ALG)
 
-## Make topic models using gensim's LdaMulticore
 COHERENCE_LOC=$(VIZ_DIR)/coherence$(TIMESTAMP).csv
 DCT_TOK_LOC=$(MODEL_DIR)/gensim_tok_dct.mm
 CORP_TOK_LOC=$(MODEL_DIR)/gensim_tok_corpus.mm
-$(COH_PLT_LOC): # $(DCT_LOC) $(CORP_LOC) $(MAP_LOC)
-run-gensim-lda-mult: #$(COH_PLT_LOC)
+## Make topic models using gensim's LdaMulticore
+run-gensim-lda-mult: $(COH_PLT_LOC)
+$(COH_PLT_LOC): $(DCT_LOC) $(CORP_LOC) $(MAP_LOC)
 	mkdir -p $(TMODEL_DIR); \
 	python src/topic_modeling.py run-gensim-lda-mult \
 		--plot_loc $(COH_PLT_LOC) \
@@ -231,7 +231,7 @@ run-gensim-lda-mult: #$(COH_PLT_LOC)
 		--tokens_loc $(KWD_TOKENS_LOC)
 
 ## Get coherences for gensim topic models
-get-gensim-coherences: #$(COH_PLT_LOC)
+get-gensim-coherences: $(COH_PLT_LOC)
 	python src/topic_modeling.py get-gensim-coherences \
 		--plot_loc $(COH_PLT_LOC) \
 		--corp_loc $(CORP_LOC) \
@@ -283,9 +283,9 @@ $(TOPIC_TO_BIBCODES_LOC):  $(TMODELS)
 
 TOPIC_TO_YEARS_LOC=$(VIZ_DIR)/topic_years$(N_TOPICS).jsonl
 ## Get year time series for topics
-#get-topic-years: $(TOPIC_TO_YEARS_LOC)
-#$(TOPIC_TO_YEARS_LOC): $(TOPIC_TO_BIBCODES_LOC) $(RECORDS_LOC)
-get-topic-years:
+get-topic-years: $(TOPIC_TO_YEARS_LOC)
+$(TOPIC_TO_YEARS_LOC): $(TOPIC_TO_BIBCODES_LOC) $(RECORDS_LOC)
+#get-topic-years:
 	python src/topic_modeling.py get-topic-years \
 		--records_loc $(RECORDS_LOC) \
 		--in_bib $(TOPIC_TO_BIBCODES_LOC) \
@@ -364,7 +364,7 @@ $(DOC_TXTS): $(RECORDS_LOC)
 NEURAL_LDA_MODEL_DIR=$(MODEL_DIR)/neural_lda
 N_EPOCHS=10
 ## Run contextual neural lda with bert embeddings
-run-neural-lda: #$(NEURAL_LDA_MODEL_LOC)
+run-neural-lda: $(NEURAL_LDA_MODEL_LOC)
 	python src/topic_modeling.py run-neural-lda \
 		--in_docs $(DOC_TXTS) \
 		--dct_loc $(DCT_LOC) \

@@ -490,7 +490,7 @@ sync-app-data-from-s3:
 
 ## sync raw ADS files from s3 bucket
 sync-raw-data-from-s3:
-	aws s3 sync s3://hq-ocio-ci-bigdata/data/ADS/2020_03_15 data/raw
+	aws s3 sync s3://datasquad-low/data/ADS/2020_03_15 data/raw
 
 #################################################################################
 # Self Documenting Commands                                                     #

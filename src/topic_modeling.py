@@ -628,12 +628,13 @@ def visualize_gensim_topic_models(
     # This could be a problem. Might need to change that.
     # Counting freq would be like:
     # mdoc_lens = [sum([v[1] for v in corpus[i]]) for i in mat_id_to_doc_id["matrix_row_index"]]
-    mdoc_lens = [len(corpus[i]) for i in mat_id_to_doc_id["matrix_row_index"]]
+    # mdoc_lens = [len(corpus[i]) for i in mat_id_to_doc_id["matrix_row_index"]]
 
     LOG.info("Getting documents topic distributions.")
     tc = lda.get_document_topics(corpus, minimum_probability=0)
     embedding = np.vstack([[v for t, v in r] for r in tqdm(tc)])
     new_df = get_bibcodes_with_embedding(infile, embedding, mat_id_to_doc_id)
+    import ipdb; ipdb.set_trace()
 
     LOG.info(f"Writing topic coherences to {topic_cohs_loc}")
     pd.DataFrame(coh_per_topic).to_csv(topic_cohs_loc)

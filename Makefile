@@ -46,7 +46,6 @@ RECORDS_LOC=$(DATA_DIR)/kwds.jsonl
 ## Join all years and and use rake to extract keywords.
 join-and-clean: $(RECORDS_LOC)
 $(RECORDS_LOC): $(RAW_FILES)
-#join-and-clean:
 	mkdir -p $(DATA_DIR); \
 	mkdir -p $(MODEL_DIR); \
 	mkdir -p $(VIZ_DIR); \
@@ -63,7 +62,6 @@ KWD_TOKENS_LOC=$(DATA_DIR)/kwd_tokens.jsonl
 ## Get dataframe of keyword frequencies over the years
 docs-to-keywords-df: $(ALL_KWDS_LOC) $(YEAR_COUNT_LOC)
 $(ALL_KWDS_LOC) $(YEAR_COUNT_LOC): $(RECORDS_LOC)
-#docs-to-keywords-df:
 	python src/extract_keywords.py main \
 		--infile $(RECORDS_LOC) \
 		--outfile $(ALL_KWDS_LOC) \
@@ -189,7 +187,6 @@ TOKENS_LOC=$(MODEL_DIR)/gensim_tokens.jsonl
 ## Prepare corpus, dictionary, and matrix id to doc id mapping for gensim topic modeling
 prepare-gensim-features: $(CORP_TOK_LOC) $(DCT_TOK_LOC) $(MAP_LOC)
 $(CORP_TOK_LOC) $(DCT_TOK_LOC) $(MAP_LOC): $(RECORDS_LOC)
-#prepare-gensim-features:
 	python src/topic_modeling.py prepare-gensim-features \
 		--docs_loc $(RECORDS_LOC) \
 		--dct_loc $(DCT_TOK_LOC) \
@@ -258,7 +255,6 @@ TMODEL_VIZ_GEN_LOC=$(VIZ_DIR)/gensim_topic_model_viz$(N_TOPICS).html
 ## Visualize gensim topic models with pyLDAvis
 visualize-gensim-topic-models: $(TMODEL_VIZ_GEN_LOC)
 $(TMODEL_VIZ_GEN_LOC): $(TMODELS) $(MAP_LOC)
-#visualize-gensim-topic-models:
 	python src/topic_modeling.py visualize-gensim-topic-models \
 		--infile $(RECORDS_LOC) \
 		--tmodel_dir $(TMODEL_DIR) \
@@ -285,7 +281,6 @@ TOPIC_TO_YEARS_LOC=$(VIZ_DIR)/topic_years$(N_TOPICS).jsonl
 ## Get year time series for topics
 get-topic-years: $(TOPIC_TO_YEARS_LOC)
 $(TOPIC_TO_YEARS_LOC): $(TOPIC_TO_BIBCODES_LOC) $(RECORDS_LOC)
-#get-topic-years:
 	python src/topic_modeling.py get-topic-years \
 		--records_loc $(RECORDS_LOC) \
 		--in_bib $(TOPIC_TO_BIBCODES_LOC) \

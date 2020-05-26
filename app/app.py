@@ -1,12 +1,15 @@
 import logging
 import os
 from pathlib import Path
+import requests
+import json
 
 import joblib
 import numpy as np
 import pandas as pd
 from flask import Flask, render_template, jsonify, request
 from sklearn.preprocessing import MinMaxScaler
+import ads
 
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
@@ -21,7 +24,12 @@ except KeyError:
     VERSION = "unspecified"
     GIT_URL = "unspecified"
 
-DATA_DIR = Path(os.environ["APP_DATA_DIR"])
+try:
+    DATA_DIR = Path(os.environ["APP_DATA_DIR"])
+except KeyError:
+    DATA_DIR = Path('data')
+
+ADS_TOKEN = os.environ['ADS_TOKEN']
 
 app.config.update(
     SC_LOC=DATA_DIR / f"slope_complex.csv",
@@ -52,6 +60,20 @@ app.config.update(
         "manifold_y",
     ],
 )
+
+
+def get_paper_from_bibcode(bibcode):
+    headers = {
+        'Authorization': f"Bearer:{ADS_TOKEN}",
+    }
+    params = (
+        ('q', f'bibcode:{bibcode}'),
+        ('fl', ['title', 'abstract']),
+    )
+    response = requests.get('https://api.adsabs.harvard.edu/v1/search/query',
+                            headers=headers, params=params)
+    c = json.loads(response.content)['response']['docs'][0]
+    return c
 
 
 @app.before_first_request
@@ -90,14 +112,11 @@ def init():
     app.config["SC_DF"]["manifold_x"] = manifold_data[:, 0]
     app.config["SC_DF"]["manifold_y"] = manifold_data[:, 1]
 
-    # LOG.info(f'Reading topic distributions from {app.config["TOPIC_DISTRIB_LOC"]}')
-    # app.config["TOPIC_DISTRIB_DF"] = pd.read_csv(
-    #     app.config["TOPIC_DISTRIB_LOC"], index_col=0
-    # )
+    LOG.info(f'Reading topic distributions from {app.config["TOPIC_DISTRIB_LOC"]}')
+    app.config["TOPIC_DISTRIB_DF"] = pd.read_csv(
+        app.config["TOPIC_DISTRIB_LOC"], index_col=0
+    ).set_index('bibcode')
 
-    # app.config["TOPIC_YEARS_DF"] = pd.read_csv(
-    #     app.config["TOPIC_YEARS_LOC"], index_col=0
-    # )
     LOG.info(f"Ready")
 
 
@@ -115,19 +134,14 @@ def lda():
 
 @app.route("/topic_bibcodes", methods=["GET", "POST"])
 def topic_bibcodes():
-    import ipdb; ipdb.set_trace()
     in_data = request.json
-    topic = in_data['topic'] - 1  # Frontend index starts at 1, here starts at 0
-    # norm_counts = app.config['TOPIC_YEARS_DF'] / app.config['TOPIC_YEARS_DF'].sum()
-    # ts = app.config['TOPIC_YEARS_DF'].loc[topic, :]
-    # ts_norm = norm_counts.loc[topic, :]
-    # df = pd.DataFrame({'count': ts, 'norm_count': ts_norm})
-    # df['stem'] = str(topic)
-    # df['kmeans_cluster'] = 1
-    # df = df.reset_index().rename(columns={'index': 'year'})
-    # df['year'] = df['year'].astype(int)
-    # records = df.to_dict(orient='records')
-    # return jsonify(records)
+    topic = in_data['topic']  # Frontend index starts at 1, here starts at 0
+    topic_inds = app.config["TOPIC_DISTRIB_DF"].values.argmax(axis=1) == int(topic)
+    topic_df = app.config["TOPIC_DISTRIB_DF"][topic_inds].max(axis=1)
+    topic_df.name = 'score'
+    topic_df = topic_df.sort_values(ascending=False)
+    records = pd.DataFrame(topic_df).reset_index().to_dict(orient='records')
+    return jsonify(records)
 
 
 @app.route("/get-scatter-data", methods=["GET", "POST"])
@@ -143,6 +157,14 @@ def get_scatter_data():
         .to_dict(orient="records")
     )
     return jsonify(chart_data)
+
+
+@app.route("/doc_preview", methods=["GET", "POST"])
+def get_doc_preview():
+    data = request.json
+    b = data['bibcode']
+    d = get_paper_from_bibcode(b)
+    return jsonify(d)
 
 
 def _trans_time(ts, kwd, clus):

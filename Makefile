@@ -1,7 +1,9 @@
 BUCKET=datasquad-low/home/DataSquad/topic-emergence-ADS/
 PROFILE=moderate
 RECIPES=python recipes.py
+IN_ADS_TOKEN=
 export LOGLEVEL=INFO
+export ADS_TOKEN=$(IN_ADS_TOKEN)
 
 # Set parameters depending on whether running test or full data
 BATCH_SIZE=1000
@@ -60,8 +62,9 @@ ALL_KWDS_LOC=$(DATA_DIR)/all_keywords.jsonl
 YEAR_COUNT_LOC=$(DATA_DIR)/year_counts.csv
 KWD_TOKENS_LOC=$(DATA_DIR)/kwd_tokens.jsonl
 ## Get dataframe of keyword frequencies over the years
-docs-to-keywords-df: $(ALL_KWDS_LOC) $(YEAR_COUNT_LOC)
-$(ALL_KWDS_LOC) $(YEAR_COUNT_LOC): $(RECORDS_LOC)
+#docs-to-keywords-df: $(ALL_KWDS_LOC) $(YEAR_COUNT_LOC)
+#$(ALL_KWDS_LOC) $(YEAR_COUNT_LOC): $(RECORDS_LOC)
+docs-to-keywords-df:
 	python src/extract_keywords.py main \
 		--infile $(RECORDS_LOC) \
 		--outfile $(ALL_KWDS_LOC) \
@@ -346,6 +349,7 @@ link-topic-data-to-app:
 	ln -f $(TOPIC_TS_FEATURES_LOC) app/data/slope_complex.csv
 	ln -f $(TMODEL_VIZ_GEN_LOC) app/static/html/topic_model_viz.html
 	ln -f $(TOPIC_TO_YEARS_LOC) app/data/topic_years.jsonl
+	ln -f $(TOPIC_TO_BIBCODES_LOC) app/data/topic_distribs_to_bibcodes.csv
 
 
 DOC_TXTS=$(DATA_DIR)/documents.txt

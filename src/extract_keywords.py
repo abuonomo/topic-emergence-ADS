@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 from html import unescape
 from html.parser import HTMLParser
 from pathlib import Path
@@ -109,7 +110,10 @@ def get_singlerank_kwds(text: pd.Series, batch_size=1000, n_process=1) -> List:
             position_bias=False,
         )
         text = ' '.join([t.lemma_ for t in doc])
-        t = [(i, text.find(k[0])) for i, k in enumerate(kwds)]
+        t = []
+        for i, (k, v) in enumerate(kwds):
+            k_inds = [(i, j) for j in range(len(text)) if text.startswith(k, j)]
+            t = t + k_inds
         st = sorted(t, key=lambda x: x[1])
         kwds_sorted = [kwds[i[0]] for i in st]
         kwd_lists.append(kwds_sorted)
@@ -362,7 +366,8 @@ def main(infile, outfile, out_years, out_tokens, min_thresh, strategy, batch_siz
     elif strategy == "singlerank":
         df["kwds"] = get_singlerank_kwds(text, batch_size, n_process)
 
-    tokens = df['kwds'].apply(lambda x: [t[0] for t in x])
+    tokens = df['kwds'].tolist()
+    import ipdb; ipdb.set_trace()
     LOG.info(f'Writing tokens to {out_tokens}')
     with open(out_tokens, 'w') as f0:
         for doc_toks in tokens:

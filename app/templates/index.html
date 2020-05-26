@@ -12,34 +12,34 @@
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/css/select2.min.css" rel="stylesheet" />
     <script src="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/js/select2.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.21/css/jquery.dataTables.css">
+    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.js"></script>
   </head>
   <body>
     <h1>Keyword Emergence Visualizer <span id="version">(version: {{ version }})</span></h1>
-    <div style="width: 100%; overflow: hidden; margin-left: 4%; display: flex">
-      <div style="flex: 50%; float: left; margin-top: 20px; margin-bottom: 0px;">
-        <p id="description">
-          We calcluated many measures from the the frequencies of keywords in the Astrophysics Data System (ADS).
-          The two dropdowns contain names of values calculated from the keyword time series.
-          A list of these measures can be found <a href="https://tsfresh.readthedocs.io/en/latest/text/list_of_features.html">here</a>.
-          Code for generating this information can be found <a href="{{ git_url }}">here</a>.<br><br>
-          On the left, there are a few predefined views which may be useful.
-        </p>
-      </div>
-      <div id='options' style="flex: 50%; margin-left: 50px; margin-top:0px; float: right;">
+    <div style="width: 50%; overflow: hidden; margin-left: 4%; display: flex">
+<!--      <div style="flex: 50%; float: left; margin-top: 20px; margin-bottom: 0px;">-->
+<!--        <p id="description">-->1
+<!--          We calcluated many measures from the the frequencies of keywords in the Astrophysics Data System (ADS).-->
+<!--          The two dropdowns contain names of values calculated from the keyword time series.-->
+<!--          A list of these measures can be found <a href="https://tsfresh.readthedocs.io/en/latest/text/list_of_features.html">here</a>.-->
+<!--          Code for generating this information can be found <a href="{{ git_url }}">here</a>.<br><br>-->
+<!--          On the left, there are a few predefined views which may be useful.-->
+<!--        </p>-->
+<!--      </div>-->
+      <div id='options' style="flex: 25%; margin-left: 50px; margin-right: 0px; margin-top: 0px; float: left;">
         <ul style="list-style-type:none">
           <li>x: <select id="selectButtonX" class="selector"></select></li>
           <li>y: <select id="selectButtonY" class="selector"></select></li>
           <li>xScale: <select id="selectButtonXScale" class="selector"></select></li>
           <li>minimum count: <input id="minCountInput" value="0" type="number"></input></li>
-          <li>minimum rake score: <input id="minRakeInput" value="0" type="number"></input></li>
+          <li>minimum score: <input id="minRakeInput" value="0" type="number"></input></li>
           <li><button type="button" id="enterButton">Transform</button></li>
           <li><br></li>
           <li><button type="button" id="toggleNorm">Toggle Time Series Normalize</button></li>
         </ul>
       </div>
-    </div>
-    <div style="width: 100%; overflow: hidden;">
-      <div id="views" style="width: 100px; float: left; margin-top: 50px">
+      <div id="views" style="flex: 25%; margin-right: 50px; margin-top:0px; float: right;">
         <div class="btn-group">
           <button id="cagrNasaafil">CAGR vs NASA Affiliation</button>
           <button id="manifold">manifold</button>
@@ -47,13 +47,19 @@
           <button id="changeComplex">mean change vs complexity</button>
         </div>
       </div>
-      <div id="plots" style="margin-left: 120px; height: 100%"></div>
-      <div class="resp-container" style="margin-left: 130px; height: 100%">
-        <iframe class="resp-iframe" id="pyLDAvis" src="static/topic_model_viz.html" allowfullscreen>
-          Your browser doesn't support iframes
-        </iframe>
-        <script>document.getElementById("pyLDAvis").src = page_url + "static/html/topic_model_viz.html"</script>
-      </div>
+    </div>
+    <div id="dashboard" style="width: 100%; overflow: hidden;">
+        <div style="width: 75%; float:left;">
+            <div id="plots" style="margin-left: 0px; height: 100%"></div>
+            <div class="resp-container" style="margin-left: 0px; height: 100%">
+                <iframe class="resp-iframe" id="pyLDAvis" src="static/topic_model_viz.html" allowfullscreen>
+                    Your browser doesn't support iframes
+                </iframe>
+                <script>document.getElementById("pyLDAvis").src = page_url + "static/html/topic_model_viz.html"</script>
+            </div>
+        </div>
+        <div id='table_container' style="width: 22%; float:right;">
+        </div>
     </div>
     <br>
 
@@ -244,7 +250,7 @@
                 iframeElementy = (iframeElementx.contentWindow || iframeElementx.contentDocument),
                 iframeElementz = iframeElementy.document.body;
         var svg = d3.select(iframeElementz);
-        // svg.selectAll('.txt').text(function(d, i) {return (+d['topics'] - 1).toString()});
+        svg.style('margin', 0).style('padding', 0);
         var nTopics = svg.selectAll('.dot').size();
         console.log(nTopics);
         svg.selectAll(".dot").each(function(d, i) {
@@ -255,6 +261,7 @@
         })
       });
 
+      onTopicClick({'topics': '2'});
 
     </script>
   <footer id="footerInfo">

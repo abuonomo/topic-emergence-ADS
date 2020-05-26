@@ -19,7 +19,21 @@ function onTopicClick(d, i) {
     function(data) {
       timeChart.data(data);
     }
-  )
+  );
+  d3.json(page_url + "topic_bibcodes", {
+      method:"POST",
+      body: JSON.stringify({
+        topic: topic
+      }),
+      headers: {
+        "Content-type": "application/json; charset=UTF-8"
+      }
+  }).then(function(data) {
+      var header =  Object.keys(data[0]);
+      d3.selectAll('#doc_table_wrapper').remove();
+      var table = tabulate(data, header, "doc_table");
+      $('#doc_table').DataTable({"pageLength": 30});
+  });
 }
 
 function onRectClick(d, i) {
@@ -584,3 +598,45 @@ $(document).ready(function() {
 $(".selector").select2({
   width: 'resolve' // need to override the changed default
 });
+
+
+// from here: https://gist.github.com/jfreels/6733593
+function tabulate(data, columns, id) {
+	var table = d3.select('#table_container').append('table')
+    .attr('id', id)
+    .attr('class', 'display');
+
+	var thead = table.append('thead');
+	var	tbody = table.append('tbody');
+
+	// append the header row
+	thead.append('tr')
+	  .selectAll('th')
+	  .data(columns).enter()
+	  .append('th')
+	    .text(function (column) { return column; });
+
+	// create a row for each object in the data
+	var rows = tbody.selectAll('tr')
+	  .data(data)
+	  .enter()
+	  .append('tr')
+    .on("click", onBibClick);
+
+	// create a cell in each row for each column
+	var cells = rows.selectAll('td')
+	  .data(function (row) {
+	    return columns.map(function (column) {
+	      return {column: column, value: row[column]};
+	    });
+	  })
+	  .enter()
+	  .append('td')
+	    .text(function (d) { return d.value; });
+
+  return table;
+}
+
+function onBibClick(data){
+  console.log(data)
+}

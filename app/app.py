@@ -1,4 +1,5 @@
 import json
+import h5py
 import logging
 import os
 from pathlib import Path
@@ -39,7 +40,7 @@ app.config.update(
     KMEANS_LOC=DATA_DIR / "kmeans.jbl",
     KWD_KMEANS_LOC=DATA_DIR / "kwd_kmeans.jbl",
     MAN_LOC=DATA_DIR / "dtw_manifold_proj.jbl",
-    TOPIC_DISTRIB_LOC=DATA_DIR / "topic_distribs_to_bibcodes.csv",
+    TOPIC_DISTRIB_LOC=DATA_DIR / "topic_distribs_to_bibcodes.hdf5",
     TOPIC_YEARS_LOC=DATA_DIR / "topic_years.csv",
     SC_DF=None,
     N_DF=None,
@@ -111,10 +112,10 @@ def init():
     app.config["SC_DF"]["manifold_x"] = manifold_data[:, 0]
     app.config["SC_DF"]["manifold_y"] = manifold_data[:, 1]
 
-    LOG.info(f'Reading topic distributions from {app.config["TOPIC_DISTRIB_LOC"]}')
-    app.config["TOPIC_DISTRIB_DF"] = pd.read_csv(
-        app.config["TOPIC_DISTRIB_LOC"], index_col=0
-    ).set_index('bibcode')
+    # LOG.info(f'Reading topic distributions from {app.config["TOPIC_DISTRIB_LOC"]}')
+    # app.config["TOPIC_DISTRIB_DF"] = pd.read_csv(
+    #     app.config["TOPIC_DISTRIB_LOC"], index_col=0
+    # ).set_index('bibcode')
 
     LOG.info(f"Ready")
 
@@ -131,15 +132,26 @@ def lda():
     return render_template("lda.html", version=VERSION, git_url=GIT_URL)
 
 
+def load_topic_distributions(loc: os.PathLike, t: int):
+    with h5py.File(loc, 'r') as f0:
+        mask = f0['topic_maxes'][:] == t
+        v = f0['topic_distribution'][mask, :]
+        b = f0['bibcodes'][mask]
+
+    tmp_df = pd.DataFrame(v)
+    tmp_df.index = b
+    tmps = tmp_df.iloc[:, t]
+    df = tmps.reset_index()
+    df.columns = ['bibcode', 'score']
+    return df
+
+
 @app.route("/topic_bibcodes", methods=["GET", "POST"])
 def topic_bibcodes():
     in_data = request.json
-    topic = in_data['topic']  # Frontend index starts at 1, here starts at 0
-    topic_inds = app.config["TOPIC_DISTRIB_DF"].values.argmax(axis=1) == int(topic)
-    topic_df = app.config["TOPIC_DISTRIB_DF"][topic_inds].max(axis=1)
-    topic_df.name = 'score'
-    topic_df = topic_df.sort_values(ascending=False)
-    records = pd.DataFrame(topic_df).reset_index().to_dict(orient='records')
+    topic = int(in_data['topic'])  # Frontend index starts at 1, here starts at 0
+    topic_df = load_topic_distributions(app.config["TOPIC_DISTRIB_LOC"], topic)
+    records = topic_df.to_dict(orient='records')
     return jsonify(records)
 
 

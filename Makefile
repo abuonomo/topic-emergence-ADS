@@ -268,7 +268,7 @@ $(TMODEL_VIZ_GEN_LOC): $(TMODELS) $(MAP_LOC)
 		--tmodel_viz_loc $(TMODEL_VIZ_GEN_LOC) \
 		--topic_to_bibcodes_loc $(TOPIC_TO_BIBCODES_LOC)
 
-TOPIC_TO_BIBCODES_LOC=$(VIZ_DIR)/topic_distribs_to_bibcodes$(N_TOPICS).csv
+TOPIC_TO_BIBCODES_LOC=$(VIZ_DIR)/topic_distribs_to_bibcodes$(N_TOPICS).hdf5
 ## Explore topic models and how they connect to original dataset
 explore-topic-models: $(TOPIC_TO_BIBCODES_LOC)
 $(TOPIC_TO_BIBCODES_LOC):  $(TMODELS)
@@ -349,7 +349,7 @@ link-topic-data-to-app:
 	ln -f $(TOPIC_TS_FEATURES_LOC) app/data/slope_complex.csv
 	ln -f $(TMODEL_VIZ_GEN_LOC) app/static/html/topic_model_viz.html
 	ln -f $(TOPIC_TO_YEARS_LOC) app/data/topic_years.jsonl
-	ln -f $(TOPIC_TO_BIBCODES_LOC) app/data/topic_distribs_to_bibcodes.csv
+	ln -f $(TOPIC_TO_BIBCODES_LOC) app/data/topic_distribs_to_bibcodes.hdf5
 
 
 DOC_TXTS=$(DATA_DIR)/documents.txt

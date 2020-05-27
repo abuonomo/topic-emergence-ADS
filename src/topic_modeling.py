@@ -1,4 +1,5 @@
 import json
+import h5py
 import dask
 from collections import defaultdict
 import logging
@@ -593,6 +594,33 @@ def visualize_topic_models(infile, tmodel_dir, n, mlb_loc, map_loc, tmodel_viz_l
     topic_model_viz(tmodel, mlb, mdoc_lens, tmodel_viz_loc)
 
 
+def write_topic_distributions(df, loc):
+    """
+    Write topic distributions to h5py
+
+    Args:
+        df: dataframe with first column of bibcodes and topic distributions for all after
+        loc: where to save the h5py file
+
+    Returns:
+        loc: the location where the file has been saved
+    """
+    vals = df.iloc[:, 1:]
+    tmaxes = vals.values.argmax(axis=1)
+    dt = h5py.string_dtype()
+
+    with h5py.File(loc, 'w') as f0:
+        bib_dset = f0.create_dataset("bibcodes", (df.shape[0],), dtype=dt)
+        bib_dset[:] = df['bibcode']
+        val_dset = f0.create_dataset("topic_distribution",
+                                     (vals.shape[0], vals.shape[1]), dtype=np.float64)
+        val_dset[:] = vals
+        tmax_dset = f0.create_dataset("topic_maxes", (tmaxes.shape[0],), dtype=np.int)
+        tmax_dset[:] = tmaxes
+
+    return loc
+
+
 @cli.command()
 @click.option("--infile", type=Path)
 @click.option("--tmodel_dir", type=Path)
@@ -640,7 +668,7 @@ def visualize_gensim_topic_models(
     pd.DataFrame(coh_per_topic).to_csv(topic_cohs_loc)
 
     LOG.info(f"Writing bibcodes to {topic_to_bibcodes_loc}")
-    new_df.to_csv(topic_to_bibcodes_loc)
+    write_topic_distributions(new_df, topic_to_bibcodes_loc)
 
     viz_data = pyLDAvis.gensim.prepare(lda, corpus, dct, sort_topics=False, mds="mmds")
     LOG.info(f"Writing visualization to {tmodel_viz_loc}")

@@ -256,8 +256,9 @@ $(TMODEL_VIZ_LOC): $(TMODELS)
 
 TMODEL_VIZ_GEN_LOC=$(VIZ_DIR)/gensim_topic_model_viz$(N_TOPICS).html
 ## Visualize gensim topic models with pyLDAvis
-visualize-gensim-topic-models: $(TMODEL_VIZ_GEN_LOC)
-$(TMODEL_VIZ_GEN_LOC): $(TMODELS) $(MAP_LOC)
+#visualize-gensim-topic-models: $(TMODEL_VIZ_GEN_LOC)
+#$(TMODEL_VIZ_GEN_LOC): $(TMODELS) $(MAP_LOC)
+visualize-gensim-topic-models:
 	python src/topic_modeling.py visualize-gensim-topic-models \
 		--infile $(RECORDS_LOC) \
 		--tmodel_dir $(TMODEL_DIR) \

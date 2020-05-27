@@ -121,8 +121,8 @@ def get_singlerank_kwds(text: pd.Series, batch_size=1000, n_process=1) -> List:
     return kwd_lists
 
 
-def flatten_to_keywords(df, min_thresh=5):
-    df = df.pipe(get_kwd_occurences, min_thresh)
+def flatten_to_keywords(df, min_thresh=5, max_thresh=1):
+    df = df.pipe(get_kwd_occurences, min_thresh, max_thresh)
     df = df.pipe(stem_kwds)
     df = df.pipe(stem_reduce, min_thresh)
     df = df.pipe(binarize_years)
@@ -317,14 +317,14 @@ def tokenize(infile, outfile, batch_size, n_process):
 
 @cli.command()
 @click.option("--infile", type=Path)
-@click.option("--outfile", type=Path)
+# @click.option("--outfile", type=Path)
 @click.option("--out_years", type=Path)
 @click.option("--out_tokens", type=Path)
-@click.option("--min_thresh", type=int, default=0)
+# @click.option("--min_thresh", type=int, default=0)
 @click.option("--strategy", type=str, default="singlerank")
 @click.option("--batch_size", type=int, default=1000)
 @click.option("--n_process", type=int, default=1)
-def main(infile, outfile, out_years, out_tokens, min_thresh, strategy, batch_size, n_process):
+def main(infile, out_years, out_tokens, strategy, batch_size, n_process):
     """
     Get dataframe of keyword frequencies over the years
     """
@@ -374,7 +374,23 @@ def main(infile, outfile, out_years, out_tokens, min_thresh, strategy, batch_siz
             f0.write(json.dumps(doc_toks))
             f0.write('\n')
 
-    kwd_df = flatten_to_keywords(df, min_thresh)
+    # kwd_df = flatten_to_keywords(df, min_thresh)
+    # LOG.info(f"Writing out all keywords to {outfile}.")
+    # kwd_df.to_json(outfile, orient="records", lines=True)
+
+
+@cli.command()
+@click.option("--infile", type=Path)
+@click.option("--in_kwd_lists", type=Path)
+@click.option("--outfile", type=Path)
+@click.option("--min_thresh", type=int, default=0)
+@click.option("--max_thresh", type=float, default=1)
+def filter_kwds(infile, in_kwd_lists, outfile, min_thresh, max_thresh):
+    df = pd.read_json(infile, orient="records", lines=True)
+    with open(in_kwd_lists, 'r') as f0:
+        kwds = [json.loads(l) for l in f0.read().splitlines()]
+    df['kwds'] = kwds
+    kwd_df = flatten_to_keywords(df, min_thresh, max_thresh)
     LOG.info(f"Writing out all keywords to {outfile}.")
     kwd_df.to_json(outfile, orient="records", lines=True)
 

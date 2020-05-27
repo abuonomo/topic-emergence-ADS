@@ -9,6 +9,7 @@ export ADS_TOKEN=$(IN_ADS_TOKEN)
 BATCH_SIZE=1000
 N_PROCESS=1
 MIN_THRESH=100
+MAX_THRESH=1
 NO_BELOW=300
 NO_ABOVE=0.25
 RAW_DIR=data/raw
@@ -62,18 +63,24 @@ ALL_KWDS_LOC=$(DATA_DIR)/all_keywords.jsonl
 YEAR_COUNT_LOC=$(DATA_DIR)/year_counts.csv
 KWD_TOKENS_LOC=$(DATA_DIR)/kwd_tokens.jsonl
 ## Get dataframe of keyword frequencies over the years
-#docs-to-keywords-df: $(ALL_KWDS_LOC) $(YEAR_COUNT_LOC)
-#$(ALL_KWDS_LOC) $(YEAR_COUNT_LOC): $(RECORDS_LOC)
-docs-to-keywords-df:
+docs-to-keywords-df: $(ALL_KWDS_LOC) $(YEAR_COUNT_LOC)
+$(ALL_KWDS_LOC) $(YEAR_COUNT_LOC): $(RECORDS_LOC)
 	python src/extract_keywords.py main \
 		--infile $(RECORDS_LOC) \
-		--outfile $(ALL_KWDS_LOC) \
 		--out_years $(YEAR_COUNT_LOC) \
 		--out_tokens $(KWD_TOKENS_LOC) \
-		--min_thresh $(MIN_THRESH) \
 		--strategy $(STRATEGY) \
 		--n_process $(N_PROCESS) \
 		--batch_size $(BATCH_SIZE)
+
+
+filter-kwds: $(KWD_TOKENS_LOC)
+	python src/extract_keywords.py filter-kwds \
+		--infile $(RECORDS_LOC) \
+		--in_kwd_lists $(KWD_TOKENS_LOC) \
+		--outfile $(ALL_KWDS_LOC) \
+		--min_thresh $(MIN_THRESH) \
+		--max_thresh $(MAX_THRESH) \
 
 TOKENIZED_CORPUS_LOC=$(DATA_DIR)/tokens.jsonl
 ## Tokenize the corpus using spacy and textacy
@@ -165,9 +172,11 @@ link-data-to-app:
 
 
 ## Run app for visualize results
-app: | $(APP_DATA_FILES)
-	export APP_DATA_DIR=data && cd app && flask run
+app-dev: | $(APP_DATA_FILES)
+	export APP_DATA_DIR=data && cd app && flask run FLASK_ENV=development
 
+app-prod: | $(APP_DATA_FILES)
+	cd app && APP_DATA_DIR=data gunicorn app:app -b :5000 --timeout 1200
 #========= Topic Modeling =========#
 
 DOC_FEAT_MAT_LOC=$(DATA_DIR)/doc_feature_matrix.mtx

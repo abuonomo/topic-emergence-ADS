@@ -17,7 +17,7 @@ function postBibcode(topic, spinner) {
       spinner.stop();
       var header =  Object.keys(data[0]);
       var table = tabulate(data, header, "doc_table", topic);
-      $('#doc_table').DataTable({"pageLength": 30});
+      $('#doc_table').DataTable({"pageLength": 30, "order": [[ 1, "desc" ]]});
   });
 }
 
@@ -33,6 +33,8 @@ function onTopicClick(d, i) {
     speed: 1.9, // Rounds per second
     trail: 40, // Afterglow percentage
     className: 'spinner', // The CSS class to assign to the spinner
+    top: '100px', // Top position relative to parent in px
+    left: '50%' // Left position relative to parent in px
   };
   var target = document.getElementById('table_container');
   var spinner = new Spinner(opts).spin(target);
@@ -40,33 +42,6 @@ function onTopicClick(d, i) {
   var topic = (+d['topics'] - 1).toString();
   postTopic(topic, d[colorName]);
   postBibcode(topic, spinner);
-  // d3.json(page_url + 'get-time-data', {
-  //   method:"POST",
-  //   body: JSON.stringify({
-  //     stem: topic, kmeans_cluster: d[colorName]
-  //   }),
-  //   headers: {
-  //     "Content-type": "application/json; charset=UTF-8"
-  //   }
-  // }).then(
-  //   function(data) {
-  //     timeChart.data(data);
-  //   }
-  // );
-  // d3.json(page_url + "topic_bibcodes", {
-  //     method:"POST",
-  //     body: JSON.stringify({
-  //       topic: topic
-  //     }),
-  //     headers: {
-  //       "Content-type": "application/json; charset=UTF-8"
-  //     }
-  // }).then(function(data) {
-  //     spinner.stop();
-  //     var header =  Object.keys(data[0]);
-  //     var table = tabulate(data, header, "doc_table", topic);
-  //     $('#doc_table').DataTable({"pageLength": 30});
-  // });
 }
 
 function onRectClick(d, i) {
@@ -284,6 +259,8 @@ function scatterChart() {
       speed: 1.9, // Rounds per second
       trail: 40, // Afterglow percentage
       className: 'spinner', // The CSS class to assign to the spinner
+      top: "100px",
+      left: "50%",
     };
     var target = document.getElementById('table_container');
     var spinner = new Spinner(opts).spin(target);
@@ -694,6 +671,23 @@ function tabulate(data, columns, id, topic="") {
 
 
 function onBibClick(d){
+  d3.select("#doc_bibcode").selectAll("*").remove();
+  d3.select("#doc_title").selectAll("*").remove();
+  d3.select("#doc_abstract").selectAll("*").remove();
+  var opts = {
+    lines: 9, // The number of lines to draw
+    length: 9, // The length of each line
+    width: 5, // The line thickness
+    radius: 14, // The radius of the inner circle
+    color: "white", // #rgb or #rrggbb or array of colors
+    speed: 1.9, // Rounds per second
+    trail: 40, // Afterglow percentage
+    className: 'spinner', // The CSS class to assign to the spinner
+    top: '50%', // Top position relative to parent in px
+    left: '50%' // Left position relative to parent in px
+  };
+  var target = document.getElementById('doc_preview');
+  var spinner = new Spinner(opts).spin(target);
   d3.json(page_url + 'doc_preview', {
       method:"POST",
       body: JSON.stringify({
@@ -704,9 +698,7 @@ function onBibClick(d){
       }
     }).then(
       function(data) {
-        d3.select("#doc_bibcode").selectAll("*").remove();
-        d3.select("#doc_title").selectAll("*").remove();
-        d3.select("#doc_abstract").selectAll("*").remove();
+        spinner.stop();
         d3.select("#doc_bibcode").append('text').text(d['bibcode']).style("font-size", "10px");
         d3.select("#doc_title").append('text').text(data['title'][0]).style('font-weight', 'bold');
         d3.select("#doc_abstract").append('text').text(data['abstract']);

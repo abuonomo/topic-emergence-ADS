@@ -4,23 +4,8 @@ function update(selectedX, selectedY) {
 }
 
 
-function onTopicClick(d, i) {
-  var colorName = 'kmeans_cluster';
-  var topic = (+d['topics'] - 1).toString();
-  d3.json(page_url + 'get-time-data', {
-    method:"POST",
-    body: JSON.stringify({
-      stem: topic, kmeans_cluster: d[colorName]
-    }),
-    headers: {
-      "Content-type": "application/json; charset=UTF-8"
-    }
-  }).then(
-    function(data) {
-      timeChart.data(data);
-    }
-  );
-  d3.json(page_url + "topic_bibcodes", {
+function postBibcode(topic, spinner) {
+    d3.json(page_url + "topic_bibcodes", {
       method:"POST",
       body: JSON.stringify({
         topic: topic
@@ -29,11 +14,59 @@ function onTopicClick(d, i) {
         "Content-type": "application/json; charset=UTF-8"
       }
   }).then(function(data) {
+      spinner.stop();
       var header =  Object.keys(data[0]);
-      d3.selectAll('#doc_table_wrapper').remove();
-      var table = tabulate(data, header, "doc_table");
+      var table = tabulate(data, header, "doc_table", topic);
       $('#doc_table').DataTable({"pageLength": 30});
   });
+}
+
+function onTopicClick(d, i) {
+  console.log(d);
+  d3.select("#table_container").selectAll("*").remove();
+  var opts = {
+    lines: 9, // The number of lines to draw
+    length: 9, // The length of each line
+    width: 5, // The line thickness
+    radius: 14, // The radius of the inner circle
+    color: "gainsboro", // #rgb or #rrggbb or array of colors
+    speed: 1.9, // Rounds per second
+    trail: 40, // Afterglow percentage
+    className: 'spinner', // The CSS class to assign to the spinner
+  };
+  var target = document.getElementById('table_container');
+  var spinner = new Spinner(opts).spin(target);
+  var colorName = 'kmeans_cluster';
+  var topic = (+d['topics'] - 1).toString();
+  postTopic(topic, d[colorName]);
+  postBibcode(topic, spinner);
+  // d3.json(page_url + 'get-time-data', {
+  //   method:"POST",
+  //   body: JSON.stringify({
+  //     stem: topic, kmeans_cluster: d[colorName]
+  //   }),
+  //   headers: {
+  //     "Content-type": "application/json; charset=UTF-8"
+  //   }
+  // }).then(
+  //   function(data) {
+  //     timeChart.data(data);
+  //   }
+  // );
+  // d3.json(page_url + "topic_bibcodes", {
+  //     method:"POST",
+  //     body: JSON.stringify({
+  //       topic: topic
+  //     }),
+  //     headers: {
+  //       "Content-type": "application/json; charset=UTF-8"
+  //     }
+  // }).then(function(data) {
+  //     spinner.stop();
+  //     var header =  Object.keys(data[0]);
+  //     var table = tabulate(data, header, "doc_table", topic);
+  //     $('#doc_table').DataTable({"pageLength": 30});
+  // });
 }
 
 function onRectClick(d, i) {
@@ -64,6 +97,22 @@ function exportToJsonFile(jsonData) {
   linkElement.setAttribute('href', dataUri);
   linkElement.setAttribute('download', exportFileDefaultName);
   linkElement.click();
+}
+
+function postTopic(t, c) {
+  d3.json(window.location.pathname + 'get-time-data', {
+    method:"POST",
+    body: JSON.stringify({
+      stem: t, kmeans_cluster: c
+    }),
+    headers: {
+      "Content-type": "application/json; charset=UTF-8"
+    }
+  }).then(
+    function(data) {
+      timeChart.data(data);
+    }
+  );
 }
 
 
@@ -223,20 +272,23 @@ function scatterChart() {
     .attr("cy", function (d) { return yScale(d[yName]); });
   }
 
+
   function onClick(d, i) {
-    d3.json(window.location.pathname + 'get-time-data', {
-      method:"POST",
-      body: JSON.stringify({
-        stem: d[labelName], kmeans_cluster: d[colorName]
-      }),
-      headers: {
-        "Content-type": "application/json; charset=UTF-8"
-      }
-    }).then(
-      function(data) {
-        timeChart.data(data);
-      }
-    );
+    d3.select("#table_container").selectAll("*").remove();
+    var opts = {
+      lines: 9, // The number of lines to draw
+      length: 9, // The length of each line
+      width: 5, // The line thickness
+      radius: 14, // The radius of the inner circle
+      color: "gainsboro", // #rgb or #rrggbb or array of colors
+      speed: 1.9, // Rounds per second
+      trail: 40, // Afterglow percentage
+      className: 'spinner', // The CSS class to assign to the spinner
+    };
+    var target = document.getElementById('table_container');
+    var spinner = new Spinner(opts).spin(target);
+    postTopic(d[labelName], d[colorName]);
+    postBibcode(d[labelName], spinner);
     var iframeElementx = document.getElementById("pyLDAvis"),
       iframeElementy = (iframeElementx.contentWindow || iframeElementx.contentDocument),
       iframeElementz = iframeElementy.document.body;
@@ -601,11 +653,12 @@ $(".selector").select2({
 
 
 // from here: https://gist.github.com/jfreels/6733593
-function tabulate(data, columns, id) {
+function tabulate(data, columns, id, topic="") {
 	var table = d3.select('#table_container').append('table')
     .attr('id', id)
     .attr('class', 'display');
 
+	var caption = table.append('caption').text(`Topic ${topic}`);
 	var thead = table.append('thead');
 	var	tbody = table.append('tbody');
 
@@ -637,6 +690,27 @@ function tabulate(data, columns, id) {
   return table;
 }
 
-function onBibClick(data){
-  console.log(data)
+
+
+
+function onBibClick(d){
+  d3.json(page_url + 'doc_preview', {
+      method:"POST",
+      body: JSON.stringify({
+        bibcode: d["bibcode"]
+      }),
+      headers: {
+        "Content-type": "application/json; charset=UTF-8"
+      }
+    }).then(
+      function(data) {
+        d3.select("#doc_bibcode").selectAll("*").remove();
+        d3.select("#doc_title").selectAll("*").remove();
+        d3.select("#doc_abstract").selectAll("*").remove();
+        d3.select("#doc_bibcode").append('text').text(d['bibcode']).style("font-size", "10px");
+        d3.select("#doc_title").append('text').text(data['title'][0]).style('font-weight', 'bold');
+        d3.select("#doc_abstract").append('text').text(data['abstract']);
+        console.log(data);
+      }
+    );
 }

@@ -1,15 +1,14 @@
+import json
 import logging
 import os
 from pathlib import Path
-import requests
-import json
 
 import joblib
 import numpy as np
 import pandas as pd
+import requests
 from flask import Flask, render_template, jsonify, request
 from sklearn.preprocessing import MinMaxScaler
-import ads
 
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)

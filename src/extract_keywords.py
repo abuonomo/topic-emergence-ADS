@@ -62,36 +62,6 @@ def get_keywords_from_text(text: pd.Series) -> List:
     return rake_kwds
 
 
-def tokenize_texts(
-    text: pd.Series, outfile: os.PathLike, batch_size=1000, n_process=1
-) -> os.PathLike:
-    LOG.info(f"Extracting tokens from {text.shape[0]} documents.")
-    pbar = tqdm(
-        NLP.pipe(text.replace(np.nan, ""), batch_size=batch_size, n_process=n_process),
-        total=len(text),
-    )
-    with open(outfile, "w") as f0:
-        for doc in pbar:
-            # SingleRank parameters
-            kwds = textrank(
-                doc,
-                normalize="lemma",
-                topn=999,
-                window_size=10,
-                edge_weighting="count",
-                position_bias=False,
-            )
-            text = ' '.join([t.lemma_ for t in doc])
-            t = [(i, text.find(k[0])) for i, k in enumerate(kwds)]
-            st = sorted(t, key=lambda x: x[1])
-            tokens = [kwds[i[0]] for i in st]
-            import ipdb; ipdb.set_trace()
-            f0.write(json.dumps(tokens))
-            f0.write("\n")
-            pbar.update(1)
-    return outfile
-
-
 def get_singlerank_kwds(text: pd.Series, batch_size=1000, n_process=1) -> List:
     LOG.info(f"Extracting keywords from {text.shape[0]} documents.")
     kwd_lists = []
@@ -283,44 +253,8 @@ def filter_kwds(infile, out_loc, threshold, score_thresh, hard_limit):
 
 @cli.command()
 @click.option("--infile", type=Path)
-@click.option("--outfile", type=Path)
-@click.option("--batch_size", type=int, default=1000)
-@click.option("--n_process", type=int, default=1)
-def tokenize(infile, outfile, batch_size, n_process):
-    """
-    Get dataframe of keyword frequencies over the years
-    """
-    # TODO: this file above should go in size folder so only one to be changed with exp
-
-    LOG.info(f"Reading records from {infile}.")
-    df = pd.read_json(infile, orient="records", lines=True)
-    df = df.drop(
-        [
-            "arxiv_class",
-            "alternate_bibcode",
-            "keyword",
-            "ack",
-            "aff",
-            "bibstem",
-            "aff_id",
-            "citation_count",
-        ],
-        axis=1,
-    )
-    df["title"] = df["title"].astype(str)
-    df["abstract"] = df["abstract"].astype(str)
-    text = df["title"] + ". " + df["abstract"]
-    text = text.apply(unescape).astype(str)
-    text = text.apply(strip_tags).astype(str)
-    tokenize_texts(text, outfile)
-
-
-@cli.command()
-@click.option("--infile", type=Path)
-# @click.option("--outfile", type=Path)
 @click.option("--out_years", type=Path)
 @click.option("--out_tokens", type=Path)
-# @click.option("--min_thresh", type=int, default=0)
 @click.option("--strategy", type=str, default="singlerank")
 @click.option("--batch_size", type=int, default=1000)
 @click.option("--n_process", type=int, default=1)
@@ -367,16 +301,11 @@ def main(infile, out_years, out_tokens, strategy, batch_size, n_process):
         df["kwds"] = get_singlerank_kwds(text, batch_size, n_process)
 
     tokens = df['kwds'].tolist()
-    import ipdb; ipdb.set_trace()
     LOG.info(f'Writing tokens to {out_tokens}')
     with open(out_tokens, 'w') as f0:
         for doc_toks in tokens:
             f0.write(json.dumps(doc_toks))
             f0.write('\n')
-
-    # kwd_df = flatten_to_keywords(df, min_thresh)
-    # LOG.info(f"Writing out all keywords to {outfile}.")
-    # kwd_df.to_json(outfile, orient="records", lines=True)
 
 
 @cli.command()
@@ -385,7 +314,7 @@ def main(infile, out_years, out_tokens, strategy, batch_size, n_process):
 @click.option("--outfile", type=Path)
 @click.option("--min_thresh", type=int, default=0)
 @click.option("--max_thresh", type=float, default=1)
-def filter_kwds(infile, in_kwd_lists, outfile, min_thresh, max_thresh):
+def aggregate_kwds(infile, in_kwd_lists, outfile, min_thresh, max_thresh):
     df = pd.read_json(infile, orient="records", lines=True)
     with open(in_kwd_lists, 'r') as f0:
         kwds = [json.loads(l) for l in f0.read().splitlines()]

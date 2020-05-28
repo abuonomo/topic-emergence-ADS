@@ -465,10 +465,13 @@ def get_coherence_df(ldas, topic_range, c_measures, texts=None, corpus=None, dct
     for lda, n in coh_pbar:
         for c in c_measures:
             coh_pbar.set_description(f"n_topics={n} | measure={c}")
-            cm = CoherenceModel(model=lda, texts=texts, corpus=corpus, coherence=c, dictionary=dct)
+            cm = CoherenceModel(
+                model=lda, texts=texts, corpus=corpus, coherence=c, dictionary=dct
+            )
             coherence = cm.get_coherence()  # get coherence value
             coherences[c].append(coherence)
 
+    import ipdb; ipdb.set_trace()
     df = pd.DataFrame(
         {
             **{
@@ -499,7 +502,7 @@ def run_gensim_lda_mult_inner(
 
 @cli.command()
 @click.option("--plot_loc", type=Path)
-@click.option("--tokens_loc", type=Path, default='')
+@click.option("--tokens_loc", type=Path, default="")
 @click.option("--topic_range_loc", type=Path)
 @click.option("--tmodels_dir", type=Path)
 @click.option("--coherence_loc", type=Path)
@@ -512,9 +515,13 @@ def run_gensim_lda_mult(
     dct = Dictionary.load(str(dct_loc))
     LOG.info(f"Loading corpus from {corp_loc}")
     corpus = MmCorpus(str(corp_loc))
-    if tokens_loc != Path('.'):
+    if tokens_loc != Path("."):
         with open(tokens_loc, "r") as f0:
-            tokens = [json.loads(line) for line in f0.read().splitlines()]
+            # Load only the keywords without their scores from each line.
+            tokens = [
+                [k for k, v in json.loads(line)]
+                for line in f0.read().splitlines()
+            ]
     else:
         tokens = None
     with open(topic_range_loc, "r") as f0:
@@ -609,11 +616,12 @@ def write_topic_distributions(df, loc):
     tmaxes = vals.values.argmax(axis=1)
     dt = h5py.string_dtype()
 
-    with h5py.File(loc, 'w') as f0:
+    with h5py.File(loc, "w") as f0:
         bib_dset = f0.create_dataset("bibcodes", (df.shape[0],), dtype=dt)
-        bib_dset[:] = df['bibcode']
-        val_dset = f0.create_dataset("topic_distribution",
-                                     (vals.shape[0], vals.shape[1]), dtype=np.float64)
+        bib_dset[:] = df["bibcode"]
+        val_dset = f0.create_dataset(
+            "topic_distribution", (vals.shape[0], vals.shape[1]), dtype=np.float64
+        )
         val_dset[:] = vals
         tmax_dset = f0.create_dataset("topic_maxes", (tmaxes.shape[0],), dtype=np.int)
         tmax_dset[:] = tmaxes
@@ -648,7 +656,7 @@ def visualize_gensim_topic_models(
     lda = LdaModel.load(str(tmodel_dir / f"gensim_topic_model{n}"))
     mat_id_to_doc_id = pd.read_csv(map_loc, index_col=0)
 
-    cm = CoherenceModel(model=lda, corpus=corpus, coherence='u_mass')
+    cm = CoherenceModel(model=lda, corpus=corpus, coherence="u_mass")
     coh_per_topic = cm.get_coherence_per_topic()
 
     # Just counting number of terms which appear, not the frequency of them
@@ -700,32 +708,40 @@ def get_bibcodes_with_embedding(infile, embedding, mat_id_to_doc_id):
 @click.option("--out_years", type=Path)
 def get_topic_years(records_loc, in_bib, topic_cohs_loc, map_loc, out_years):
     LOG.info("Reading data...")
-    df = pd.read_json(records_loc, orient='records', lines=True)
-    bib_df = pd.read_csv(in_bib, index_col=0)
+    df = pd.read_json(records_loc, orient="records", lines=True)
+    with h5py.File(in_bib, 'r') as f0:
+        bibs = f0['bibcodes'][:]
+        vals = f0['topic_distribution'][:]
+    bib_df = pd.DataFrame(vals)
+    bib_df.insert(0, 'bibcode', bibs)
     map_df = pd.read_csv(map_loc, index_col=0)
     coh_df = pd.read_csv(topic_cohs_loc, index_col=0)
 
     LOG.info("Transforming...")
-    topics = bib_df.set_index('bibcode').values.argmax(axis=1)  # Could add thresh
+    topics = bib_df.set_index("bibcode").values.argmax(axis=1)  # Could add thresh
+    # Thresh in addition to argmax? Too limiting but everything is complicate if one doc
+    # can be a part of multiple topics for the counts over time.
+    import ipdb; ipdb.set_trace()
     ndf = pd.DataFrame(topics)
     ndf.index = bib_df.index
-    ndf.columns = ['stem']
-    ndf = ndf.join(map_df.set_index('matrix_row_index'))
-    ndf = ndf.sort_values('doc_id')
-    ndf['year'] = df.loc[ndf['doc_id'], 'year'].values
+    ndf.columns = ["stem"] # Lost information about matrix row index with the bibcode version
+    # need to get the matrix location from the bibcode now
+    ndf = ndf.join(map_df.set_index("matrix_row_index"))
+    ndf = ndf.sort_values("doc_id")
+    ndf["year"] = df.loc[ndf["doc_id"], "year"].values
     # why wrong if I don't use values? Because automatically setting index?
-    ndf['nasa_afil'] = df.loc[ndf['doc_id'], "nasa_afil"].values
+    ndf["nasa_afil"] = df.loc[ndf["doc_id"], "nasa_afil"].values
     ndf = ndf.dropna().copy()
-    ndf['year'] = ndf['year'].astype(int)
-    ndf['score'] = coh_df.loc[ndf['stem'].tolist()].iloc[:, 0].tolist()
-    ndf['keyword'] = ['' for _ in range(ndf.shape[0])]
-
+    ndf["year"] = ndf["year"].astype(int)
+    ndf["score"] = coh_df.loc[ndf["stem"].tolist()].iloc[:, 0].tolist()
+    ndf["keyword"] = ["" for _ in range(ndf.shape[0])]
+    # Here have multiple lines for each doc and it might work.
     bndf = binarize_years(ndf)
     agg_df = get_stem_aggs(bndf).reset_index()
-    agg_df['stem'] = agg_df['stem'].astype(str)
+    agg_df["stem"] = agg_df["stem"].astype(str)
 
     LOG.info(f"Writing to {out_years}")
-    agg_df.to_json(out_years, orient='records', lines=True)
+    agg_df.to_json(out_years, orient="records", lines=True)
 
 
 @cli.command()
@@ -752,7 +768,6 @@ def explore_topic_models(
     bib_df = get_bibcodes_with_embedding(infile, tmodel.embedding_, mat_id_to_doc_id)
     LOG.info(f"Writing bibcodes to {topic_to_bibcodes_loc}")
     bib_df.to_csv(topic_to_bibcodes_loc)
-
 
 
 if __name__ == "__main__":

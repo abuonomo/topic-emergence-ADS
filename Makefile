@@ -31,8 +31,10 @@ all: join-and-clean docs-to-keywords-df get-filtered-kwds normalize-keyword-freq
 	 slope-complexity dtw cluster-tests dtw-viz \
 	 make-topic-models visualize-topic-models
 
+
 $(DATA_DIR) $(MODEL_DIR) $(VIZ_DIR):
 	mkdir -p $(DATA_DIR) $(MODEL_DIR) $(VIZ_DIR)
+
 
 ## Install packages to current environment with pip (venv recommended)
 requirements:
@@ -40,9 +42,11 @@ requirements:
 	@echo "You need to install the rust compiler on your system to use contextualized embedding topic modeling."
 	@echo "If you are on a mac see here: https://sourabhbajaj.com/mac-setup/Rust/"
 
+
 ## Install the requirements for the app
 requirements-app:
 	pip install -r app/requirements.txt
+
 
 RAW_FILES=$(shell find $(RAW_DIR) -type f -name '*')
 RECORDS_LOC=$(DATA_DIR)/kwds.jsonl
@@ -59,12 +63,13 @@ $(RECORDS_LOC): $(RAW_FILES)
 		$(JOURNAL_LIMIT) \
 		$(YEAR_LIMIT)
 
-ALL_KWDS_LOC=$(DATA_DIR)/all_keywords.jsonl
+
 YEAR_COUNT_LOC=$(DATA_DIR)/year_counts.csv
 KWD_TOKENS_LOC=$(DATA_DIR)/kwd_tokens.jsonl
-## Get dataframe of keyword frequencies over the years
-docs-to-keywords-df: $(ALL_KWDS_LOC) $(YEAR_COUNT_LOC)
-$(ALL_KWDS_LOC) $(YEAR_COUNT_LOC): $(RECORDS_LOC)
+## Extract all keywords and their scores from abstracts and titles
+#docs-to-keywords-df: $(ALL_KWDS_LOC) $(YEAR_COUNT_LOC)
+#$(ALL_KWDS_LOC) $(YEAR_COUNT_LOC): $(RECORDS_LOC)
+docs-to-keywords-df:
 	python src/extract_keywords.py main \
 		--infile $(RECORDS_LOC) \
 		--out_years $(YEAR_COUNT_LOC) \
@@ -74,22 +79,16 @@ $(ALL_KWDS_LOC) $(YEAR_COUNT_LOC): $(RECORDS_LOC)
 		--batch_size $(BATCH_SIZE)
 
 
-filter-kwds: $(KWD_TOKENS_LOC)
-	python src/extract_keywords.py filter-kwds \
+ALL_KWDS_LOC=$(DATA_DIR)/all_keywords.jsonl
+## Get dataframe of keyword frequencies over the years
+aggregate-kwds: $(KWD_TOKENS_LOC)
+	python src/extract_keywords.py aggregate-kwds \
 		--infile $(RECORDS_LOC) \
 		--in_kwd_lists $(KWD_TOKENS_LOC) \
 		--outfile $(ALL_KWDS_LOC) \
 		--min_thresh $(MIN_THRESH) \
 		--max_thresh $(MAX_THRESH) \
 
-TOKENIZED_CORPUS_LOC=$(DATA_DIR)/tokens.jsonl
-## Tokenize the corpus using spacy and textacy
-tokenize:
-	python src/extract_keywords.py tokenize \
-		--infile $(RECORDS_LOC) \
-		--outfile $(TOKENIZED_CORPUS_LOC) \
-		--n_process $(N_PROCESS) \
-		--batch_size $(BATCH_SIZE)
 
 OUT_AFFIL=$(DATA_DIR)/nasa_affiliation.csv
 ## Get overall nasa affiliation
@@ -97,8 +96,10 @@ affil: $(OUT_AFFIL)
 $(OUT_AFFIL): $(RECORDS_LOC) src/get_overall_nasa_affil.py
 	python src/get_overall_nasa_affil.py $(RECORDS_LOC) $(OUT_AFFIL)
 
+
 bootstrap: $(RECORDS_LOC)
 	python src/bootstrapping.py $(RECORDS_LOC)
+
 
 FILT_KWDS_LOC=$(DATA_DIR)/all_keywords_threshold_$(FREQ)_$(SCORE)_$(HARD).jsonl
 ## Filter keywords by total frequency and rake score. Also provide hard limit.
@@ -110,6 +111,7 @@ $(FILT_KWDS_LOC): $(ALL_KWDS_LOC)
 		--out_loc $(FILT_KWDS_LOC) \
 		--threshold $(FREQ) --score_thresh=$(SCORE) --hard_limit $(HARD)
 
+
 NORM_KWDS_LOC=$(DATA_DIR)/all_keywords_norm_threshold_$(FREQ)_$(SCORE)_$(HARD).jsonl
 ## Normalize keyword frequencies by year totals and percent of baselines.
 normalize-keyword-freqs: $(NORM_KWDS_LOC)
@@ -119,6 +121,7 @@ $(NORM_KWDS_LOC): $(FILT_KWDS_LOC) $(YEAR_COUNT_LOC)
 		--in_years $(YEAR_COUNT_LOC) \
 		--out_norm $(NORM_KWDS_LOC)
 
+
 TS_FEATURES_LOC=$(DATA_DIR)/slope_complex.csv
 ## Get various measures for keyword time series
 slope-complexity: $(TS_FEATURES_LOC)
@@ -127,6 +130,7 @@ $(TS_FEATURES_LOC): $(NORM_KWDS_LOC) $(OUT_AFFIL)
 		--norm_loc $(NORM_KWDS_LOC) \
 		--affil_loc $(OUT_AFFIL) \
 		--out_df $(TS_FEATURES_LOC)
+
 
 DTW_DISTS_LOC=$(DATA_DIR)/dynamic_time_warp_distances.csv
 ## Compute pairwise dynamic time warp between keywords
@@ -195,6 +199,7 @@ $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC): $(NORM_KWDS_LOC)
 		--dct_loc $(DCT_LOC) \
 		--corp_loc $(CORP_LOC)
 
+
 TOKENS_LOC=$(MODEL_DIR)/gensim_tokens.jsonl
 ## Prepare corpus, dictionary, and matrix id to doc id mapping for gensim topic modeling
 prepare-gensim-features: $(CORP_TOK_LOC) $(DCT_TOK_LOC) $(MAP_LOC)
@@ -207,6 +212,7 @@ $(CORP_TOK_LOC) $(DCT_TOK_LOC) $(MAP_LOC): $(RECORDS_LOC)
 		--token_loc $(TOKENS_LOC) \
 		--no_below $(NO_BELOW) \
 		--no_above $(NO_ABOVE)
+
 
 COH_PLT_LOC=$(VIZ_DIR)/coherence.png
 TMODEL_DIR=$(MODEL_DIR)/topic_models
@@ -223,12 +229,14 @@ $(COH_PLT_LOC): $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC)
 		--tmodels_dir $(TMODEL_DIR) \
 		--alg $(ALG)
 
+
 COHERENCE_LOC=$(VIZ_DIR)/coherence$(TIMESTAMP).csv
 DCT_TOK_LOC=$(MODEL_DIR)/gensim_tok_dct.mm
 CORP_TOK_LOC=$(MODEL_DIR)/gensim_tok_corpus.mm
 ## Make topic models using gensim's LdaMulticore
-run-gensim-lda-mult: $(COH_PLT_LOC)
-$(COH_PLT_LOC): $(DCT_LOC) $(CORP_LOC) $(MAP_LOC)
+#run-gensim-lda-mult: $(COH_PLT_LOC)
+#$(COH_PLT_LOC): $(DCT_LOC) $(CORP_LOC) $(MAP_LOC)
+run-gensim-lda-mult:
 	mkdir -p $(TMODEL_DIR); \
 	python src/topic_modeling.py run-gensim-lda-mult \
 		--plot_loc $(COH_PLT_LOC) \
@@ -239,12 +247,14 @@ $(COH_PLT_LOC): $(DCT_LOC) $(CORP_LOC) $(MAP_LOC)
 		--corp_loc $(CORP_LOC) \
 		--tokens_loc $(KWD_TOKENS_LOC)
 
+
 ## Get coherences for gensim topic models
 get-gensim-coherences: $(COH_PLT_LOC)
 	python src/topic_modeling.py get-gensim-coherences \
 		--plot_loc $(COH_PLT_LOC) \
 		--corp_loc $(CORP_LOC) \
 		--tmodels_dir $(TMODEL_DIR)
+
 
 TMODELS=$(shell find $(TMODEL_DIR) -type f -name '*')
 N_TOPICS=50
@@ -263,7 +273,9 @@ $(TMODEL_VIZ_LOC): $(TMODELS)
 		--tmodel_viz_loc $(TMODEL_VIZ_LOC) \
 		--topic_cohs_loc $(TOPIC_COHS_LOC)
 
+
 TMODEL_VIZ_GEN_LOC=$(VIZ_DIR)/gensim_topic_model_viz$(N_TOPICS).html
+TOPIC_TO_BIBCODES_LOC=$(VIZ_DIR)/topic_distribs_to_bibcodes$(N_TOPICS).hdf5
 ## Visualize gensim topic models with pyLDAvis
 #visualize-gensim-topic-models: $(TMODEL_VIZ_GEN_LOC)
 #$(TMODEL_VIZ_GEN_LOC): $(TMODELS) $(MAP_LOC)
@@ -276,19 +288,20 @@ visualize-gensim-topic-models:
 		--dct_loc $(DCT_LOC) \
 		--map_loc $(MAP_LOC) \
 		--tmodel_viz_loc $(TMODEL_VIZ_GEN_LOC) \
-		--topic_to_bibcodes_loc $(TOPIC_TO_BIBCODES_LOC)
+		--topic_to_bibcodes_loc $(TOPIC_TO_BIBCODES_LOC) \
+		--topic_cohs_loc $(TOPIC_COHS_LOC)
 
-TOPIC_TO_BIBCODES_LOC=$(VIZ_DIR)/topic_distribs_to_bibcodes$(N_TOPICS).hdf5
-## Explore topic models and how they connect to original dataset
-explore-topic-models: $(TOPIC_TO_BIBCODES_LOC)
-$(TOPIC_TO_BIBCODES_LOC):  $(TMODELS)
-	python src/topic_modeling.py explore-topic-models \
-		--infile $(RECORDS_LOC) \
-		--tmodel_dir $(TMODEL_DIR) \
-		--n $(N_TOPICS) \
-		--mlb_loc $(MULT_LAB_BIN_LOC) \
-		--map_loc $(MAP_LOC) \
-		--topic_to_bibcodes_loc $(TOPIC_TO_BIBCODES_LOC)
+
+### Explore topic models and how they connect to original dataset
+#explore-topic-models: $(TOPIC_TO_BIBCODES_LOC)
+#$(TOPIC_TO_BIBCODES_LOC):  $(TMODELS)
+#	python src/topic_modeling.py explore-topic-models \
+#		--infile $(RECORDS_LOC) \
+#		--tmodel_dir $(TMODEL_DIR) \
+#		--n $(N_TOPICS) \
+#		--mlb_loc $(MULT_LAB_BIN_LOC) \
+#		--map_loc $(MAP_LOC) \
+#		--topic_to_bibcodes_loc $(TOPIC_TO_BIBCODES_LOC)
 
 TOPIC_TO_YEARS_LOC=$(VIZ_DIR)/topic_years$(N_TOPICS).jsonl
 ## Get year time series for topics
@@ -301,6 +314,7 @@ $(TOPIC_TO_YEARS_LOC): $(TOPIC_TO_BIBCODES_LOC) $(RECORDS_LOC)
 		--map_loc $(MAP_LOC) \
 		--out_years $(TOPIC_TO_YEARS_LOC)
 
+
 NORM_TOPICS_LOC=$(VIZ_DIR)/topic_years_norm$(N_TOPICS).jsonl
 ## Normalize topic frequencies by year totals and percent of baselines.
 normalize-topic-freqs: $(TOPIC_TO_YEARS_LOC)
@@ -309,6 +323,7 @@ $(NORM_TOPICS_LOC): $(TOPIC_TO_YEARS_LOC) $(YEAR_COUNT_LOC)
 		--kwds_loc $(TOPIC_TO_YEARS_LOC) \
 		--in_years $(YEAR_COUNT_LOC) \
 		--out_norm $(NORM_TOPICS_LOC)
+
 
 TOPIC_TS_FEATURES_LOC=$(DATA_DIR)/topic_time_series_measures$(N_TOPICS).csv
 ## Get various measures for topics time series
@@ -319,6 +334,7 @@ $(TOPIC_TS_FEATURES_LOC): $(NORM_TOPICS_LOC) $(OUT_AFFIL)
 		--affil_loc $(OUT_AFFIL) \
 		--out_df $(TOPIC_TS_FEATURES_LOC)
 
+
 TOPIC_DTW_DISTS_LOC=$(DATA_DIR)/topic_dynamic_time_warp_distances.csv
 ## Compute pairwise dynamic time warp between topics
 topic-dtw: $(TOPIC_DTW_DISTS_LOC)
@@ -327,6 +343,7 @@ $(TOPIC_DTW_DISTS_LOC): $(NORM_TOPICS_LOC)
 		--norm_loc $(NORM_TOPICS_LOC) \
 		--dtw_loc $(TOPIC_DTW_DISTS_LOC)
 
+
 ELBOW_PLT_LOC=$(VIZ_DIR)/topic_elbow.png
 ## Try various numbers of clusters for kmeans topic time series clustering
 topic-cluster-tests: $(ELBOW_PLT_LOC)
@@ -334,6 +351,7 @@ $(ELBOW_PLT_LOC): $(TOPIC_DTW_DISTS_LOC)
 	$(RECIPES) cluster-tests \
 		--dtw_loc $(TOPIC_DTW_DISTS_LOC) \
 		--out_elbow_plot $(ELBOW_PLT_LOC)
+
 
 TOPIC_KM_MODEL_LOC=$(MODEL_DIR)/topic_kmeans.jbl
 TOPIC_MANIF_PLT_LOC=$(VIZ_DIR)/topic_manifold.png
@@ -347,6 +365,7 @@ $(TOPIC_MANIF_PLT_LOC) $(TOPIC_MANIF_POINTS_LOC) $(TOPIC_KM_MODEL_LOC): $(NORM_T
 		--kmeans_loc $(TOPIC_KM_MODEL_LOC) \
 		--out_man_plot $(TOPIC_MANIF_PLT_LOC) \
 		--out_man_points $(TOPIC_MANIF_POINTS_LOC)
+
 
 link-topic-data-to-app:
 	ln -f $(YEAR_COUNT_LOC) app/data/year_counts.csv

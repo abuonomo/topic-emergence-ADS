@@ -3,6 +3,32 @@ function update(selectedX, selectedY) {
   console.log(selectedY);
 }
 
+function highlightTopic(topic, labelName, sizeVal, duration=1000) {
+  d3.selectAll('circle')
+  .filter(function(d, i) { return d[labelName] === topic; })
+  .style('stroke', 'black')
+  .transition()
+    .attr("r", function (d) {
+      return 20;
+    })
+    .duration(duration)
+  .transition()
+    .attr("r", function (d) {
+      return d[sizeVal];
+    })
+    .duration(duration);
+
+  d3.selectAll('circle')
+  .filter(function(d, i) { return d[labelName] !== topic; })
+  .style('stroke', 'none')
+  .transition()
+    .style("opacity", 0.05)
+    .duration(duration)
+  .transition()
+    .style("opacity", 0.5)
+    .duration(duration)
+}
+
 
 function postBibcode(topic, spinner) {
     d3.json(page_url + "topic_bibcodes", {
@@ -48,8 +74,9 @@ function onTopicClick(d, i) {
   var spinner = new Spinner(opts).spin(target);
   var colorName = 'kmeans_cluster';
   var topic = (+d['topics'] - 1).toString();
-  postTopic(topic, d[colorName]);
   postBibcode(topic, spinner);
+  highlightTopic(+topic, 'stem', 'scaled_counts');
+  postTopic(topic, d[colorName]);
 }
 
 function onRectClick(d, i) {
@@ -255,7 +282,6 @@ function scatterChart() {
     .attr("cy", function (d) { return yScale(d[yName]); });
   }
 
-
   function onClick(d, i) {
     d3.select("#table_container").selectAll("*").remove();
     var opts = {
@@ -272,8 +298,16 @@ function scatterChart() {
     };
     var target = document.getElementById('table_container');
     var spinner = new Spinner(opts).spin(target);
+    var topic = d[labelName];
     postTopic(d[labelName], d[colorName]);
     postBibcode(d[labelName], spinner);
+    d3.selectAll('circle')
+    .filter(function(d, i) { return d[labelName] === topic; })
+    .style('stroke', 'black');
+    d3.selectAll('circle')
+    .filter(function(d, i) { return d[labelName] !== topic; })
+    .style('stroke', 'none');
+    // highlightTopic(d[labelName], labelName, sizeVal);
     var iframeElementx = document.getElementById("pyLDAvis"),
       iframeElementy = (iframeElementx.contentWindow || iframeElementx.contentDocument),
       iframeElementz = iframeElementy.document.body;

@@ -82,23 +82,23 @@
         <div id="doc_abstract"><text>Abstract</text></div>
     </div>
     <div id="dashboard" style="width: 100%; overflow: hidden;">
-        <div style="width: 75%; float:left;">
+        <div style="width: 82%; float:left;">
             <div id="plots" style="margin-left: 0px; height: 100%">
                 <div id="scatter-plot-container" style="width: 50%; overflow: hidden; margin-right: 0%; float: left;">
                     <button type="button" id="enterButton" style="margin-left: 13%; float: left;">Recreate Scatter Plot</button>
                 </div>
-                <div id="time-plot-container" >
-                    <button type="button" id="toggleNorm" style="margin-left: 7%; float: left;">Toggle Normalize Time Series</button>
+                <div id="time-plot-container" style="width: 50%; overflow: hidden; margin-right: 0%;">
+                    <button type="button" id="toggleNorm" style="margin-left: 13%;">Toggle Normalize Time Series</button>
                 </div>
             </div>
-            <div class="resp-container" style="margin-left: 0px; height: 150px">
+            <div class="resp-container" style="margin-left: 6%; height: 150px">
                 <iframe class="resp-iframe" id="pyLDAvis" src="static/topic_model_viz.html" allowfullscreen>
                     Your browser doesn't support iframes
                 </iframe>
                 <script>document.getElementById("pyLDAvis").src = page_url + "static/html/topic_model_viz.html"</script>
             </div>
         </div>
-        <div id='table_container' style="width: 22%; float:right; margin-right: 2%; position: relative;">
+        <div id='table_container' style="width: 15%; float:right; margin-right: 3%; position: relative;">
         </div>
     </div>
     <br>

@@ -177,7 +177,7 @@ link-data-to-app:
 
 ## Run app for visualize results
 app-dev: | $(APP_DATA_FILES)
-	export APP_DATA_DIR=data && cd app && flask run FLASK_ENV=development
+	export FLASK_ENV=development APP_DATA_DIR=data && cd app && flask run
 
 app-prod: | $(APP_DATA_FILES)
 	cd app && APP_DATA_DIR=data gunicorn app:app -b :5000 --timeout 1200

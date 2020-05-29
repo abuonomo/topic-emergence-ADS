@@ -17,7 +17,15 @@ function postBibcode(topic, spinner) {
       spinner.stop();
       var header =  Object.keys(data[0]);
       var table = tabulate(data, header, "doc_table", topic);
-      $('#doc_table').DataTable({"pageLength": 30, "order": [[ 1, "desc" ]]});
+      $('#doc_table').DataTable({
+        pageLength: 30,
+        order: [[ 1, "desc" ]],
+        columnDefs: [
+          {render: $.fn.dataTable.render.number(',', '.', 3),
+          targets: [1]}
+        ],
+        render: $.fn.dataTable.render.number(',', '.', 2)
+      });
   });
 }
 

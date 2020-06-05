@@ -234,7 +234,6 @@ COHERENCE_LOC=$(VIZ_DIR)/coherence$(TIMESTAMP).csv
 DCT_TOK_LOC=$(MODEL_DIR)/gensim_tok_dct.mm
 CORP_TOK_LOC=$(MODEL_DIR)/gensim_tok_corpus.mm
 TMODEL0 = $(TMODEL_DIR)/gensim_topic_model$(N_TOPICS)
-#run-gensim-lda-mult:
 ## Make topic models using gensim's LdaMulticore
 run-gensim-lda-mult: $(COH_PLT_LOC) $(TMODEL0)
 $(COH_PLT_LOC) $(TMODEL0): $(DCT_LOC) $(CORP_LOC) $(MAP_LOC)
@@ -291,17 +290,6 @@ $(TMODEL_VIZ_GEN_LOC) $(TOPIC_TO_BIBCODES_LOC): $(TMODELS) $(MAP_LOC) $(TMODEL0)
 		--topic_to_bibcodes_loc $(TOPIC_TO_BIBCODES_LOC) \
 		--topic_cohs_loc $(TOPIC_COHS_LOC)
 
-
-### Explore topic models and how they connect to original dataset
-#explore-topic-models: $(TOPIC_TO_BIBCODES_LOC)
-#$(TOPIC_TO_BIBCODES_LOC):  $(TMODELS)
-#	python src/topic_modeling.py explore-topic-models \
-#		--infile $(RECORDS_LOC) \
-#		--tmodel_dir $(TMODEL_DIR) \
-#		--n $(N_TOPICS) \
-#		--mlb_loc $(MULT_LAB_BIN_LOC) \
-#		--map_loc $(MAP_LOC) \
-#		--topic_to_bibcodes_loc $(TOPIC_TO_BIBCODES_LOC)
 
 TOPIC_TO_YEARS_LOC=$(VIZ_DIR)/topic_years$(N_TOPICS).jsonl
 ## Get year time series for topics

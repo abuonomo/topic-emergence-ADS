@@ -67,9 +67,8 @@ $(RECORDS_LOC): $(RAW_FILES)
 YEAR_COUNT_LOC=$(DATA_DIR)/year_counts.csv
 KWD_TOKENS_LOC=$(DATA_DIR)/kwd_tokens.jsonl
 ## Extract all keywords and their scores from abstracts and titles
-#docs-to-keywords-df: $(ALL_KWDS_LOC) $(YEAR_COUNT_LOC)
-#$(ALL_KWDS_LOC) $(YEAR_COUNT_LOC): $(RECORDS_LOC)
-docs-to-keywords-df:
+docs-to-keywords-df: $(ALL_KWDS_LOC) $(YEAR_COUNT_LOC)
+$(ALL_KWDS_LOC) $(YEAR_COUNT_LOC): $(RECORDS_LOC)
 	python src/extract_keywords.py main \
 		--infile $(RECORDS_LOC) \
 		--out_years $(YEAR_COUNT_LOC) \

@@ -5,17 +5,17 @@ import click
 import joblib
 import pandas as pd
 
-from src.analyze_keyword_time_series import (
+from analyze_keyword_time_series import (
     slope_count_complexity,
     plot_slop_complex,
     dtw_to_manifold,
     yellow_plot_kmd,
     dtw_to_tboard,
 )
-from src.create_keyword_and_syn_lists import (
+from create_keyword_and_syn_lists import (
     normalize_by_perc,
 )
-from src.dtw_time_analysis import dtw_kwds
+from dtw_time_analysis import dtw_kwds
 
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)

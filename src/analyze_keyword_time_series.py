@@ -197,7 +197,8 @@ def plot_slop_complex(se_df, viz_dir, x_measure="slope", y_measure="complexity")
 
 
 def cagr(x):
-    x = x[~x.isna()]
+    first_nonzero_index = np.nonzero(x.values)[0][0]
+    x = x[first_nonzero_index:]  # Not valid if starts with 0. Becomes inf
     return (x[-1] / x[0]) ** (1 / len(x)) - 1
 
 
@@ -230,6 +231,7 @@ def slope_count_complexity(lim_kwd_df, overall_affil):
     features.loc[down_ind, "norm_nasa_afil"] = sl1
 
     features["mean_change_nan_before_exist"] = only_years.apply(f2, axis=1)
+    import ipdb; ipdb.set_trace()
     features["cagr"] = only_years.apply(cagr, axis=1)
     features["score_mean"] = lim_kwd_df["score_mean"]
     return features

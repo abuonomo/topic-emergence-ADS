@@ -59,7 +59,6 @@ def get_feature_matrix(lim_kwds_df):
     mat_id_to_doc_id = (
         doc_to_kwd.reset_index().reset_index().loc[:, ["index", "doc_id_list"]]
     )
-
     dct = Dictionary(doc_to_kwd["stem"])
     corpus = [dct.doc2bow(text) for text in tqdm(doc_to_kwd["stem"])]
     mat_id_to_doc_id.columns = ["matrix_row_index", "doc_id"]
@@ -399,6 +398,7 @@ def prepare_features(norm_loc, mat_loc, mlb_loc, map_loc, dct_loc, corp_loc):
     Create document term matrix
     """
     lim_kwds_df = pd.read_json(norm_loc, orient="records", lines=True)
+
     X, mlb, mat_doc_id_map, dct, corpus = get_feature_matrix(lim_kwds_df)
 
     LOG.info("Writing matrix, multilabel binarizer, and matrix to doc id mapping.")
@@ -471,7 +471,6 @@ def get_coherence_df(ldas, topic_range, c_measures, texts=None, corpus=None, dct
             coherence = cm.get_coherence()  # get coherence value
             coherences[c].append(coherence)
 
-    import ipdb; ipdb.set_trace()
     df = pd.DataFrame(
         {
             **{
@@ -519,8 +518,7 @@ def run_gensim_lda_mult(
         with open(tokens_loc, "r") as f0:
             # Load only the keywords without their scores from each line.
             tokens = [
-                [k for k, v in json.loads(line)]
-                for line in f0.read().splitlines()
+                [k for k, v in json.loads(line)] for line in f0.read().splitlines()
             ]
     else:
         tokens = None
@@ -617,14 +615,17 @@ def write_topic_distributions(df, loc):
     dt = h5py.string_dtype()
 
     with h5py.File(loc, "w") as f0:
-        bib_dset = f0.create_dataset("bibcodes", (df.shape[0],), dtype=dt)
-        bib_dset[:] = df["bibcode"]
-        val_dset = f0.create_dataset(
-            "topic_distribution", (vals.shape[0], vals.shape[1]), dtype=np.float64
+        f0.create_dataset("bibcodes", (df.shape[0],), dtype=dt, data=df["bibcode"])
+        f0.create_dataset(
+            "topic_distribution",
+            (vals.shape[0], vals.shape[1]),
+            dtype=np.float64,
+            data=vals,
         )
-        val_dset[:] = vals
-        tmax_dset = f0.create_dataset("topic_maxes", (tmaxes.shape[0],), dtype=np.int)
-        tmax_dset[:] = tmaxes
+        f0.create_dataset("topic_maxes", (tmaxes.shape[0],), dtype=np.int, data=tmaxes)
+        f0.create_dataset(
+            "dist_to_doc_index", (df.shape[0],), dtype=np.int, data=df.index.values
+        )
 
     return loc
 
@@ -709,11 +710,13 @@ def get_bibcodes_with_embedding(infile, embedding, mat_id_to_doc_id):
 def get_topic_years(records_loc, in_bib, topic_cohs_loc, map_loc, out_years):
     LOG.info("Reading data...")
     df = pd.read_json(records_loc, orient="records", lines=True)
-    with h5py.File(in_bib, 'r') as f0:
-        bibs = f0['bibcodes'][:]
-        vals = f0['topic_distribution'][:]
+    with h5py.File(in_bib, "r") as f0:
+        bibs = f0["bibcodes"][:]
+        vals = f0["topic_distribution"][:]
+        dind = f0["dist_to_doc_index"][:]
     bib_df = pd.DataFrame(vals)
-    bib_df.insert(0, 'bibcode', bibs)
+    bib_df.insert(0, "bibcode", bibs)
+    bib_df.index = dind
     map_df = pd.read_csv(map_loc, index_col=0)
     coh_df = pd.read_csv(topic_cohs_loc, index_col=0)
 
@@ -721,10 +724,11 @@ def get_topic_years(records_loc, in_bib, topic_cohs_loc, map_loc, out_years):
     topics = bib_df.set_index("bibcode").values.argmax(axis=1)  # Could add thresh
     # Thresh in addition to argmax? Too limiting but everything is complicate if one doc
     # can be a part of multiple topics for the counts over time.
-    import ipdb; ipdb.set_trace()
     ndf = pd.DataFrame(topics)
     ndf.index = bib_df.index
-    ndf.columns = ["stem"] # Lost information about matrix row index with the bibcode version
+    ndf.columns = [
+        "stem"
+    ]  # Lost information about matrix row index with the bibcode version
     # need to get the matrix location from the bibcode now
     ndf = ndf.join(map_df.set_index("matrix_row_index"))
     ndf = ndf.sort_values("doc_id")

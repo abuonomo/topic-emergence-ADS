@@ -50,7 +50,6 @@ function postBibcode(topic, spinner) {
           {render: $.fn.dataTable.render.number(',', '.', 3),
           targets: [1]}
         ],
-        render: $.fn.dataTable.render.number(',', '.', 2)
       });
   });
 }
@@ -662,6 +661,23 @@ function timeSeriesChart() {
 
   return my;
 }
+
+var LdaVis = function(ldaIframe) {
+  this.ldaIFrame = ldaIframe;
+  this.svg = d3.select(this.ldaIFrame);
+
+  svg.style('margin', 0).style('padding', 0);
+  var nTopics = svg.selectAll('.dot').size();
+  console.log(nTopics);
+  svg.selectAll(".dot").each(function(d, i) {
+    d3.select(this).on("click", onTopicClick);
+  });
+  svg.selectAll('.terms').each(function (d, i) {
+    d3.select(this).on("click", onRectClick);
+  })
+
+}
+
 $(document).ready(function() {
   $('.selector').select2();
 });

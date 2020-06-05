@@ -202,16 +202,16 @@ $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC): $(NORM_KWDS_LOC)
 
 TOKENS_LOC=$(MODEL_DIR)/gensim_tokens.jsonl
 ## Prepare corpus, dictionary, and matrix id to doc id mapping for gensim topic modeling
-prepare-gensim-features: $(CORP_TOK_LOC) $(DCT_TOK_LOC) $(MAP_LOC)
-$(CORP_TOK_LOC) $(DCT_TOK_LOC) $(MAP_LOC): $(RECORDS_LOC)
-	python src/topic_modeling.py prepare-gensim-features \
-		--docs_loc $(RECORDS_LOC) \
-		--dct_loc $(DCT_TOK_LOC) \
-		--corp_loc $(CORP_TOK_LOC) \
-		--map_loc $(MAP_LOC) \
-		--token_loc $(TOKENS_LOC) \
-		--no_below $(NO_BELOW) \
-		--no_above $(NO_ABOVE)
+#prepare-gensim-features: $(CORP_TOK_LOC) $(DCT_TOK_LOC) $(MAP_LOC)
+#$(CORP_TOK_LOC) $(DCT_TOK_LOC) $(MAP_LOC): $(RECORDS_LOC)
+#	python src/topic_modeling.py prepare-gensim-features \
+#		--docs_loc $(RECORDS_LOC) \
+#		--dct_loc $(DCT_TOK_LOC) \
+#		--corp_loc $(CORP_TOK_LOC) \
+#		--map_loc $(MAP_LOC) \
+#		--token_loc $(TOKENS_LOC) \
+#		--no_below $(NO_BELOW) \
+#		--no_above $(NO_ABOVE)
 
 
 COH_PLT_LOC=$(VIZ_DIR)/coherence.png
@@ -233,10 +233,11 @@ $(COH_PLT_LOC): $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC)
 COHERENCE_LOC=$(VIZ_DIR)/coherence$(TIMESTAMP).csv
 DCT_TOK_LOC=$(MODEL_DIR)/gensim_tok_dct.mm
 CORP_TOK_LOC=$(MODEL_DIR)/gensim_tok_corpus.mm
+TMODEL0 = $(TMODEL_DIR)/gensim_topic_model$(N_TOPICS)
+#run-gensim-lda-mult:
 ## Make topic models using gensim's LdaMulticore
-#run-gensim-lda-mult: $(COH_PLT_LOC)
-#$(COH_PLT_LOC): $(DCT_LOC) $(CORP_LOC) $(MAP_LOC)
-run-gensim-lda-mult:
+run-gensim-lda-mult: $(COH_PLT_LOC) $(TMODEL0)
+$(COH_PLT_LOC) $(TMODEL0): $(DCT_LOC) $(CORP_LOC) $(MAP_LOC)
 	mkdir -p $(TMODEL_DIR); \
 	python src/topic_modeling.py run-gensim-lda-mult \
 		--plot_loc $(COH_PLT_LOC) \
@@ -277,9 +278,8 @@ $(TMODEL_VIZ_LOC): $(TMODELS)
 TMODEL_VIZ_GEN_LOC=$(VIZ_DIR)/gensim_topic_model_viz$(N_TOPICS).html
 TOPIC_TO_BIBCODES_LOC=$(VIZ_DIR)/topic_distribs_to_bibcodes$(N_TOPICS).hdf5
 ## Visualize gensim topic models with pyLDAvis
-#visualize-gensim-topic-models: $(TMODEL_VIZ_GEN_LOC)
-#$(TMODEL_VIZ_GEN_LOC): $(TMODELS) $(MAP_LOC)
-visualize-gensim-topic-models:
+visualize-gensim-topic-models: $(TMODEL_VIZ_GEN_LOC) $(TOPIC_TO_BIBCODES_LOC)
+$(TMODEL_VIZ_GEN_LOC) $(TOPIC_TO_BIBCODES_LOC): $(TMODELS) $(MAP_LOC) $(TMODEL0)
 	python src/topic_modeling.py visualize-gensim-topic-models \
 		--infile $(RECORDS_LOC) \
 		--tmodel_dir $(TMODEL_DIR) \
@@ -328,9 +328,9 @@ $(NORM_TOPICS_LOC): $(TOPIC_TO_YEARS_LOC) $(YEAR_COUNT_LOC)
 TOPIC_TS_FEATURES_LOC=$(DATA_DIR)/topic_time_series_measures$(N_TOPICS).csv
 ## Get various measures for topics time series
 topics-time-series-measures: $(TOPIC_TS_FEATURES_LOC)
-$(TOPIC_TS_FEATURES_LOC): $(NORM_TOPICS_LOC) $(OUT_AFFIL)
+$(TOPIC_TS_FEATURES_LOC): $(TOPIC_TO_YEARS_LOC) $(OUT_AFFIL)
 	$(RECIPES) slope-complexity \
-		--norm_loc $(NORM_TOPICS_LOC) \
+		--norm_loc $(TOPIC_TO_YEARS_LOC) \
 		--affil_loc $(OUT_AFFIL) \
 		--out_df $(TOPIC_TS_FEATURES_LOC)
 

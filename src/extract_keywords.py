@@ -1,22 +1,24 @@
 import json
-import logging
 import os
-import re
 from html import unescape
 from html.parser import HTMLParser
-from pathlib import Path
-from typing import List
 
 import RAKE
 import click
+import logging
 import numpy as np
 import pandas as pd
 import spacy
 from nltk import PorterStemmer
+from pathlib import Path
 from sklearn.preprocessing import LabelBinarizer
+from spacy.lang.char_classes import ALPHA, ALPHA_LOWER, ALPHA_UPPER
+from spacy.lang.char_classes import CONCAT_QUOTES, LIST_ELLIPSES, LIST_ICONS
 from spacy.lang.en import STOP_WORDS
+from spacy.util import compile_infix_regex
 from textacy.ke import textrank
 from tqdm import tqdm
+from typing import List
 
 LOGLEVEL = os.environ.get("LOGLEVEL", "WARNING").upper()
 logging.basicConfig(level=LOGLEVEL)
@@ -24,6 +26,25 @@ LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
 
 NLP = spacy.load("en_core_web_sm")
+
+# modify tokenizer infix patterns to not split on hyphen
+infixes = (
+        LIST_ELLIPSES
+        + LIST_ICONS
+        + [
+            r"(?<=[0-9])[+\-\*^](?=[0-9-])",
+            r"(?<=[{al}{q}])\.(?=[{au}{q}])".format(
+                al=ALPHA_LOWER, au=ALPHA_UPPER, q=CONCAT_QUOTES
+            ),
+            r"(?<=[{a}]),(?=[{a}])".format(a=ALPHA),
+            # EDIT: commented out regex that splits on hyphens between letters:
+            # r"(?<=[{a}])(?:{h})(?=[{a}])".format(a=ALPHA, h=HYPHENS),
+            r"(?<=[{a}0-9])[:<>=/](?=[{a}])".format(a=ALPHA),
+        ]
+)
+infix_re = compile_infix_regex(infixes)
+NLP.tokenizer.infix_finditer = infix_re.finditer
+
 tqdm.pandas()
 
 
@@ -73,13 +94,13 @@ def get_singlerank_kwds(text: pd.Series, batch_size=1000, n_process=1) -> List:
         # SingleRank parameters
         kwds = textrank(
             doc,
-            normalize="lemma",
-            topn=999,
+            normalize=None,
+            topn=999,  # This could technically cause issues with a huge abstract
             window_size=10,
             edge_weighting="count",
             position_bias=False,
         )
-        text = ' '.join([t.lemma_ for t in doc])
+        text = doc.text
         t = []
         for i, (k, v) in enumerate(kwds):
             k_inds = [(i, j) for j in range(len(text)) if text.startswith(k, j)]
@@ -93,6 +114,7 @@ def get_singlerank_kwds(text: pd.Series, batch_size=1000, n_process=1) -> List:
 
 def flatten_to_keywords(df, min_thresh=5, max_thresh=1):
     df = df.pipe(get_kwd_occurences, min_thresh, max_thresh)
+    # TODO: include gensim process from notebook arb-16?
     df = df.pipe(stem_kwds)
     df = df.pipe(stem_reduce, min_thresh)
     df = df.pipe(binarize_years)
@@ -124,6 +146,9 @@ def get_kwd_occurences(df, min_thresh=5, max_thresh=0.7):
         .query(f"doc_id < {max_thresh_int}")
         .index
     )
+    n_removed = kwd_df.shape[0] - len(kwds)
+    LOG.info(f"Removed {n_removed} keywords which occur less "
+             f"than {min_thresh} times or in more than {max_thresh} of corpus")
 
     # Go back and string match the keywords against all titles and abstracts.
     # Do this because RAKE gives us candidate keywords but does not assure us of their
@@ -300,12 +325,12 @@ def main(infile, out_years, out_tokens, strategy, batch_size, n_process):
     elif strategy == "singlerank":
         df["kwds"] = get_singlerank_kwds(text, batch_size, n_process)
 
-    tokens = df['kwds'].tolist()
-    LOG.info(f'Writing tokens to {out_tokens}')
-    with open(out_tokens, 'w') as f0:
+    tokens = df["kwds"].tolist()
+    LOG.info(f"Writing tokens to {out_tokens}")
+    with open(out_tokens, "w") as f0:
         for doc_toks in tokens:
             f0.write(json.dumps(doc_toks))
-            f0.write('\n')
+            f0.write("\n")
 
 
 @cli.command()
@@ -316,9 +341,9 @@ def main(infile, out_years, out_tokens, strategy, batch_size, n_process):
 @click.option("--max_thresh", type=float, default=1)
 def aggregate_kwds(infile, in_kwd_lists, outfile, min_thresh, max_thresh):
     df = pd.read_json(infile, orient="records", lines=True)
-    with open(in_kwd_lists, 'r') as f0:
+    with open(in_kwd_lists, "r") as f0:
         kwds = [json.loads(l) for l in f0.read().splitlines()]
-    df['kwds'] = kwds
+    df["kwds"] = kwds
     kwd_df = flatten_to_keywords(df, min_thresh, max_thresh)
     LOG.info(f"Writing out all keywords to {outfile}.")
     kwd_df.to_json(outfile, orient="records", lines=True)

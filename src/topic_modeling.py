@@ -638,6 +638,7 @@ def write_topic_distributions(df, loc):
 @click.option("--dct_loc", type=Path)
 @click.option("--map_loc", type=Path)
 @click.option("--tmodel_viz_loc", type=Path)
+@click.option("--viz_data_loc", type=Path)
 @click.option("--topic_to_bibcodes_loc", type=Path)
 @click.option("--topic_cohs_loc", type=Path)
 def visualize_gensim_topic_models(
@@ -648,6 +649,7 @@ def visualize_gensim_topic_models(
     dct_loc,
     map_loc,
     tmodel_viz_loc,
+    viz_data_loc,
     topic_to_bibcodes_loc,
     topic_cohs_loc,
 ):
@@ -678,9 +680,13 @@ def visualize_gensim_topic_models(
     LOG.info(f"Writing bibcodes to {topic_to_bibcodes_loc}")
     write_topic_distributions(new_df, topic_to_bibcodes_loc)
 
-    viz_data = pyLDAvis.gensim.prepare(lda, corpus, dct, sort_topics=False, mds="mmds")
+    viz_data = pyLDAvis.gensim.prepare(lda, corpus, dct, sort_topics=False, mds="mmds", start_index=0)
+    import ipdb; ipdb.set_trace()
+    LOG.info(f"Writing visualization data to {viz_data_loc}")
+    with open(viz_data_loc, 'w') as f0:
+        json.dump(viz_data.to_json(), f0)
     LOG.info(f"Writing visualization to {tmodel_viz_loc}")
-    pyLDAvis.save_html(viz_data, str(tmodel_viz_loc))
+    pyLDAvis.save_html(viz_data, str(tmodel_viz_loc), ldavis_url="/static/js/ldavis.js") # TODO: fix this path
 
 
 def get_bibcodes_with_embedding(infile, embedding, mat_id_to_doc_id):

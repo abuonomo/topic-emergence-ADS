@@ -3,6 +3,7 @@ function update(selectedX, selectedY) {
   console.log(selectedY);
 }
 
+
 function highlightTopic(topic, labelName, sizeVal, duration=1000) {
   d3.selectAll('circle')
   .filter(function(d, i) { return d[labelName] === topic; })
@@ -72,7 +73,7 @@ function onTopicClick(d, i) {
   var target = document.getElementById('table_container');
   var spinner = new Spinner(opts).spin(target);
   var colorName = 'kmeans_cluster';
-  var topic = (+d['topics'] - 1).toString();
+  var topic = (+d['topics']).toString();
   postBibcode(topic, spinner);
   highlightTopic(+topic, 'stem', 'scaled_counts');
   postTopic(topic, d[colorName]);
@@ -311,7 +312,9 @@ function scatterChart() {
       iframeElementy = (iframeElementx.contentWindow || iframeElementx.contentDocument),
       iframeElementz = iframeElementy.document.body;
     var vizSvg = d3.select(iframeElementz);
-    vizSvg.select('#ldavis_el5816652949919526245638977-topic').node().value = (+d[labelName] + 1).toString()
+    var topicID = '#ldavis_el43085544119632163672894-topic';
+    vizSvg.select(topicID).node().value = (+d[labelName]).toString();
+    d3.select(topicID).on('keyup')();
   }
 
   function tooltip() {

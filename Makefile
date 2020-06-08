@@ -274,10 +274,12 @@ $(TMODEL_VIZ_LOC): $(TMODELS)
 
 
 TMODEL_VIZ_GEN_LOC=$(VIZ_DIR)/gensim_topic_model_viz$(N_TOPICS).html
+VIZ_DATA_LOC=$(VIZ_DIR)/viz_data$(N_TOPICS).json
 TOPIC_TO_BIBCODES_LOC=$(VIZ_DIR)/topic_distribs_to_bibcodes$(N_TOPICS).hdf5
 ## Visualize gensim topic models with pyLDAvis
-visualize-gensim-topic-models: $(TMODEL_VIZ_GEN_LOC) $(TOPIC_TO_BIBCODES_LOC)
-$(TMODEL_VIZ_GEN_LOC) $(TOPIC_TO_BIBCODES_LOC): $(TMODELS) $(MAP_LOC) $(TMODEL0)
+#visualize-gensim-topic-models: $(TMODEL_VIZ_GEN_LOC) $(TOPIC_TO_BIBCODES_LOC)
+#$(TMODEL_VIZ_GEN_LOC) $(TOPIC_TO_BIBCODES_LOC): $(TMODELS) $(MAP_LOC) $(TMODEL0)
+visualize-gensim-topic-models:
 	python src/topic_modeling.py visualize-gensim-topic-models \
 		--infile $(RECORDS_LOC) \
 		--tmodel_dir $(TMODEL_DIR) \
@@ -286,6 +288,7 @@ $(TMODEL_VIZ_GEN_LOC) $(TOPIC_TO_BIBCODES_LOC): $(TMODELS) $(MAP_LOC) $(TMODEL0)
 		--dct_loc $(DCT_LOC) \
 		--map_loc $(MAP_LOC) \
 		--tmodel_viz_loc $(TMODEL_VIZ_GEN_LOC) \
+		--viz_data_loc $(VIZ_DATA_LOC) \
 		--topic_to_bibcodes_loc $(TOPIC_TO_BIBCODES_LOC) \
 		--topic_cohs_loc $(TOPIC_COHS_LOC)
 
@@ -363,7 +366,8 @@ link-topic-data-to-app:
 	ln -f $(TOPIC_KM_MODEL_LOC) app/data/kmeans.jbl
 	ln -f $(KM_MODEL_LOC) app/data/kwd_kmeans.jbl
 	ln -f $(TOPIC_TS_FEATURES_LOC) app/data/slope_complex.csv
-	ln -f $(TMODEL_VIZ_GEN_LOC) app/static/html/topic_model_viz.html
+	ln -f $(TMODEL_VIZ_GEN_LOC) app/data/topic_model_viz.html
+	ln -f $(VIZ_DATA_LOC) app/data/viz_data.json
 	ln -f $(TOPIC_TO_YEARS_LOC) app/data/topic_years.jsonl
 	ln -f $(TOPIC_TO_BIBCODES_LOC) app/data/topic_distribs_to_bibcodes.hdf5
 

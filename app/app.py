@@ -42,6 +42,7 @@ app.config.update(
     MAN_LOC=DATA_DIR / "dtw_manifold_proj.jbl",
     TOPIC_DISTRIB_LOC=DATA_DIR / "topic_distribs_to_bibcodes.hdf5",
     TOPIC_YEARS_LOC=DATA_DIR / "topic_years.csv",
+    VIZ_DATA_LOC=DATA_DIR / "viz_data.json",
     SC_DF=None,
     N_DF=None,
     KWD_SC_DF=None,
@@ -51,6 +52,7 @@ app.config.update(
     KWD_KMEANS=None,
     TOPIC_DISTRIB_DF=None,
     TOPIC_YEARS_DF=None,
+    VIZ_DATA=None,
     LOAD_COLS=[
         "stem",
         "count",
@@ -117,6 +119,9 @@ def init():
     #     app.config["TOPIC_DISTRIB_LOC"], index_col=0
     # ).set_index('bibcode')
 
+    with open(app.config['VIZ_DATA_LOC'], 'r') as f0:
+        app.config['VIZ_DATA'] = json.load(f0)
+
     LOG.info(f"Ready")
 
 
@@ -126,10 +131,10 @@ def index():
     return render_template("index.html", version=VERSION, git_url=GIT_URL)
 
 
-@app.route("/lda")
+@app.route("/lda", methods=["GET"])
 def lda():
     LOG.info("Serving LDA viz.")
-    return render_template("lda.html", version=VERSION, git_url=GIT_URL)
+    return jsonify(app.config['VIZ_DATA'])
 
 
 def load_topic_distributions(loc: os.PathLike, t: int):
@@ -197,9 +202,9 @@ def _trans_time(ts, kwd, clus):
 
 
 def get_time_data_inner(data, n_df, sc_df):
-    data = request.json
     LOG.info(f"Getting time data for {data}.")
-    ts = n_df.query(f'stem == "{data["stem"]}"').iloc[:, 6:]
+    cols = [f"{y}_sum" for y in app.config['YEAR_COUNTS']['year'].sort_values()]
+    ts = n_df.query(f'stem == "{data["stem"]}"').loc[:, cols]
     s = data['stem']
     kmc = sc_df.query(f'stem == "{s}"')['kmeans_cluster'].iloc[0]
     ts = ts.T

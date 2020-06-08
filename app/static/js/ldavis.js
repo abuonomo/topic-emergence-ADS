@@ -481,7 +481,7 @@ var LDAvis = function(to_select, data_or_file_name) {
             .style("fill", color1)
             .attr("opacity", 0.4);
         d3.select("#" + barFreqsID).append("text")
-            .attr("x", barguide.width + 5)
+            .attr("x", barguide.width + 5 + 55)
             .attr("y", mdsheight + 10 + barguide.height/2)
             .style("dominant-baseline", "middle")
             .text("Overall term frequency");
@@ -494,7 +494,7 @@ var LDAvis = function(to_select, data_or_file_name) {
             .style("fill", color2)
             .attr("opacity", 0.8);
         d3.select("#" + barFreqsID).append("text")
-            .attr("x", barguide.width/2 + 5)
+            .attr("x", barguide.width/2 + 5 + 120)
             .attr("y", mdsheight + 10 + (3/2)*barguide.height + 5)
             .style("dominant-baseline", "middle")
             .text("Estimated term frequency within the selected topic");
@@ -505,7 +505,7 @@ var LDAvis = function(to_select, data_or_file_name) {
             .attr("xlink:href", "http://vis.stanford.edu/files/2012-Termite-AVI.pdf")
             .attr("target", "_blank")
             .append("text")
-            .attr("x", 0)
+            .attr("x", 258)
             .attr("y", mdsheight + 10 + (6/2)*barguide.height + 5)
             .style("dominant-baseline", "middle")
             .text("1. saliency(term w) = frequency(w) * [sum_t p(t | w) * log(p(t | w)/p(t))] for topics t; see Chuang et. al (2012)");
@@ -514,7 +514,7 @@ var LDAvis = function(to_select, data_or_file_name) {
             .attr("xlink:href", "http://nlp.stanford.edu/events/illvi2014/papers/sievert-illvi2014.pdf")
             .attr("target", "_blank")
             .append("text")
-            .attr("x", 0)
+            .attr("x", 227)
             .attr("y", mdsheight + 10 + (8/2)*barguide.height + 5)
             .style("dominant-baseline", "middle")
             .text("2. relevance(term w | topic t) = \u03BB * p(w | t) + (1 - \u03BB) * p(w | t)/p(w); see Sievert & Shirley (2014)");

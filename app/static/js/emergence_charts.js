@@ -5,7 +5,7 @@ function update(selectedX, selectedY) {
 
 
 function highlightTopic(topic, labelName, sizeVal, duration=1000) {
-  d3.selectAll('circle')
+  d3.selectAll('#scatter-plot-container circle')
   .filter(function(d, i) { return d[labelName] === topic; })
   .style('stroke', 'black')
   .transition()
@@ -19,7 +19,7 @@ function highlightTopic(topic, labelName, sizeVal, duration=1000) {
     })
     .duration(duration);
 
-  d3.selectAll('circle')
+  d3.selectAll('#scatter-plot-container circle')
   .filter(function(d, i) { return d[labelName] !== topic; })
   .style('stroke', 'none')
   .transition()
@@ -208,7 +208,7 @@ function scatterChart() {
       .attr("x", 0)
       .attr("y", -20)
       .attr("class", "title")
-      .text(`Keywords Time Series Measures`);
+      .text(`Topics' Time Series Measures`);
 
       brush = d3.brush().extent([[0, 0], [width, height]]).on("end", brushended);
       scatter.append("g")
@@ -283,7 +283,7 @@ function scatterChart() {
   }
 
   function onClick(d, i) {
-    d3.select("#table_container").selectAll("*").remove();
+    d3.select("#table_container").style('opacity', 0.1);
     var opts = {
       lines: 9, // The number of lines to draw
       length: 9, // The length of each line
@@ -301,19 +301,17 @@ function scatterChart() {
     var topic = d[labelName];
     postTopic(d[labelName], d[colorName]);
     postBibcode(d[labelName], spinner);
-    d3.selectAll('circle')
+    d3.select("#table_container").selectAll("*").remove();
+    d3.select("#table_container").style('opacity', 1);
+    d3.selectAll('#scatter-plot-container circle')
     .filter(function(d, i) { return d[labelName] === topic; })
     .style('stroke', 'black');
-    d3.selectAll('circle')
+    d3.selectAll('#scatter-plot-container  circle')
     .filter(function(d, i) { return d[labelName] !== topic; })
     .style('stroke', 'none');
     // highlightTopic(d[labelName], labelName, sizeVal);
-    var iframeElementx = document.getElementById("pyLDAvis"),
-      iframeElementy = (iframeElementx.contentWindow || iframeElementx.contentDocument),
-      iframeElementz = iframeElementy.document.body;
-    var vizSvg = d3.select(iframeElementz);
-    var topicID = '#ldavis_el43085544119632163672894-topic';
-    vizSvg.select(topicID).node().value = (+d[labelName]).toString();
+    var topicID = '#ldavis_el1-topic';
+    d3.select(topicID).node().value = (+d[labelName]).toString();
     d3.select(topicID).on('keyup')();
   }
 

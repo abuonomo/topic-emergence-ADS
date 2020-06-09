@@ -19,10 +19,15 @@ app = Flask(__name__)
 
 try:
     VERSION = os.environ["VERSION"]
-    GIT_URL = os.environ["GIT_URL"]
 except KeyError:
     VERSION = "unspecified"
+
+try:
+    GIT_URL = os.environ["GIT_URL"]
+except KeyError:
     GIT_URL = "unspecified"
+
+LOG.info(f"Deploying Version: {VERSION}")
 
 try:
     DATA_DIR = Path(os.environ["APP_DATA_DIR"])

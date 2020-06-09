@@ -182,9 +182,10 @@ app-dev: | $(APP_DATA_FILES)
 	export FLASK_ENV=development APP_DATA_DIR=data export VERSION=$$(python version.py) && cd app && flask run
 
 ## Run app for visualize results in production mode
+PORT=5000
 app-prod: | $(APP_DATA_FILES)
 	export VERSION=$$(python version.py); \
-	cd app && APP_DATA_DIR=data gunicorn app:app -b :5000 --timeout 1200
+	cd app && APP_DATA_DIR=data gunicorn app:app -b :$(PORT) --timeout 1200
 #========= Topic Modeling =========#
 
 DOC_FEAT_MAT_LOC=$(DATA_DIR)/doc_feature_matrix.mtx

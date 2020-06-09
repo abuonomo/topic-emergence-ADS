@@ -155,8 +155,12 @@ def load_topic_distributions(loc: os.PathLike, t: int):
 def topic_bibcodes():
     in_data = request.json
     topic = int(in_data['topic'])  # Frontend index starts at 1, here starts at 0
+    limit = int(in_data['limit'])
     topic_df = load_topic_distributions(app.config["TOPIC_DISTRIB_LOC"], topic)
-    records = topic_df.to_dict(orient='records')[0:100]
+    if limit == 0:
+        records = topic_df.to_dict(orient='records')
+    else:
+        records = topic_df.to_dict(orient='records')[0:limit]
     return jsonify(records)
 
 

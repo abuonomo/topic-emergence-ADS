@@ -31,11 +31,11 @@ function highlightTopic(topic, labelName, sizeVal, duration=1000) {
 }
 
 
-function postBibcode(topic, spinner) {
+function postBibcode(topic, spinner, limit=0) {
     d3.json(page_url + "topic_bibcodes", {
       method:"POST",
       body: JSON.stringify({
-        topic: topic
+        topic: topic, limit: limit
       }),
       headers: {
         "Content-type": "application/json; charset=UTF-8"
@@ -43,7 +43,7 @@ function postBibcode(topic, spinner) {
   }).then(function(data) {
       spinner.stop();
       var header =  Object.keys(data[0]);
-      var table = tabulate(data, header, "doc_table", topic);
+      var table = tabulate(data, header, "doc_table", topic, limit);
       $('#doc_table').DataTable({
         pageLength: 30,
         order: [[ 1, "desc" ]],
@@ -74,7 +74,7 @@ function onTopicClick(d, i) {
   var spinner = new Spinner(opts).spin(target);
   var colorName = 'kmeans_cluster';
   var topic = (+d['topics']).toString();
-  postBibcode(topic, spinner);
+  postBibcode(topic, spinner, limit=100);
   highlightTopic(+topic, 'stem', 'scaled_counts');
   postTopic(topic, d[colorName]);
 }
@@ -300,7 +300,7 @@ function scatterChart() {
     var spinner = new Spinner(opts).spin(target);
     var topic = d[labelName];
     postTopic(d[labelName], d[colorName]);
-    postBibcode(d[labelName], spinner);
+    postBibcode(d[labelName], spinner, limit=100);
     d3.selectAll('#scatter-plot-container circle')
     .filter(function(d, i) { return d[labelName] === topic; })
     .style('stroke', 'black');
@@ -687,12 +687,35 @@ $(".selector").select2({
 
 
 // from here: https://gist.github.com/jfreels/6733593
-function tabulate(data, columns, id, topic="") {
+function tabulate(data, columns, id, topic="", limit=0) {
 	var table = d3.select('#table_container').append('table')
     .attr('id', id)
     .attr('class', 'display');
 
-	var caption = table.append('caption').text(`Topic ${topic}`);
+	if (limit === 0) {
+    var caption = table.append('caption').text(`Topic ${topic}`);
+  }
+	else{
+	  var caption = table.append('caption').text(`Topic ${topic} (top ${limit})`);
+	  caption.append('button').text('Load All').on('click', function(d, i) {
+      var opts = {
+        lines: 9, // The number of lines to draw
+        length: 9, // The length of each line
+        width: 5, // The line thickness
+        radius: 14, // The radius of the inner circle
+        color: "white", // #rgb or #rrggbb or array of colors
+        speed: 1.9, // Rounds per second
+        trail: 40, // Afterglow percentage
+        className: 'spinner', // The CSS class to assign to the spinner
+        top: '50%', // Top position relative to parent in px
+        left: '50%' // Left position relative to parent in px
+      };
+      d3.select("#table_container").selectAll("*").remove();
+      var target = document.getElementById('table_container');
+      var spinner = new Spinner(opts).spin(target);
+	    postBibcode(topic, spinner, limit=0)
+	  });
+  }
 	var thead = table.append('thead');
 	var	tbody = table.append('tbody');
 

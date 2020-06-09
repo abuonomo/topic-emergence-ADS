@@ -127,6 +127,7 @@ slope-complexity: $(TS_FEATURES_LOC)
 $(TS_FEATURES_LOC): $(NORM_KWDS_LOC) $(OUT_AFFIL)
 	$(RECIPES) slope-complexity \
 		--norm_loc $(NORM_KWDS_LOC) \
+		--year_count_loc $(YEAR_COUNT_LOC) \
 		--affil_loc $(OUT_AFFIL) \
 		--out_df $(TS_FEATURES_LOC)
 
@@ -137,6 +138,7 @@ dtw: $(DTW_DISTS_LOC)
 $(DTW_DISTS_LOC): $(NORM_KWDS_LOC)
 	$(RECIPES) dtw \
 		--norm_loc $(NORM_KWDS_LOC) \
+		--year_count_loc $(YEAR_COUNT_LOC) \
 		--dtw_loc $(DTW_DISTS_LOC)
 
 ELBOW_PLT_LOC=$(VIZ_DIR)/elbow.png
@@ -295,8 +297,9 @@ visualize-gensim-topic-models:
 
 TOPIC_TO_YEARS_LOC=$(VIZ_DIR)/topic_years$(N_TOPICS).jsonl
 ## Get year time series for topics
-get-topic-years: $(TOPIC_TO_YEARS_LOC)
-$(TOPIC_TO_YEARS_LOC): $(TOPIC_TO_BIBCODES_LOC) $(RECORDS_LOC)
+#get-topic-years: $(TOPIC_TO_YEARS_LOC)
+#$(TOPIC_TO_YEARS_LOC): $(TOPIC_TO_BIBCODES_LOC) $(RECORDS_LOC)
+get-topic-years:
 	python src/topic_modeling.py get-topic-years \
 		--records_loc $(RECORDS_LOC) \
 		--in_bib $(TOPIC_TO_BIBCODES_LOC) \
@@ -321,6 +324,7 @@ topics-time-series-measures: $(TOPIC_TS_FEATURES_LOC)
 $(TOPIC_TS_FEATURES_LOC): $(TOPIC_TO_YEARS_LOC) $(OUT_AFFIL)
 	$(RECIPES) slope-complexity \
 		--norm_loc $(TOPIC_TO_YEARS_LOC) \
+		--year_count_loc $(YEAR_COUNT_LOC) \
 		--affil_loc $(OUT_AFFIL) \
 		--out_df $(TOPIC_TS_FEATURES_LOC)
 
@@ -331,6 +335,7 @@ topic-dtw: $(TOPIC_DTW_DISTS_LOC)
 $(TOPIC_DTW_DISTS_LOC): $(NORM_TOPICS_LOC)
 	$(RECIPES) dtw \
 		--norm_loc $(NORM_TOPICS_LOC) \
+		--year_count_loc $(YEAR_COUNT_LOC) \
 		--dtw_loc $(TOPIC_DTW_DISTS_LOC)
 
 

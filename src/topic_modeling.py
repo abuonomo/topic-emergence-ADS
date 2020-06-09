@@ -695,6 +695,7 @@ def get_bibcodes_with_embedding(infile, embedding, mat_id_to_doc_id):
     mdoc_bibs = [bibcodes[i] for i in mat_id_to_doc_id["doc_id"]]
 
     df = pd.DataFrame(embedding)
+    import ipdb; ipdb.set_trace()
     df.insert(0, "bibcode", mdoc_bibs)
 
     LOG.info("Reorder by descending topic scores where given topic is max")

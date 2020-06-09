@@ -47,6 +47,10 @@
     <div style="width: 50%; overflow: hidden; margin-left: 2%; float: left;">
       <div id='options' style="flex: 25%; margin-left: 50px; margin-right: 0px; margin-top: 0px; float: left;">
           <table class="filters">
+              <colgroup>
+                  <col span="1" style="width: 30%;">
+                  <col span="1" style="width: 70%;">
+              </colgroup>
               <tr>
                   <td>x</td>
                   <td><select id="selectButtonX" class="selector"></select></td>
@@ -64,12 +68,12 @@
                   <td><input id="minCountInput" value="0" type="number"></input></td>
               </tr>
               <tr>
-                  <td>min score</td>
-                  <td><input id="minRakeInput" value="0" type="number"></input></td>
+                  <td>min coherence</td>
+                  <td><input id="minRakeInput" value="-99" type="number"></input></td>
               </tr>
           </table>
       </div>
-      <div id="views" style="flex: 25%; margin-right: 50px; margin-top:0px; float: right;">
+      <div id="views" style="flex: 25%; margin-right: 20px; margin-top:0px; float: right;">
         <div class="btn-group">
           <button id="cagrNasaafil">CAGR vs NASA Affiliation</button>
           <button id="manifold">manifold</button>
@@ -158,7 +162,7 @@
       .color(color);
 
       var min_count = -999;
-      var minRake=-999;
+      var minRake= -999;
 
       d3.json(window.location.pathname + "get-scatter-data", {
             method:"POST",

@@ -51,17 +51,22 @@ def normalize_keyword_freqs(kwds_loc, in_years, out_norm):
 
 @cli.command()
 @click.option("--norm_loc", type=Path)
+@click.option("--year_count_loc", type=Path)
 @click.option("--affil_loc", type=Path)
 @click.option("--out_df", type=Path)
-def slope_complexity(norm_loc, affil_loc, out_df):
+def slope_complexity(norm_loc, year_count_loc, affil_loc, out_df):
     """
     Get various measures for keyword time series
     """
     # TODO: Variable for the path above?
     LOG.info(f"Reading normalized keywords years from {norm_loc}.")
     normed_kwds_df = pd.read_json(norm_loc, orient="records", lines=True)
+
+    LOG.info(f"Reading year counts from {norm_loc}.")
+    year_count_df = pd.read_csv(year_count_loc, index_col=0)
+    years = year_count_df['year'].sort_values().values
     overall_affil = pd.read_csv(affil_loc)['nasa_affiliation'].iloc[0]
-    features = slope_count_complexity(normed_kwds_df, overall_affil)
+    features = slope_count_complexity(normed_kwds_df, overall_affil, years)
     LOG.info(f"Writing time series features to {out_df}")
     features.to_csv(out_df)
 
@@ -79,14 +84,21 @@ def plot_slope(infile, viz_dir):
 
 @cli.command()
 @click.option("--norm_loc", type=Path)
+@click.option("--year_count_loc", type=Path)
 @click.option("--dtw_loc", type=Path)
-def dtw(norm_loc, dtw_loc):
+def dtw(norm_loc, year_count_loc, dtw_loc):
     """
     Compute pairwise dynamic time warp between keywords
     """
     LOG.info(f"Reading normalized keywords years from {norm_loc}.")
     normed_kwds_df = pd.read_json(norm_loc, orient="records", lines=True)
-    normed_kwd_years = normed_kwds_df.set_index("stem").iloc[:, 5:]
+
+    LOG.info(f"Reading year counts from {year_count_loc}.")
+    year_count_df = pd.read_csv(year_count_loc, index_col=0)
+    years = year_count_df['year'].sort_values().values
+    ycols = [f"{y}_sum" for y in years]
+
+    normed_kwd_years = normed_kwds_df.set_index("stem").loc[:, ycols]
     dtw_df = dtw_kwds(normed_kwd_years)
     LOG.info(f"Outputting dynamic time warps to {dtw_loc}.")
     dtw_df.to_csv(dtw_loc)

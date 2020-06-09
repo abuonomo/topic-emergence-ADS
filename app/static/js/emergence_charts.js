@@ -283,7 +283,7 @@ function scatterChart() {
   }
 
   function onClick(d, i) {
-    d3.select("#table_container").style('opacity', 0.1);
+    d3.select("#table_container").selectAll("*").remove();
     var opts = {
       lines: 9, // The number of lines to draw
       length: 9, // The length of each line
@@ -301,8 +301,6 @@ function scatterChart() {
     var topic = d[labelName];
     postTopic(d[labelName], d[colorName]);
     postBibcode(d[labelName], spinner);
-    d3.select("#table_container").selectAll("*").remove();
-    d3.select("#table_container").style('opacity', 1);
     d3.selectAll('#scatter-plot-container circle')
     .filter(function(d, i) { return d[labelName] === topic; })
     .style('stroke', 'black');

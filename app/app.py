@@ -147,7 +147,7 @@ def load_topic_distributions(loc: os.PathLike, t: int):
     tmp_df.index = b
     tmps = tmp_df.iloc[:, t]
     df = tmps.reset_index()
-    df.columns = ['bibcode', 'score']
+    df.columns = ['bibcode', 'prob']
     return df
 
 
@@ -156,7 +156,7 @@ def topic_bibcodes():
     in_data = request.json
     topic = int(in_data['topic'])  # Frontend index starts at 1, here starts at 0
     topic_df = load_topic_distributions(app.config["TOPIC_DISTRIB_LOC"], topic)
-    records = topic_df.to_dict(orient='records')
+    records = topic_df.to_dict(orient='records')[0:100]
     return jsonify(records)
 
 

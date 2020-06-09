@@ -206,8 +206,9 @@ def cagr(x):
     return (x[-1] / x[0]) ** (1 / period) - 1
 
 
-def slope_count_complexity(lim_kwd_df, overall_affil):
-    only_years = lim_kwd_df.iloc[:, 6:]
+def slope_count_complexity(lim_kwd_df, overall_affil, years):
+    year_cols = [f'{y}_sum' for y in years]
+    only_years = lim_kwd_df.loc[:, year_cols]
     # TODO: using an index by number here is quite inflexible to change. Fix it.
 
     f2 = lambda x: fc.mean_change(x[~x.isna()])

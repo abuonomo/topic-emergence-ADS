@@ -184,7 +184,7 @@ def get_kwd_occurences(df, min_thresh=5, max_thresh=0.7):
 
 def stem_kwds(df):
     LOG.info("Creating keyword stems.")
-    df = df.copy()
+    # df = df.copy()
     unq_kwds = df["keyword"].astype(str).unique()
     p = PorterStemmer()
     kwd_to_stem = {kwd: p.stem(kwd) for kwd in tqdm(unq_kwds)}
@@ -195,7 +195,7 @@ def stem_kwds(df):
 
 def binarize_years(df):
     LOG.info("Binarizing year columns.")
-    df = df.copy()
+    # df = df.copy()
     lb = LabelBinarizer()
     df["year"] = df["year"].astype(np.int16)
     year_binary = lb.fit_transform(df["year"])  # there should not be NAs.
@@ -208,7 +208,7 @@ def binarize_years(df):
 
 
 def stem_reduce(df, min_thresh):
-    df = df.copy()
+    # df = df.copy()
     LOG.info("Filtering down by keyword stems.")
     kwds_counts = df["stem"].value_counts()
     valid_stems = kwds_counts[kwds_counts > min_thresh].index
@@ -221,7 +221,7 @@ def stem_reduce(df, min_thresh):
 
 def get_stem_aggs(df):
     LOG.info("Aggregating by stems")
-    df = df.copy()
+    # df = df.copy()
     df["nasa_afil"] = df["nasa_afil"].apply(lambda x: 1 if x == "YES" else 0)
     years = np.sort(df["year"].unique())
     year_count_dict = {c: "sum" for c in years if not np.isnan(c)}

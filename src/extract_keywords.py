@@ -29,18 +29,18 @@ NLP = spacy.load("en_core_web_sm")
 
 # modify tokenizer infix patterns to not split on hyphen
 infixes = (
-        LIST_ELLIPSES
-        + LIST_ICONS
-        + [
-            r"(?<=[0-9])[+\-\*^](?=[0-9-])",
-            r"(?<=[{al}{q}])\.(?=[{au}{q}])".format(
-                al=ALPHA_LOWER, au=ALPHA_UPPER, q=CONCAT_QUOTES
-            ),
-            r"(?<=[{a}]),(?=[{a}])".format(a=ALPHA),
-            # EDIT: commented out regex that splits on hyphens between letters:
-            # r"(?<=[{a}])(?:{h})(?=[{a}])".format(a=ALPHA, h=HYPHENS),
-            r"(?<=[{a}0-9])[:<>=/](?=[{a}])".format(a=ALPHA),
-        ]
+    LIST_ELLIPSES
+    + LIST_ICONS
+    + [
+        r"(?<=[0-9])[+\-\*^](?=[0-9-])",
+        r"(?<=[{al}{q}])\.(?=[{au}{q}])".format(
+            al=ALPHA_LOWER, au=ALPHA_UPPER, q=CONCAT_QUOTES
+        ),
+        r"(?<=[{a}]),(?=[{a}])".format(a=ALPHA),
+        # EDIT: commented out regex that splits on hyphens between letters:
+        # r"(?<=[{a}])(?:{h})(?=[{a}])".format(a=ALPHA, h=HYPHENS),
+        r"(?<=[{a}0-9])[:<>=/](?=[{a}])".format(a=ALPHA),
+    ]
 )
 infix_re = compile_infix_regex(infixes)
 NLP.tokenizer.infix_finditer = infix_re.finditer
@@ -147,8 +147,10 @@ def get_kwd_occurences(df, min_thresh=5, max_thresh=0.7):
         .index
     )
     n_removed = kwd_df.shape[0] - len(kwds)
-    LOG.info(f"Removed {n_removed} keywords which occur less "
-             f"than {min_thresh} times or in more than {max_thresh} of corpus")
+    LOG.info(
+        f"Removed {n_removed} keywords which occur less "
+        f"than {min_thresh} times or in more than {max_thresh} of corpus"
+    )
 
     # Go back and string match the keywords against all titles and abstracts.
     # Do this because RAKE gives us candidate keywords but does not assure us of their
@@ -243,6 +245,14 @@ def get_stem_aggs(df):
     return df
 
 
+def is_nu_like(s):
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
+
+
 def filter_kwds_inner(kwd_df, threshold=50, score_thresh=1.3, hard_limit=10_000):
     LOG.info(f"Only getting keywords which occur in more than {threshold} docs.")
     lim_kwd_df = (
@@ -251,7 +261,9 @@ def filter_kwds_inner(kwd_df, threshold=50, score_thresh=1.3, hard_limit=10_000)
         .sort_values("score_mean", ascending=False)
         .iloc[0:hard_limit]
     )
-    return lim_kwd_df
+    tdf = kwd_df.drop(kwd_df.index[kwd_df['stem'].apply(lambda x: len(x.strip()) == 1)])
+    tdf = tdf.drop(tdf.index[tdf['stem'].apply(is_nu_like)])
+    return tdf
 
 
 @click.group()
@@ -262,15 +274,24 @@ def cli():
 @cli.command()
 @click.option("--infile", type=Path)
 @click.option("--out_loc", type=Path)
+@click.option("--year_count_loc", type=Path)
 @click.option("--threshold", type=int)
 @click.option("--score_thresh", type=float)
 @click.option("--hard_limit", type=int)
-def filter_kwds(infile, out_loc, threshold, score_thresh, hard_limit):
+@click.option("--year_min", type=int, default=0)
+def filter_kwds(
+    infile, out_loc, year_count_loc, threshold, score_thresh, hard_limit, year_min
+):
     """
     Filter keywords by total frequency and score. Also provide hard limit.
     """
     LOG.info(f"Reading from {infile}")
     df = pd.read_json(infile, orient="records", lines=True)
+    LOG.info(f"Reading year counts from {year_count_loc}.")
+    year_count_df = pd.read_csv(year_count_loc, index_col=0)
+    years = year_count_df["year"].sort_values().values
+    dropycols = [f"{y}_sum" for y in years if y < year_min]
+    df = df.drop(dropycols, axis=1)
     lim_kwd_df = filter_kwds_inner(df, threshold, score_thresh, hard_limit)
     LOG.info(f"Writing dataframe with size {lim_kwd_df.shape[0]} to {out_loc}.")
     lim_kwd_df.to_json(out_loc, orient="records", lines=True)

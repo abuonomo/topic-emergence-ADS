@@ -681,7 +681,6 @@ def visualize_gensim_topic_models(
     write_topic_distributions(new_df, topic_to_bibcodes_loc)
 
     viz_data = pyLDAvis.gensim.prepare(lda, corpus, dct, sort_topics=False, mds="mmds", start_index=0)
-    import ipdb; ipdb.set_trace()
     LOG.info(f"Writing visualization data to {viz_data_loc}")
     with open(viz_data_loc, 'w') as f0:
         json.dump(viz_data.to_json(), f0)
@@ -695,7 +694,6 @@ def get_bibcodes_with_embedding(infile, embedding, mat_id_to_doc_id):
     mdoc_bibs = [bibcodes[i] for i in mat_id_to_doc_id["doc_id"]]
 
     df = pd.DataFrame(embedding)
-    import ipdb; ipdb.set_trace()
     df.insert(0, "bibcode", mdoc_bibs)
 
     LOG.info("Reorder by descending topic scores where given topic is max")
@@ -714,7 +712,8 @@ def get_bibcodes_with_embedding(infile, embedding, mat_id_to_doc_id):
 @click.option("--topic_cohs_loc", type=Path)
 @click.option("--map_loc", type=Path)
 @click.option("--out_years", type=Path)
-def get_topic_years(records_loc, in_bib, topic_cohs_loc, map_loc, out_years):
+@click.option("--year_min", type=int, default=0)
+def get_topic_years(records_loc, in_bib, topic_cohs_loc, map_loc, out_years, year_min):
     LOG.info("Reading data...")
     df = pd.read_json(records_loc, orient="records", lines=True)
     with h5py.File(in_bib, "r") as f0:
@@ -740,6 +739,7 @@ def get_topic_years(records_loc, in_bib, topic_cohs_loc, map_loc, out_years):
     ndf = ndf.join(map_df.set_index("matrix_row_index"))
     ndf = ndf.sort_values("doc_id")
     ndf["year"] = df.loc[ndf["doc_id"], "year"].values
+    ndf = ndf.loc[ndf['year'] >= year_min]
     # why wrong if I don't use values? Because automatically setting index?
     ndf["nasa_afil"] = df.loc[ndf["doc_id"], "nasa_afil"].values
     ndf = ndf.dropna().copy()

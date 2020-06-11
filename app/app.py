@@ -119,11 +119,6 @@ def init():
     app.config["SC_DF"]["manifold_x"] = manifold_data[:, 0]
     app.config["SC_DF"]["manifold_y"] = manifold_data[:, 1]
 
-    # LOG.info(f'Reading topic distributions from {app.config["TOPIC_DISTRIB_LOC"]}')
-    # app.config["TOPIC_DISTRIB_DF"] = pd.read_csv(
-    #     app.config["TOPIC_DISTRIB_LOC"], index_col=0
-    # ).set_index('bibcode')
-
     with open(app.config['VIZ_DATA_LOC'], 'r') as f0:
         app.config['VIZ_DATA'] = json.load(f0)
 
@@ -213,7 +208,8 @@ def _trans_time(ts, kwd, clus):
 def get_time_data_inner(data, n_df, sc_df):
     LOG.info(f"Getting time data for {data}.")
     cols = [f"{y}_sum" for y in app.config['YEAR_COUNTS']['year'].sort_values()]
-    ts = n_df.query(f'stem == "{data["stem"]}"').loc[:, cols]
+    lcols = [c for c in cols if c in n_df.columns]
+    ts = n_df.query(f'stem == "{data["stem"]}"').loc[:, lcols]
     s = data['stem']
     kmc = sc_df.query(f'stem == "{s}"')['kmeans_cluster'].iloc[0]
     ts = ts.T

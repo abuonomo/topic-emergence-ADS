@@ -16,6 +16,7 @@ RAW_DIR=data/raw
 JOURNAL_LIMIT=--no_only_nature_and_sci
 TOPIC_RANGE_FILE=config/topic_range.json
 CONFIG_FILE=config/example_small.mk
+YEAR_MIN=0
 TIMESTAMP=$$(date +%Y-%m-%d_%H:%M:%S)
 include $(CONFIG_FILE) # This file may overwrite some defaults variables above
 
@@ -26,10 +27,12 @@ MODEL_DIR=models/$(EXP_NAME)
 
 .PHONY: join-and-clean docs-to-keywords-df get-filtered-kwds normalize-keyword-freqs \
 		slope-complexity dtw cluster-tests dtw-viz \
-		make-topic-models visualize-topic-models app
-all: join-and-clean docs-to-keywords-df get-filtered-kwds normalize-keyword-freqs \
-	 slope-complexity dtw cluster-tests dtw-viz \
-	 make-topic-models visualize-topic-models
+		make-topic-models visualize-topic-models app clean check_clean
+#all: join-and-clean docs-to-keywords-df get-filtered-kwds normalize-keyword-freqs \
+#	 slope-complexity dtw cluster-tests dtw-viz \
+#	 make-topic-models visualize-topic-models
+
+all: topics-time-series-measures topic-dtw-viz slope-complexity dtw-viz
 
 
 $(DATA_DIR) $(MODEL_DIR) $(VIZ_DIR):
@@ -80,7 +83,8 @@ $(ALL_KWDS_LOC) $(YEAR_COUNT_LOC) $(KWD_TOKENS_LOC): $(RECORDS_LOC)
 
 ALL_KWDS_LOC=$(DATA_DIR)/all_keywords.jsonl
 ## Get dataframe of keyword frequencies over the years
-aggregate-kwds: $(KWD_TOKENS_LOC)
+aggregate-kwds: $(ALL_KWDS_LOC)
+$(ALL_KWDS_LOC): $(KWD_TOKENS_LOC)
 	python src/extract_keywords.py aggregate-kwds \
 		--infile $(RECORDS_LOC) \
 		--in_kwd_lists $(KWD_TOKENS_LOC) \
@@ -93,7 +97,10 @@ OUT_AFFIL=$(DATA_DIR)/nasa_affiliation.csv
 ## Get overall nasa affiliation
 affil: $(OUT_AFFIL)
 $(OUT_AFFIL): $(RECORDS_LOC) src/get_overall_nasa_affil.py
-	python src/get_overall_nasa_affil.py $(RECORDS_LOC) $(OUT_AFFIL)
+	python src/get_overall_nasa_affil.py \
+		$(RECORDS_LOC) \
+		$(OUT_AFFIL) \
+		--year_min $(YEAR_MIN)
 
 
 bootstrap: $(RECORDS_LOC)
@@ -108,7 +115,8 @@ $(FILT_KWDS_LOC): $(ALL_KWDS_LOC)
 	python src/extract_keywords.py filter-kwds \
 		--infile $(ALL_KWDS_LOC) \
 		--out_loc $(FILT_KWDS_LOC) \
-		--threshold $(FREQ) --score_thresh=$(SCORE) --hard_limit $(HARD)
+		--threshold $(FREQ) --score_thresh=$(SCORE) --hard_limit $(HARD) \
+		--year_count_loc $(YEAR_COUNT_LOC) --year_min $(YEAR_MIN)
 
 
 NORM_KWDS_LOC=$(DATA_DIR)/all_keywords_norm_threshold_$(FREQ)_$(SCORE)_$(HARD).jsonl
@@ -118,7 +126,8 @@ $(NORM_KWDS_LOC): $(FILT_KWDS_LOC) $(YEAR_COUNT_LOC)
 	$(RECIPES) normalize-keyword-freqs \
 		--kwds_loc $(FILT_KWDS_LOC) \
 		--in_years $(YEAR_COUNT_LOC) \
-		--out_norm $(NORM_KWDS_LOC)
+		--out_norm $(NORM_KWDS_LOC) \
+		--year_min $(YEAR_MIN)
 
 
 TS_FEATURES_LOC=$(DATA_DIR)/slope_complex.csv
@@ -129,7 +138,8 @@ $(TS_FEATURES_LOC): $(NORM_KWDS_LOC) $(OUT_AFFIL)
 		--norm_loc $(NORM_KWDS_LOC) \
 		--year_count_loc $(YEAR_COUNT_LOC) \
 		--affil_loc $(OUT_AFFIL) \
-		--out_df $(TS_FEATURES_LOC)
+		--out_df $(TS_FEATURES_LOC) \
+		--year_min $(YEAR_MIN)
 
 
 DTW_DISTS_LOC=$(DATA_DIR)/dynamic_time_warp_distances.csv
@@ -139,7 +149,8 @@ $(DTW_DISTS_LOC): $(NORM_KWDS_LOC)
 	$(RECIPES) dtw \
 		--norm_loc $(NORM_KWDS_LOC) \
 		--year_count_loc $(YEAR_COUNT_LOC) \
-		--dtw_loc $(DTW_DISTS_LOC)
+		--dtw_loc $(DTW_DISTS_LOC) \
+		--year_min $(YEAR_MIN)
 
 ELBOW_PLT_LOC=$(VIZ_DIR)/elbow.png
 ## Try various numbers of clusters for kmeans, produce plots
@@ -186,6 +197,18 @@ PORT=5000
 app-prod: | $(APP_DATA_FILES)
 	export VERSION=$$(python version.py); \
 	cd app && APP_DATA_DIR=data gunicorn app:app -b :$(PORT) --timeout 1200
+
+
+clean: check_clean
+	rm -r $(DATA_DIR)
+	rm -r $(VIZ_DIR)
+	rm -r $(MODEL_DIR)
+
+
+check_clean:
+	echo -n "Are you sure you want to delete \'$(DATA_DIR)\', \'$(VIZ_DIR)\' and \'$(MODEL_DIR)\'? [y/N] " \&& read ans && [ $${ans:-N} = y ]
+
+
 #========= Topic Modeling =========#
 
 DOC_FEAT_MAT_LOC=$(DATA_DIR)/doc_feature_matrix.mtx
@@ -194,8 +217,8 @@ MAP_LOC=$(MODEL_DIR)/mat_doc_mapping.csv
 DCT_LOC=$(MODEL_DIR)/gensim_dct.mm
 CORP_LOC=$(MODEL_DIR)/gensim_corpus.mm
 ## Create document term matrix
-prepare-features: $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC)
-$(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC): $(NORM_KWDS_LOC)
+prepare-features: $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC) $(DCT_LOC) $(CORP_LOC)
+$(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC) $(DCT_LOC) $(CORP_LOC): $(NORM_KWDS_LOC)
 	python src/topic_modeling.py prepare-features \
 		--norm_loc $(NORM_KWDS_LOC) \
 		--mat_loc $(DOC_FEAT_MAT_LOC) \
@@ -206,19 +229,6 @@ $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC): $(NORM_KWDS_LOC)
 
 
 TOKENS_LOC=$(MODEL_DIR)/gensim_tokens.jsonl
-## Prepare corpus, dictionary, and matrix id to doc id mapping for gensim topic modeling
-#prepare-gensim-features: $(CORP_TOK_LOC) $(DCT_TOK_LOC) $(MAP_LOC)
-#$(CORP_TOK_LOC) $(DCT_TOK_LOC) $(MAP_LOC): $(RECORDS_LOC)
-#	python src/topic_modeling.py prepare-gensim-features \
-#		--docs_loc $(RECORDS_LOC) \
-#		--dct_loc $(DCT_TOK_LOC) \
-#		--corp_loc $(CORP_TOK_LOC) \
-#		--map_loc $(MAP_LOC) \
-#		--token_loc $(TOKENS_LOC) \
-#		--no_below $(NO_BELOW) \
-#		--no_above $(NO_ABOVE)
-
-
 COH_PLT_LOC=$(VIZ_DIR)/coherence.png
 TMODEL_DIR=$(MODEL_DIR)/topic_models
 ALG='lda'
@@ -283,9 +293,8 @@ TMODEL_VIZ_GEN_LOC=$(VIZ_DIR)/gensim_topic_model_viz$(N_TOPICS).html
 VIZ_DATA_LOC=$(VIZ_DIR)/viz_data$(N_TOPICS).json
 TOPIC_TO_BIBCODES_LOC=$(VIZ_DIR)/topic_distribs_to_bibcodes$(N_TOPICS).hdf5
 ## Visualize gensim topic models with pyLDAvis
-#visualize-gensim-topic-models: $(TMODEL_VIZ_GEN_LOC) $(TOPIC_TO_BIBCODES_LOC)
-#$(TMODEL_VIZ_GEN_LOC) $(TOPIC_TO_BIBCODES_LOC): $(TMODELS) $(MAP_LOC) $(TMODEL0)
-visualize-gensim-topic-models:
+visualize-gensim-topic-models: $(TMODEL_VIZ_GEN_LOC) $(TOPIC_TO_BIBCODES_LOC)
+$(TMODEL_VIZ_GEN_LOC) $(TOPIC_TO_BIBCODES_LOC): $(TMODELS) $(MAP_LOC) $(TMODEL0)
 	python src/topic_modeling.py visualize-gensim-topic-models \
 		--infile $(RECORDS_LOC) \
 		--tmodel_dir $(TMODEL_DIR) \
@@ -301,15 +310,15 @@ visualize-gensim-topic-models:
 
 TOPIC_TO_YEARS_LOC=$(VIZ_DIR)/topic_years$(N_TOPICS).jsonl
 ## Get year time series for topics
-#get-topic-years: $(TOPIC_TO_YEARS_LOC)
-#$(TOPIC_TO_YEARS_LOC): $(TOPIC_TO_BIBCODES_LOC) $(RECORDS_LOC)
-get-topic-years:
+get-topic-years: $(TOPIC_TO_YEARS_LOC)
+$(TOPIC_TO_YEARS_LOC): $(TOPIC_TO_BIBCODES_LOC) $(RECORDS_LOC)
 	python src/topic_modeling.py get-topic-years \
 		--records_loc $(RECORDS_LOC) \
 		--in_bib $(TOPIC_TO_BIBCODES_LOC) \
 		--topic_cohs_loc $(TOPIC_COHS_LOC) \
 		--map_loc $(MAP_LOC) \
-		--out_years $(TOPIC_TO_YEARS_LOC)
+		--out_years $(TOPIC_TO_YEARS_LOC) \
+		--year_min $(YEAR_MIN)
 
 
 NORM_TOPICS_LOC=$(VIZ_DIR)/topic_years_norm$(N_TOPICS).jsonl
@@ -319,7 +328,9 @@ $(NORM_TOPICS_LOC): $(TOPIC_TO_YEARS_LOC) $(YEAR_COUNT_LOC)
 	$(RECIPES) normalize-keyword-freqs \
 		--kwds_loc $(TOPIC_TO_YEARS_LOC) \
 		--in_years $(YEAR_COUNT_LOC) \
-		--out_norm $(NORM_TOPICS_LOC)
+		--out_norm $(NORM_TOPICS_LOC) \
+		--year_min $(YEAR_MIN)
+
 
 
 TOPIC_TS_FEATURES_LOC=$(DATA_DIR)/topic_time_series_measures$(N_TOPICS).csv
@@ -330,7 +341,8 @@ $(TOPIC_TS_FEATURES_LOC): $(TOPIC_TO_YEARS_LOC) $(OUT_AFFIL)
 		--norm_loc $(TOPIC_TO_YEARS_LOC) \
 		--year_count_loc $(YEAR_COUNT_LOC) \
 		--affil_loc $(OUT_AFFIL) \
-		--out_df $(TOPIC_TS_FEATURES_LOC)
+		--out_df $(TOPIC_TS_FEATURES_LOC) \
+		--year_min $(YEAR_MIN)
 
 
 TOPIC_DTW_DISTS_LOC=$(DATA_DIR)/topic_dynamic_time_warp_distances.csv
@@ -340,7 +352,8 @@ $(TOPIC_DTW_DISTS_LOC): $(NORM_TOPICS_LOC)
 	$(RECIPES) dtw \
 		--norm_loc $(NORM_TOPICS_LOC) \
 		--year_count_loc $(YEAR_COUNT_LOC) \
-		--dtw_loc $(TOPIC_DTW_DISTS_LOC)
+		--dtw_loc $(TOPIC_DTW_DISTS_LOC) \
+		--year_min $(YEAR_MIN)
 
 
 ELBOW_PLT_LOC=$(VIZ_DIR)/topic_elbow.png

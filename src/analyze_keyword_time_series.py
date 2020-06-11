@@ -198,12 +198,19 @@ def plot_slop_complex(se_df, viz_dir, x_measure="slope", y_measure="complexity")
 
 def cagr(x):
     x = x.copy()
-    first_nonzero_index = np.nonzero(x.values)[0][0]
-    x = x[first_nonzero_index:]  # Not valid if starts with 0. Becomes inf
-    x = x[~x.isna()]  # For normalized time series, NaNs before any occurrence of kwd
-    ys = [int(s.split('_')[0]) for s in x.index]
-    period = max(ys) - min(ys)
-    return (x[-1] / x[0]) ** (1 / period) - 1
+    nz_inds = np.nonzero(x.values)[0]
+    if len(nz_inds) == 0:  # If all are 0, set CAGR to 0
+        return 0
+    else:
+        first_nonzero_index = nz_inds[0]
+        x = x[first_nonzero_index:]  # Not valid if starts with 0. Becomes inf
+        x = x[~x.isna()]  # For normalized time series, NaNs before any occurrence of kwd
+    if len(x) < 2:  # If no periods, set CAGR to 0
+        return 0
+    else:
+        ys = [int(s.split('_')[0]) for s in x.index]
+        period = max(ys) - min(ys)
+        return (x[-1] / x[0]) ** (1 / period) - 1
 
 
 def slope_count_complexity(lim_kwd_df, overall_affil, years):
@@ -230,13 +237,18 @@ def slope_count_complexity(lim_kwd_df, overall_affil, years):
     up_ind = features["norm_nasa_afil"] >= 1
     down_ind = features["norm_nasa_afil"] <= 1
 
-    sg1 = minmax_scale(features["norm_nasa_afil"][up_ind], feature_range=(0, 100))
-    sl1 = minmax_scale(features["norm_nasa_afil"][down_ind], feature_range=(0, 1))
+    if sum(up_ind) > 0:
+        sg1 = minmax_scale(features["norm_nasa_afil"][up_ind], feature_range=(0, 100))
+    else:
+        sg1 = np.array([])
+    if sum(down_ind) > 0:
+        sl1 = minmax_scale(features["norm_nasa_afil"][down_ind], feature_range=(0, 1))
+    else:
+        sl1 = np.array([])
     features.loc[up_ind, "norm_nasa_afil"] = sg1
     features.loc[down_ind, "norm_nasa_afil"] = sl1
 
     features["mean_change_nan_before_exist"] = only_years.apply(f2, axis=1)
-    import ipdb; ipdb.set_trace()
     features["cagr"] = only_years.apply(cagr, axis=1)
     features["score_mean"] = lim_kwd_df["score_mean"]
     return features

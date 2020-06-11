@@ -4,6 +4,7 @@ from pathlib import Path
 import click
 import joblib
 import pandas as pd
+import numpy as np
 
 from analyze_keyword_time_series import (
     slope_count_complexity,
@@ -31,7 +32,8 @@ def cli():
 @click.option("--kwds_loc", type=Path)
 @click.option("--in_years", type=Path)
 @click.option("--out_norm", type=Path)
-def normalize_keyword_freqs(kwds_loc, in_years, out_norm):
+@click.option("--year_min", type=int, default=0)
+def normalize_keyword_freqs(kwds_loc, in_years, out_norm, year_min):
     """
     Normalize keyword frequencies by year totals and percent of baselines.
     """
@@ -40,6 +42,7 @@ def normalize_keyword_freqs(kwds_loc, in_years, out_norm):
 
     LOG.info(f"Reading year counts from {in_years}.")
     year_counts = pd.read_csv(in_years, index_col=0)
+    year_counts = year_counts[year_counts['year'] >= year_min]
 
     year_counts = year_counts.sort_values("year")
     year_counts = year_counts.set_index("year")
@@ -54,7 +57,8 @@ def normalize_keyword_freqs(kwds_loc, in_years, out_norm):
 @click.option("--year_count_loc", type=Path)
 @click.option("--affil_loc", type=Path)
 @click.option("--out_df", type=Path)
-def slope_complexity(norm_loc, year_count_loc, affil_loc, out_df):
+@click.option("--year_min", type=int, default=0)
+def slope_complexity(norm_loc, year_count_loc, affil_loc, out_df, year_min=0):
     """
     Get various measures for keyword time series
     """
@@ -64,9 +68,11 @@ def slope_complexity(norm_loc, year_count_loc, affil_loc, out_df):
 
     LOG.info(f"Reading year counts from {norm_loc}.")
     year_count_df = pd.read_csv(year_count_loc, index_col=0)
+
     years = year_count_df['year'].sort_values().values
+    years_lim = np.array([y for y in years if y >= year_min])
     overall_affil = pd.read_csv(affil_loc)['nasa_affiliation'].iloc[0]
-    features = slope_count_complexity(normed_kwds_df, overall_affil, years)
+    features = slope_count_complexity(normed_kwds_df, overall_affil, years_lim)
     LOG.info(f"Writing time series features to {out_df}")
     features.to_csv(out_df)
 
@@ -86,7 +92,8 @@ def plot_slope(infile, viz_dir):
 @click.option("--norm_loc", type=Path)
 @click.option("--year_count_loc", type=Path)
 @click.option("--dtw_loc", type=Path)
-def dtw(norm_loc, year_count_loc, dtw_loc):
+@click.option("--year_min", type=int, default=0)
+def dtw(norm_loc, year_count_loc, dtw_loc, year_min):
     """
     Compute pairwise dynamic time warp between keywords
     """
@@ -96,7 +103,7 @@ def dtw(norm_loc, year_count_loc, dtw_loc):
     LOG.info(f"Reading year counts from {year_count_loc}.")
     year_count_df = pd.read_csv(year_count_loc, index_col=0)
     years = year_count_df['year'].sort_values().values
-    ycols = [f"{y}_sum" for y in years]
+    ycols = [f"{y}_sum" for y in years if y >= year_min]
 
     normed_kwd_years = normed_kwds_df.set_index("stem").loc[:, ycols]
     dtw_df = dtw_kwds(normed_kwd_years)

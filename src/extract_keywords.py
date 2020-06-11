@@ -261,7 +261,7 @@ def filter_kwds_inner(kwd_df, threshold=50, score_thresh=1.3, hard_limit=10_000)
         .sort_values("score_mean", ascending=False)
         .iloc[0:hard_limit]
     )
-    tdf = kwd_df.drop(kwd_df.index[kwd_df['stem'].apply(lambda x: len(x.strip()) == 1)])
+    tdf = lim_kwd_df.drop(lim_kwd_df.index[lim_kwd_df['stem'].apply(lambda x: len(x.strip()) == 1)])
     tdf = tdf.drop(tdf.index[tdf['stem'].apply(is_nu_like)])
     return tdf
 

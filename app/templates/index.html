@@ -101,7 +101,9 @@
                 <div id="ldavis_el1"></div>
             </div>
         </div>
-        <div id='table_container' style="width: 15%; float:right; margin-right: 3%; position: relative; height: 600px">
+        <div style="width: 15%; float:right; margin-right: 3%; position: relative; height: 600px">
+            <div id='table_container' style="height: 300px; display: block;"></div>
+            <div id='kwd_table_container' style="height: 300px; display: block;"></div>
         </div>
     </div>
     <br>
@@ -303,12 +305,14 @@
       var target = document.getElementById('table_container');
       var spinner = new Spinner(opts).spin(target);
       postBibcode(0, spinner, limit=100)
+      getKeywordTable()
 
     </script>
 
 <script type="text/javascript">
 d3.json(page_url + "lda").then(function(data){
-  var ldavis_el1_data = JSON.parse(data);
+  // var ldavis_el1_data = JSON.parse(data);
+  var ldavis_el1_data = data;
 
   function LDAvis_load_lib(url, callback){
     var s = document.createElement('script');

@@ -122,7 +122,7 @@ def init():
     app.config["SC_DF"]["manifold_y"] = manifold_data[:, 1]
 
     with open(app.config['VIZ_DATA_LOC'], 'r') as f0:
-        app.config['VIZ_DATA'] = json.load(f0)
+        app.config['VIZ_DATA'] = json.loads(json.load(f0))
 
     LOG.info(f"Ready")
 
@@ -166,6 +166,13 @@ def topic_bibcodes():
         records = topic_df.to_dict(orient='records')
     else:
         records = topic_df.to_dict(orient='records')[0:limit]
+    return jsonify(records)
+
+
+@app.route("/keyword_distribs", methods=["GET"])
+def keyword_distribs():
+    df = pd.DataFrame(app.config['VIZ_DATA']['token.table'])
+    records = df.to_dict(orient='records')
     return jsonify(records)
 
 

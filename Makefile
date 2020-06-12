@@ -259,8 +259,7 @@ $(COH_PLT_LOC) $(TMODEL0): $(DCT_LOC) $(CORP_LOC) $(MAP_LOC)
 		--tmodels_dir $(TMODEL_DIR) \
 		--coherence_loc $(COHERENCE_LOC) \
 		--dct_loc $(DCT_LOC) \
-		--corp_loc $(CORP_LOC) \
-		--tokens_loc $(KWD_TOKENS_LOC)
+		--corp_loc $(CORP_LOC)
 
 
 ## Get coherences for gensim topic models

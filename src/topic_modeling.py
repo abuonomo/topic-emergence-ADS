@@ -501,27 +501,19 @@ def run_gensim_lda_mult_inner(
 
 @cli.command()
 @click.option("--plot_loc", type=Path)
-@click.option("--tokens_loc", type=Path, default="")
 @click.option("--topic_range_loc", type=Path)
 @click.option("--tmodels_dir", type=Path)
 @click.option("--coherence_loc", type=Path)
 @click.option("--dct_loc", type=Path)
 @click.option("--corp_loc", type=Path)
 def run_gensim_lda_mult(
-    plot_loc, tokens_loc, topic_range_loc, tmodels_dir, coherence_loc, dct_loc, corp_loc
+    plot_loc, topic_range_loc, tmodels_dir, coherence_loc, dct_loc, corp_loc
 ):
     LOG.info(f"Loading dictionary from {dct_loc}")
     dct = Dictionary.load(str(dct_loc))
     LOG.info(f"Loading corpus from {corp_loc}")
     corpus = MmCorpus(str(corp_loc))
-    if tokens_loc != Path("."):
-        with open(tokens_loc, "r") as f0:
-            # Load only the keywords without their scores from each line.
-            tokens = [
-                [k for k, v in json.loads(line)] for line in f0.read().splitlines()
-            ]
-    else:
-        tokens = None
+    tokens = None
     with open(topic_range_loc, "r") as f0:
         topic_range = json.load(f0)
     if len(topic_range) == 0:

@@ -148,6 +148,7 @@ def load_topic_distributions(loc: os.PathLike, t: int):
     tmps = tmp_df.iloc[:, t]
     df = tmps.reset_index()
     df.columns = ['bibcode', 'prob']
+    df = df.sort_values('prob', ascending=False)
     return df
 
 

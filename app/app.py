@@ -58,6 +58,7 @@ app.config.update(
     TOPIC_DISTRIB_DF=None,
     TOPIC_YEARS_DF=None,
     VIZ_DATA=None,
+    YEAR_MIN=None,
     LOAD_COLS=[
         "stem",
         "count",
@@ -106,11 +107,12 @@ def init():
     manifold_data = joblib.load(app.config["MAN_LOC"])
     app.config["YEAR_COUNTS"] = pd.read_csv(app.config["YC_LOC"], index_col=0)
 
+    app.config['YEAR_MIN'] = min([int(c.split('_')[0]) for c in app.config["N_DF"].columns if "_sum" in c])
+
     app.config["SC_DF"]["kmeans_cluster"] = app.config["KMEANS"].labels_
     log_count = np.log(app.config["SC_DF"]["count"])
 
     app.config["KWD_SC_DF"]["kmeans_cluster"] = app.config["KWD_KMEANS"].labels_
-    # log_count = np.log(app.config["KWD_SC_DF"]["count"])
 
     scaler = MinMaxScaler(feature_range=(3, 10))
     app.config["SC_DF"]["scaled_counts"] = scaler.fit_transform(
@@ -148,6 +150,8 @@ def load_topic_distributions(loc: os.PathLike, t: int):
     tmps = tmp_df.iloc[:, t]
     df = tmps.reset_index()
     df.columns = ['bibcode', 'prob']
+    year = df['bibcode'].apply(lambda x: int(x[0:4]))
+    df = df.drop(df.index[year < app.config["YEAR_MIN"]])
     df = df.sort_values('prob', ascending=False)
     return df
 
@@ -237,6 +241,7 @@ def get_all_time_data():
     LOG.info(f"Getting total frequencies for each year.")
     ts = pd.DataFrame(app.config["N_DF"].iloc[:, 5:].sum())
     tmp_df = app.config["YEAR_COUNTS"].copy().sort_values("year")
+    tmp_df = tmp_df.drop(tmp_df.index[tmp_df['year'] < app.config['YEAR_MIN']])
     ind = tmp_df["year"].apply(lambda x: f"{x}_sum")
     tmp_df["index"] = ind
     tmp_df = tmp_df.set_index("index").drop(columns=["year"])

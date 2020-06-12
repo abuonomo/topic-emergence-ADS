@@ -288,7 +288,21 @@
               }
       );
 
-      onTopicClick({'topics': '2'});
+      var opts = {
+        lines: 9, // The number of lines to draw
+        length: 9, // The length of each line
+        width: 5, // The line thickness
+        radius: 14, // The radius of the inner circle
+        color: "gainsboro", // #rgb or #rrggbb or array of colors
+        speed: 1.9, // Rounds per second
+        trail: 40, // Afterglow percentage
+        className: 'spinner', // The CSS class to assign to the spinner
+        top: '100px', // Top position relative to parent in px
+        left: '50%' // Left position relative to parent in px
+      };
+      var target = document.getElementById('table_container');
+      var spinner = new Spinner(opts).spin(target);
+      postBibcode(0, spinner, limit=100)
 
     </script>
 
@@ -307,7 +321,7 @@ d3.json(page_url + "lda").then(function(data){
 
     // require.js not available: dynamically load d3 & LDAvis
     LDAvis_load_lib("https://d3js.org/d3.v5.min.js", function(){
-      LDAvis_load_lib(page_url + "/static/js/ldavis.js", function(){
+      LDAvis_load_lib(page_url + "static/js/ldavis.js", function(){
         new LDAvis("#" + "ldavis_el1", ldavis_el1_data);
         var svg = d3.select("#ldavis_el1");
         svg.style('margin', 0).style('padding', 0);

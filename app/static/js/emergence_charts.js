@@ -765,9 +765,9 @@ function tabulate(data, columns, id, topic="", limit=0) {
       var spinner = new Spinner(opts).spin(target);
 	    postBibcode(topic, spinner, limit=0)
 	  });
-	  var table = tabulate_inner(table, data, columns, onClick=onBibClick);
-    return table
   }
+  var table = tabulate_inner(table, data, columns, onClick=onBibClick);
+  return table
 }
 
 

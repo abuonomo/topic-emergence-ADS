@@ -534,7 +534,7 @@ docker-run-app: | $(APP_DATA_FILES)
 
 #===== Data Exports ==========#
 
-KWD_EXPORT=scratch/kwd_export.csv
+KWD_EXPORT=scratch/kwd_export_$(EXP_NAME).csv
 export-keywords:
 	python src/exports.py keywords \
 		--in_slope_complex $(TS_FEATURES_LOC) \

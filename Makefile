@@ -531,6 +531,19 @@ docker-run-app: | $(APP_DATA_FILES)
 		-v $$(pwd)/data:/home/data/ \
 		$(IMAGE_NAME):$$VERSION
 
+
+#===== Data Exports ==========#
+
+KWD_EXPORT=scratch/kwd_export.csv
+export-keywords:
+	python src/exports.py keywords \
+		--in_slope_complex $(TS_FEATURES_LOC) \
+		--viz_data_loc $(VIZ_DATA_LOC) \
+		--filt_kwds_loc $(FILT_KWDS_LOC) \
+		--kwd_export_loc $(KWD_EXPORT)
+
+
+
 #===== S3 Bucket Syncing =====#
 
 ## sync data from s3 bucket

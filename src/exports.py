@@ -43,7 +43,7 @@ def keywords(
         tsc = sc.set_index("stem")
     kwd_df = tsc.join(skdf.set_index("stem")).reset_index()
     kwd_df = kwd_df.rename(columns={"index": "term"})
-
+    kwd_df = kwd_df.sort_by('count', ascending=False)
     LOG.info(f"Writing keywords to {kwd_export_loc}")
     kwd_df.to_csv(kwd_export_loc)
 

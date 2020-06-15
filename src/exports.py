@@ -13,12 +13,12 @@ LOG.setLevel(logging.INFO)
 def cli():
     pass
 
-@click.cli
+@cli.command()
 @click.option("--in_slope_complex", type=Path)
 @click.option("--viz_data_loc", type=Path)
-@click.option("--in_slope_complex", type=Path)
+@click.option("--filt_kwds_loc", type=Path)
 @click.option("--kwd_export_loc", type=Path)
-def keywords(in_slope_complex, viz_data_loc, kwd_export_loc):
+def keywords(in_slope_complex, viz_data_loc, filt_kwds_loc, kwd_export_loc):
     LOG.info("Reading data")
     sc = pd.read_csv(in_slope_complex).loc[: , ['stem', 'count']]
 
@@ -26,7 +26,7 @@ def keywords(in_slope_complex, viz_data_loc, kwd_export_loc):
         vd = json.loads(json.load(f0))
     t_df = pd.DataFrame(vd['token.table'])
 
-    rdf = pd.read_json(in_slope_complex, orient='records', lines=True)
+    rdf = pd.read_json(filt_kwds_loc, orient='records', lines=True)
     skdf = rdf.loc[:, ['stem', 'keyword_list']]
 
     LOG.info("Joining data")

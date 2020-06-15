@@ -7,8 +7,7 @@ import spacy
 from spacy.lang.char_classes import ALPHA, ALPHA_LOWER, ALPHA_UPPER
 from spacy.lang.char_classes import CONCAT_QUOTES, LIST_ELLIPSES, LIST_ICONS
 from spacy.util import compile_infix_regex
-from sqlalchemy import Column, Integer, String, ForeignKey, Boolean
-from sqlalchemy import Table
+from sqlalchemy import Column, Integer, String, ForeignKey, Boolean, Float
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
@@ -22,12 +21,16 @@ LOG.setLevel(logging.INFO)
 
 BASE = declarative_base()
 
-PAPER_KEYWORDS = Table(
-    "paper_keywords",
-    BASE.metadata,
-    Column("paper_bibcode", ForeignKey("papers.bibcode"), primary_key=True),
-    Column("keyword_id", ForeignKey("keywords.id"), primary_key=True),
-)
+
+class PaperKeywords(BASE):
+    __tablename__ = "paper_keywords"
+
+    paper_bibcode = Column(String(19), ForeignKey("papers.bibcode"), primary_key=True)
+    keyword_id = Column(Integer, ForeignKey("keywords.id"), primary_key=True)
+    score = Column(Float)
+    raw_keyword = Column(String)
+    paper = relationship("Paper", back_populates="keywords")
+    keyword = relationship("Keyword", back_populates="papers")
 
 
 class Paper(BASE):
@@ -39,9 +42,7 @@ class Paper(BASE):
     citation_count = Column(Integer)
     year = Column(Integer)
     nasa_affiliation = Column(Boolean)
-    keywords = relationship(
-        "Keyword", secondary=PAPER_KEYWORDS, back_populates="papers"
-    )
+    keywords = relationship("PaperKeywords", back_populates="paper")
 
     def __repr__(self):
         return f'<Paper(bibcode="{self.bibcode}", title="{self.title}")>'
@@ -55,57 +56,68 @@ class Keyword(BASE):
 
     id = Column(Integer, primary_key=True)
     keyword = Column(String, nullable=False, unique=True)
-    papers = relationship("Paper", secondary=PAPER_KEYWORDS, back_populates="keywords")
+    papers = relationship("PaperKeywords", back_populates="keyword")
 
     def __init__(self, keyword):
         self.keyword = keyword
 
     def __repr__(self):
-        return f'<Keyword(keyword=\"{self.keyword}\")>'
+        return f'<Keyword(keyword="{self.keyword}")>'
 
 
 class PaperMiner:
     def __init__(self, nlp):
         self.nlp = nlp
 
-    def extract_all_keywords(self, session, batch_size=100, n_process=-1):
+    def extract_all_keywords(
+        self, session, normalize=None, reorder=False, batch_size=100, n_process=-1,
+    ):
         papers = session.query(Paper).all()
         LOG.info(f"Extracting keywords from {len(papers)} documents.")
         texts = (p.get_feature_text() for p in papers)
-        pbar = tqdm(
-            zip(
-                self.nlp.pipe(texts, batch_size=batch_size, n_process=n_process), papers
-            ),
-            total=len(papers),
-        )
+        pipe = self.nlp.pipe(texts, batch_size=batch_size, n_process=n_process)
+        pbar = tqdm(zip(pipe, papers), total=len(papers))
+
+        norm_kwds_to_now = {}
         for doc, p in pbar:
-            kwds_sorted = self.extract_keyword_from_doc(doc)
-            for kwd, score in kwds_sorted:
-                if session.query(Keyword).filter(Keyword.keyword == kwd).count() == 0:
+            kwds = self.extract_keyword_from_doc(doc, normalize, reorder)
+            for kwd, score in kwds:
+                if kwd not in norm_kwds_to_now:
                     db_kwd = Keyword(kwd)
+                    norm_kwds_to_now[kwd] = db_kwd
                 else:  # Use existing keyword in database if it exists
-                    db_kwd = session.query(Keyword).filter(Keyword.keyword == kwd).first()
-                p.keywords.append(db_kwd)
+                    db_kwd = norm_kwds_to_now[kwd]
+                with session.no_autoflush:
+                    # Make sure not to flush when PaperKeywords has no primary keys
+                    assoc = PaperKeywords(raw_keyword=kwd, score=score)
+                    assoc.keyword = db_kwd
+                    p.keywords.append(assoc)
 
     @staticmethod
-    def extract_keyword_from_doc(doc):
+    def extract_keyword_from_doc(doc, normalize=None, reorder=False):
         # SingleRank parameters
         kwds = textrank(
             doc,
-            normalize=None,
-            topn=999,  # This could technically cause issues with a huge abstract
+            normalize=normalize,
+            topn=999,  # This could cause issues with a huge abstract
             window_size=10,
             edge_weighting="count",
             position_bias=False,
         )
-        text = doc.text
-        t = []
-        for i, (k, v) in enumerate(kwds):
-            k_inds = [(i, j) for j in range(len(text)) if text.startswith(k, j)]
-            t = t + k_inds
-        st = sorted(t, key=lambda x: x[1])
-        kwds_sorted = [kwds[i[0]] for i in st]
-        return kwds_sorted
+        if reorder:
+            if normalize is None:
+                text = doc.text
+            elif normalize == "lemma":
+                text = " ".join([t.lemma_ for t in doc])
+            t = []
+            for i, (k, v) in enumerate(kwds):
+                k_inds = [(i, j) for j in range(len(text)) if text.startswith(k, j)]
+                t = t + k_inds
+            st = sorted(t, key=lambda x: x[1])
+            kwds_sorted = [kwds[i[0]] for i in st]
+            return kwds_sorted
+        else:
+            return kwds
 
 
 def get_spacy_nlp():
@@ -139,7 +151,8 @@ def cli():
 
 @cli.command()
 @click.option("--db_loc", type=Path)
-def get_keywords_from_texts(db_loc):
+@click.option("--normalize", type=str, default=None)
+def get_keywords_from_texts(db_loc, normalize):
     engine = create_engine(f"sqlite:///{db_loc}")
 
     Session = sessionmaker(bind=engine)
@@ -148,10 +161,9 @@ def get_keywords_from_texts(db_loc):
     try:
         nlp = get_spacy_nlp()
         pm = PaperMiner(nlp)
-        pm.extract_all_keywords(session)
-        import ipdb; ipdb.set_trace()
+        pm.extract_all_keywords(session, normalize)
         session.commit()
-        LOG.warning(f"Added extracted keywords to papers")
+        LOG.info(f"Added extracted keywords to papers")
     except:
         LOG.warning(f"Aborted extracting keywords.")
         session.rollback()

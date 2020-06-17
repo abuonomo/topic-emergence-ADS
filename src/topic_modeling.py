@@ -20,8 +20,6 @@ from contextualized_topic_models.datasets.dataset import CTMDataset
 from contextualized_topic_models.models.ctm import CTM
 from contextualized_topic_models.utils.data_preparation import bert_embeddings_from_file
 
-# from enstop import PLSA, EnsembleTopics
-# from enstop.utils import coherence
 from gensim.corpora import Dictionary
 from gensim.corpora import MmCorpus
 from gensim.models import LdaMulticore, LdaModel
@@ -34,8 +32,7 @@ from tqdm import tqdm
 
 from extract_keywords import binarize_years, get_stem_aggs
 
-# LOGLEVEL = os.environ.get('LOGLEVEL', 'WARNING').upper()
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(filename="topic_model.log", level=logging.DEBUG)
 LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.DEBUG)
 
@@ -443,10 +440,9 @@ def make_tmodel_n(pbar, corpus, dct, n_topics, c_measures, texts, tmodels_dir):
         corpus,
         id2word=dct,
         num_topics=n_topics,
-        passes=10,
+        passes=5,
         iterations=1000,
-        # chunksize=400_000,
-        chunksize=1_000,
+        chunksize=400_000,
         eval_every=1,
         alpha="auto",
         eta="auto",

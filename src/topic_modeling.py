@@ -445,7 +445,7 @@ def make_tmodel_n(pbar, corpus, dct, n_topics, c_measures, texts, tmodels_dir):
         num_topics=n_topics,
         passes=10,
         iterations=1000,
-        chunksize=1_000_000,
+        chunksize=400_000,
         eval_every=1,
         alpha="auto",
         eta="auto",
@@ -486,6 +486,7 @@ def run_gensim_lda_mult_inner(
 ):
     jobs = []
     pbar = tqdm(topic_range)
+    LOG.debug("Starting...")
     for n_topics in topic_range:
         j = dask.delayed(make_tmodel_n)(
             pbar, corpus, dct, n_topics, c_measures, texts, tmodels_dir

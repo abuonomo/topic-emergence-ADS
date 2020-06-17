@@ -440,7 +440,7 @@ def make_tmodel_n(pbar, corpus, dct, n_topics, c_measures, texts, tmodels_dir):
         corpus,
         id2word=dct,
         num_topics=n_topics,
-        passes=5,
+        passes=8,
         iterations=1000,
         chunksize=400_000,
         eval_every=1,

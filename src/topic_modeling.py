@@ -210,7 +210,7 @@ def get_doc_len_from_file(infile,):
     return doc_lens
 
 
-class NoParsingFilter(logging.Filter):
+class OnlyPerplexityAndConvergenceFilter(logging.Filter):
     def filter(self, record):
         tf = any(x in record.getMessage() for x in ['perplex', 'converg'])
         return tf
@@ -227,7 +227,7 @@ def cli(loglevel, logfile=None):
     if logfile is not None:
         gensim_log = logging.getLogger("gensim")
         fileHandler = logging.FileHandler(filename=logfile)
-        fileHandler.addFilter(NoParsingFilter())
+        fileHandler.addFilter(OnlyPerplexityAndConvergenceFilter())
         gensim_log.addHandler(fileHandler)
 
 

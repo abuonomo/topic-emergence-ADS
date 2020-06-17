@@ -32,7 +32,7 @@ from tqdm import tqdm
 
 from extract_keywords import binarize_years, get_stem_aggs
 
-logging.basicConfig(filename="topic_model.log", level=logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG)
 LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.DEBUG)
 
@@ -210,9 +210,25 @@ def get_doc_len_from_file(infile,):
     return doc_lens
 
 
+class NoParsingFilter(logging.Filter):
+    def filter(self, record):
+        tf = any(x in record.getMessage() for x in ['perplex', 'converg'])
+        return tf
+
+
 @click.group()
-def cli():
-    pass
+@click.option('--loglevel', default='INFO')
+@click.option('--logfile', default=None)
+def cli(loglevel, logfile=None):
+    numeric_level = getattr(logging, loglevel.upper(), None)
+    if not isinstance(numeric_level, int):
+        raise ValueError('Invalid log level: %s' % loglevel)
+    LOG.setLevel(level=numeric_level)
+    if logfile is not None:
+        GENSIM_LOG = logging.getLogger("gensim")
+        fileHandler = logging.FileHandler(filename=logfile)
+        fileHandler.addFilter(NoParsingFilter())
+        GENSIM_LOG.addHandler(fileHandler)
 
 
 @cli.command()

@@ -249,11 +249,12 @@ COHERENCE_LOC=$(VIZ_DIR)/coherence$(TIMESTAMP).csv
 DCT_TOK_LOC=$(MODEL_DIR)/gensim_tok_dct.mm
 CORP_TOK_LOC=$(MODEL_DIR)/gensim_tok_corpus.mm
 TMODEL0 = $(TMODEL_DIR)/gensim_topic_model$(N_TOPICS)
+TMODELS_LOG = $(TMODEL_DIR)/model_convergence.log
 ## Make topic models using gensim's LdaMulticore
 run-gensim-lda-mult: $(COH_PLT_LOC) $(TMODEL0)
 $(COH_PLT_LOC) $(TMODEL0): $(DCT_LOC) $(CORP_LOC) $(MAP_LOC)
 	mkdir -p $(TMODEL_DIR); \
-	python src/topic_modeling.py run-gensim-lda-mult \
+	python src/topic_modeling.py --loglevel DEBUG --logfile $(TMODELS_LOG) run-gensim-lda-mult \
 		--plot_loc $(COH_PLT_LOC) \
 		--topic_range_loc $(TOPIC_RANGE_FILE) \
 		--tmodels_dir $(TMODEL_DIR) \

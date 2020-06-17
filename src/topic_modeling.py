@@ -225,10 +225,10 @@ def cli(loglevel, logfile=None):
         raise ValueError('Invalid log level: %s' % loglevel)
     LOG.setLevel(level=numeric_level)
     if logfile is not None:
-        GENSIM_LOG = logging.getLogger("gensim")
+        gensim_log = logging.getLogger("gensim")
         fileHandler = logging.FileHandler(filename=logfile)
         fileHandler.addFilter(NoParsingFilter())
-        GENSIM_LOG.addHandler(fileHandler)
+        gensim_log.addHandler(fileHandler)
 
 
 @cli.command()

@@ -1,19 +1,24 @@
 import json
 import logging
 from pathlib import Path
+from math import ceil
 
 import click
+from html import unescape
+from extract_keywords import strip_tags
 import spacy
 from spacy.lang.char_classes import ALPHA, ALPHA_LOWER, ALPHA_UPPER
 from spacy.lang.char_classes import CONCAT_QUOTES, LIST_ELLIPSES, LIST_ICONS
 from spacy.util import compile_infix_regex
 from sqlalchemy import Column, Integer, String, ForeignKey, Boolean, Float
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, func
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy.orm import sessionmaker
 from textacy.ke import textrank
 from tqdm import tqdm
+from gensim.corpora import Dictionary
+
 
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
@@ -25,12 +30,19 @@ BASE = declarative_base()
 class PaperKeywords(BASE):
     __tablename__ = "paper_keywords"
 
-    paper_bibcode = Column(String(19), ForeignKey("papers.bibcode"), primary_key=True)
-    keyword_id = Column(Integer, ForeignKey("keywords.id"), primary_key=True)
+    paper_bibcode = Column(
+        String(19), ForeignKey("papers.bibcode"), primary_key=True, nullable=False
+    )
+    keyword_id = Column(
+        Integer, ForeignKey("keywords.id"), primary_key=True, nullable=False
+    )
     score = Column(Float)
     raw_keyword = Column(String)
     paper = relationship("Paper", back_populates="keywords")
     keyword = relationship("Keyword", back_populates="papers")
+
+    def __repr__(self):
+        return f'<PaperKeywords(paper_bibcode="{self.paper_bibcode}", keyword.keyword="{self.keyword.keyword}")>'
 
 
 class Paper(BASE):
@@ -48,7 +60,10 @@ class Paper(BASE):
         return f'<Paper(bibcode="{self.bibcode}", title="{self.title}")>'
 
     def get_feature_text(self):
-        return f"{self.title}. {self.abstract}"
+        text = f"{self.title}. {self.abstract}"
+        text = unescape(text)
+        text = strip_tags(text)
+        return text
 
 
 class Keyword(BASE):
@@ -64,14 +79,27 @@ class Keyword(BASE):
     def __repr__(self):
         return f'<Keyword(keyword="{self.keyword}")>'
 
+    def get_years(self, session):
+        years = (
+            session.query(Paper.year, func.count(Paper.year))
+            .join(PaperKeywords)
+            .join(Keyword)
+            .filter(Keyword.keyword == self.keyword)
+            .group_by(Paper.year)
+            .all()
+        )
+        return years
+
 
 class PaperMiner:
     def __init__(self, nlp):
         self.nlp = nlp
+        self.dct = None
 
     def extract_all_keywords(
         self, session, normalize=None, reorder=False, batch_size=100, n_process=-1,
     ):
+        # TODO: go back through to find keywords which were missed by singlerank
         papers = session.query(Paper).all()
         LOG.info(f"Extracting keywords from {len(papers)} documents.")
         texts = (p.get_feature_text() for p in papers)
@@ -118,6 +146,51 @@ class PaperMiner:
             return kwds_sorted
         else:
             return kwds
+
+    @staticmethod
+    def get_year_counts(session):
+        q = session.query(Paper.year, func.count(Paper.year))
+        return q.group_by(Paper.year).all()
+
+    @staticmethod
+    def get_kwd_years(session, kwd):
+        years = (
+            session.query(Paper.year, func.count(Paper.year))
+            .join(PaperKeywords)
+            .join(Keyword)
+            .filter(Keyword.keyword == kwd)
+            .group_by(Paper.year)
+            .all()
+        )
+        return years
+
+    @staticmethod
+    def get_tokens(session, no_below=5, no_above=0.5):
+        q = session.query(Paper)
+        corpus_size = q.count()
+        no_above_abs = int(no_above * corpus_size)
+        q2 = (
+            session.query(Keyword, func.count(Keyword.id))
+            .join(PaperKeywords)
+            .join(Paper)
+            .group_by(Keyword.id)
+            .order_by(func.count(Keyword.id).desc())
+            .having(func.count() >= no_below)
+            .having(func.count() <= no_above_abs)
+        )
+        limited_kwds = q2.all()
+        tokens = (
+            [pk.keyword.keyword for pk in paper.keywords if pk.keyword in limited_kwds]
+            for paper in q.all()
+        )
+        return tokens
+
+    def set_dictionary(self, session, no_below=5, no_above=0.5):
+        tokens = self.get_tokens(session, no_below, no_above)
+        self.dct = Dictionary(tokens)
+
+    def set_corpus(self, session):
+        return [self.dct.doc2bow(d) for d in self.get_tokens(session)]
 
 
 def get_spacy_nlp():

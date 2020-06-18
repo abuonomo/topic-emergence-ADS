@@ -1,4 +1,5 @@
 import json
+import ast
 import os
 from html import unescape
 from html.parser import HTMLParser
@@ -253,16 +254,26 @@ def is_nu_like(s):
         return False
 
 
-def filter_kwds_inner(kwd_df, threshold=50, score_thresh=1.3, hard_limit=10_000):
+def filter_kwds_inner(
+    kwd_df, threshold=50, score_thresh=1.3, hard_limit=10_000, drop_features=None
+):
     LOG.info(f"Only getting keywords which occur in more than {threshold} docs.")
     lim_kwd_df = (
         kwd_df.query(f"doc_id_count > {threshold}")
         .query(f"score_mean > {score_thresh}")
         .sort_values("score_mean", ascending=False)
-        .iloc[0:hard_limit]
     )
-    tdf = lim_kwd_df.drop(lim_kwd_df.index[lim_kwd_df['stem'].apply(lambda x: len(x.strip()) == 1)])
-    tdf = tdf.drop(tdf.index[tdf['stem'].apply(is_nu_like)])
+    if drop_features is not None:
+        t0 = lim_kwd_df.shape[0]
+        lim_kwd_df = lim_kwd_df.loc[lim_kwd_df['stem'].apply(lambda x: x not in drop_features)]
+        t1 = lim_kwd_df.shape[0]
+        tt = t0 - t1
+        LOG.info(f'Dropped {tt} features using drop features list.')
+    lim_kwd_df = lim_kwd_df.iloc[0:hard_limit]
+    tdf = lim_kwd_df.drop(
+        lim_kwd_df.index[lim_kwd_df["stem"].apply(lambda x: len(x.strip()) == 1)]
+    )
+    tdf = tdf.drop(tdf.index[tdf["stem"].apply(is_nu_like)])
     return tdf
 
 
@@ -279,20 +290,34 @@ def cli():
 @click.option("--score_thresh", type=float)
 @click.option("--hard_limit", type=int)
 @click.option("--year_min", type=int, default=0)
+@click.option("--drop_feature_loc", type=Path, default=None)
 def filter_kwds(
-    infile, out_loc, year_count_loc, threshold, score_thresh, hard_limit, year_min
+    infile,
+    out_loc,
+    year_count_loc,
+    threshold,
+    score_thresh,
+    hard_limit,
+    year_min=0,
+    drop_feature_loc=None,
 ):
     """
     Filter keywords by total frequency and score. Also provide hard limit.
     """
     LOG.info(f"Reading from {infile}")
     df = pd.read_json(infile, orient="records", lines=True)
+
     LOG.info(f"Reading year counts from {year_count_loc}.")
     year_count_df = pd.read_csv(year_count_loc, index_col=0)
+
     years = year_count_df["year"].sort_values().values
     dropycols = [f"{y}_sum" for y in years if y < year_min]
     df = df.drop(dropycols, axis=1)
-    lim_kwd_df = filter_kwds_inner(df, threshold, score_thresh, hard_limit)
+
+    if drop_feature_loc is not None:
+        with open(drop_feature_loc, "r") as f0:
+            drop_features = list(ast.literal_eval(f0.read()).keys())
+    lim_kwd_df = filter_kwds_inner(df, threshold, score_thresh, hard_limit, drop_features)
     LOG.info(f"Writing dataframe with size {lim_kwd_df.shape[0]} to {out_loc}.")
     lim_kwd_df.to_json(out_loc, orient="records", lines=True)
 

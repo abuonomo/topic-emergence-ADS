@@ -108,6 +108,7 @@ bootstrap: $(RECORDS_LOC)
 
 
 FILT_KWDS_LOC=$(DATA_DIR)/all_keywords_threshold_$(FREQ)_$(SCORE)_$(HARD).jsonl
+DROP_FEATURE_LOC=config/drop_features.json
 ## Filter keywords by total frequency and rake score. Also provide hard limit.
 get-filtered-kwds: $(FILT_KWDS_LOC)
 $(FILT_KWDS_LOC): $(ALL_KWDS_LOC)
@@ -116,7 +117,8 @@ $(FILT_KWDS_LOC): $(ALL_KWDS_LOC)
 		--infile $(ALL_KWDS_LOC) \
 		--out_loc $(FILT_KWDS_LOC) \
 		--threshold $(FREQ) --score_thresh=$(SCORE) --hard_limit $(HARD) \
-		--year_count_loc $(YEAR_COUNT_LOC) --year_min $(YEAR_MIN)
+		--year_count_loc $(YEAR_COUNT_LOC) --year_min $(YEAR_MIN) \
+		--drop_feature_loc $(DROP_FEATURE_LOC)
 
 
 NORM_KWDS_LOC=$(DATA_DIR)/all_keywords_norm_threshold_$(FREQ)_$(SCORE)_$(HARD).jsonl

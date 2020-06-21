@@ -1,11 +1,16 @@
 import json
 from html import unescape
-from typing import Dict, Union
 
 import click
+import dask
 import logging
+import pandas as pd
 import spacy
+import yaml
 from gensim.corpora import Dictionary
+from gensim.corpora import MmCorpus
+from gensim.models.coherencemodel import CoherenceModel
+from gensim.models.ldamodel import LdaModel
 from pathlib import Path
 from spacy.lang.char_classes import ALPHA, ALPHA_LOWER, ALPHA_UPPER
 from spacy.lang.char_classes import CONCAT_QUOTES, LIST_ELLIPSES, LIST_ICONS
@@ -17,6 +22,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.orm import sessionmaker
 from textacy.ke import textrank
 from tqdm import tqdm
+from typing import Dict, Union
 
 from extract_keywords import strip_tags
 
@@ -68,6 +74,14 @@ class Paper(BASE):
         text = unescape(text)
         text = strip_tags(text)
         return text
+
+    def get_tokens(self):
+        tokens0 = [
+            [pk.keyword.keyword] * pk.count
+            for pk in p.keywords
+            if pk.keyword_id in kwd_ids
+        ]
+        tokens = [t for ts in tokens0 for t in ts]
 
 
 class Keyword(BASE):
@@ -213,16 +227,50 @@ class PaperKeywordExtractor:
 
 
 class PaperOrganizer:
-
-    def __init__(self, no_below=5, no_above=0.5, min_mean_score=0):
+    def __init__(
+        self,
+        no_below=5,
+        no_above=0.5,
+        min_mean_score=0,
+        year_min=None,
+        year_max=None,
+        journal_blacklist=None,
+    ):
         self.no_below = no_below
         self.no_above = no_above
         self.min_mean_score = min_mean_score
+        self.year_min = year_min
+        self.year_max = year_max
+        self.journal_blacklist = journal_blacklist
+        self.dictionary = None
+        self.corpus = None
 
     @staticmethod
     def get_year_counts(session):
         q = session.query(Paper.year, func.count(Paper.year))
         return q.group_by(Paper.year).all()
+
+    def get_all_kwd_years(self, session):
+        kwd_query = self._get_filtered_keywords(session)
+        kwd_ids = (k.id for k, v, c in kwd_query)
+        years_query = (
+            session.query(Paper.year, PaperKeywords.keyword_id, func.count(Paper.year))
+            .join(PaperKeywords)
+            .join(Keyword)
+            .filter(Keyword.id.in_(kwd_ids))
+            .group_by(Keyword.id)
+            .group_by(Paper.year)
+        )
+        if self.year_min is not None:
+            years_query = years_query.filter(Paper.year >= self.year_min)
+        if self.year_max is not None:
+            years_query = years_query.filter(Paper.year <= self.year_max)
+        years = years_query.all()
+        records = [{"year": y[0], "keyword_id": y[1], "count": y[2]} for y in years]
+        df = pd.DataFrame(records)
+        ydf = df.pivot(index="keyword_id", columns="year", values="count").fillna(0)
+        ydf = ydf.loc[:, sorted(ydf.columns)]
+        return ydf
 
     def get_kwd_years(self, session, kwd):
         years = (
@@ -247,6 +295,10 @@ class PaperOrganizer:
         return fy
 
     def get_filtered_keywords(self, session):
+        kwd_query = self._get_filtered_keywords(session)
+        return kwd_query.all()
+
+    def _get_filtered_keywords(self, session):
         corpus_size = session.query(Paper).count()
         no_above_abs = int(self.no_above * corpus_size)
         kwd_query = (
@@ -261,16 +313,64 @@ class PaperOrganizer:
             .having(func.count() <= no_above_abs)
             .having(func.avg(PaperKeywords.score) >= self.min_mean_score)
         )
-        return kwd_query.all()
+        return kwd_query
 
     def get_tokens(self, session):
         kwds = self.get_filtered_keywords(session)
         q = session.query(Paper)
-        tokens = (
-            [pk.keyword.keyword for pk in paper.keywords if pk.keyword in kwds]
-            for paper in q.all()
-        )
+        kwd_ids = [k.id for k, _, _ in kwds]
+        tokens = []
+        for p in tqdm(q, total=q.count()):
+            tokens0 = [
+                [pk.keyword.keyword] * pk.count
+                for pk in p.keywords
+                if pk.keyword_id in kwd_ids
+            ]
+            paper_tokens = [t for ts in tokens0 for t in ts]
+            tokens.append(paper_tokens)
         return tokens
+
+    def make_all_topic_models(self, session, topic_range, **kwargs):
+        # cluster = LocalCluster(silence_logs=False)
+        # client = Client(cluster)
+        # LOG.info(f"Dask dashboard: {client.dashboard_link}")
+        gensim_logger = logging.getLogger("gensim")
+        gensim_logger.setLevel(logging.DEBUG)
+        LOG.setLevel(logging.DEBUG)
+        tokens = self.get_tokens(session)
+        self.dictionary = Dictionary(tokens)
+        self.corpus = [self.dictionary.doc2bow(ts) for ts in tokens]
+
+        @dask.delayed
+        def make_topic_model(n_topics):
+            LOG.warning(f"Making topic model with {n_topics} topics.")
+            lda = LdaModel(
+                self.corpus, id2word=self.dictionary, num_topics=n_topics, **kwargs
+            )
+            return lda
+
+        jobs = []
+        for t in topic_range:
+            j = make_topic_model(t)
+            jobs.append(j)
+        ldas = dask.compute(jobs)[0]
+        return ldas
+
+    def get_coherences(self, lda_models):
+        coherences = []
+        coh_pbar = tqdm(lda_models)
+        for lda_model in coh_pbar:
+            coh_pbar.set_description(f"n_topics={lda_model.num_topics}")
+            cm = CoherenceModel(
+                model=lda_model,
+                corpus=self.corpus,
+                coherence="u_mass",  # Only u_mass because tokens overlap and are out of order
+                dictionary=self.dictionary,
+            )
+            coherence = cm.get_coherence()  # get coherence value
+            coherences.append(coherence)
+
+        return coherences
 
     def set_dictionary(self, session):
         tokens = self.get_tokens(session)
@@ -357,6 +457,49 @@ def add_missed_locations(db_loc):
     # See https://docs.sqlalchemy.org/en/13/faq/performance.html#i-m-inserting-400-000-rows-with-the-orm-and-it-s-really-slow
     engine.execute(PaperKeywords.__table__.insert(), records)
     LOG.info(f"Added {len(records)} missed locations.")
+
+
+@cli.command()
+@click.option("--config_loc", type=Path)
+@click.option("--out_models_dir", type=Path)
+@click.option("--db_loc", type=Path)
+def make_topic_models(db_loc, config_loc, out_models_dir):
+    with open(config_loc, "r") as f0:
+        config = yaml.safe_load(f0)
+
+    engine = create_engine(f"sqlite:///{db_loc}")
+
+    Session = sessionmaker(bind=engine)
+    session = Session()
+
+    try:
+        LOG.info(f"Running with config: {config}")
+        po = PaperOrganizer(**config["paper_organizer"])
+        models = po.make_all_topic_models(
+            session, config["topic_range"], **config["lda"],
+        )
+        session.commit()
+        LOG.info(f"Got records for PaperKeywords to be added.")
+    except:
+        LOG.warning(f"Aborted extracting keywords.")
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+    out_models_dir.mkdir(exist_ok=True)
+    for m in models:
+        mp = out_models_dir / f"topic_model{m.num_topics}"
+        LOG.info(f"Writing model to {mp}")
+        m.save(str(mp))
+
+    od = out_models_dir / "dictionary"
+    LOG.info(f"Writing dictionary to {od}")
+    po.dictionary.save(str(od))
+
+    oc = out_models_dir / "corpus.mm"
+    LOG.info(f"Writing corpus to {oc}")
+    MmCorpus.serialize((str(oc)), po.corpus)
 
 
 @cli.command()

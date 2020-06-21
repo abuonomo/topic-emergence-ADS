@@ -261,6 +261,8 @@ class PaperOrganizer:
             .group_by(Keyword.id)
             .group_by(Paper.year)
         )
+        for j in self.journal_blacklist:
+            years_query = years_query.filter(~Paper.bibcode.contains(j))
         if self.year_min is not None:
             years_query = years_query.filter(Paper.year >= self.year_min)
         if self.year_max is not None:
@@ -273,14 +275,16 @@ class PaperOrganizer:
         return ydf
 
     def get_kwd_years(self, session, kwd):
-        years = (
+        years_query = (
             session.query(Paper.year, func.count(Paper.year))
             .join(PaperKeywords)
             .join(Keyword)
             .filter(Keyword.keyword == kwd)
             .group_by(Paper.year)
-            .all()
         )
+        for j in self.journal_blacklist:
+            years_query = years_query.filter(~Paper.bibcode.contains(j))
+        years = years_query.all()
         yd = dict(years)
         fy = {}
         years = [y for y, c in self.get_year_counts(session)]
@@ -313,11 +317,15 @@ class PaperOrganizer:
             .having(func.count() <= no_above_abs)
             .having(func.avg(PaperKeywords.score) >= self.min_mean_score)
         )
+        for j in self.journal_blacklist:
+            kwd_query = kwd_query.filter(~Paper.bibcode.contains(j))
         return kwd_query
 
     def get_tokens(self, session):
         kwds = self.get_filtered_keywords(session)
         q = session.query(Paper)
+        for j in self.journal_blacklist:
+            q = q.filter(~Paper.bibcode.contains(j))
         kwd_ids = [k.id for k, _, _ in kwds]
         tokens = []
         for p in tqdm(q, total=q.count()):

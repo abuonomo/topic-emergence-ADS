@@ -2,7 +2,9 @@ import json
 from html import unescape
 
 import click
+import dask.bag as db
 import dask
+from math import ceil
 import logging
 import pandas as pd
 import spacy
@@ -53,6 +55,13 @@ class PaperKeywords(BASE):
     def __repr__(self):
         return f'<PaperKeywords(paper_bibcode="{self.paper_bibcode}", keyword.keyword="{self.keyword.keyword}")>'
 
+    def to_dict(self):
+        return {
+            k: v
+            for k, v in self.__dict__.items()
+            if k not in ["_sa_instance_state", "keyword"]
+        }
+
 
 class Paper(BASE):
     __tablename__ = "papers"
@@ -74,6 +83,15 @@ class Paper(BASE):
         text = unescape(text)
         text = strip_tags(text)
         return text
+
+    def to_dict(self):
+        d = {
+            k: v
+            for k, v in self.__dict__.items()
+            if k not in ["_sa_instance_state", "keywords"]
+        }
+        d["keyword_ids"] = [k.keyword_id for k in self.keywords]
+        return d
 
 
 class Keyword(BASE):
@@ -157,7 +175,24 @@ class PaperKeywordExtractor:
         kwd_counts = [(k, v, text.count(k.lower())) for k, v in kwds]
         return text, kwd_counts
 
-    def get_missed_keyword_locations(self, session, no_below=0, no_above=1.0):
+    def f(self, paper_dict, paper_kwds, pbar):
+        records = []
+        for k in paper_kwds:
+            if (
+                k["keyword_id"] in paper_dict["keyword_ids"]
+            ):  # Don't add keyword if its already there.
+                continue
+            elif k["raw_keyword"].lower() in paper_dict["lemma_text"]:
+                r = self.get_pk_dict(paper_dict, k)
+                records.append(r)
+            else:
+                continue
+        pbar.update(1)
+        return records
+
+    def get_missed_keyword_locations(
+        self, session, no_below=0, no_above=1.0, npartitions=1000
+    ):
         """
         For each keyword, find papers where singlerank did not identify that keyword,
         but the keyword is present in the abstract or title.
@@ -168,6 +203,7 @@ class PaperKeywordExtractor:
                 han this many times
             no_above: Do not find papers for keywords which occur in more than this
                 fraction of the corpus
+            npartitions: number of partitions for dask delayed computation
 
         Returns:
             list of dictionaries, each a record to be added to the PaperKeywords table.
@@ -182,28 +218,36 @@ class PaperKeywordExtractor:
             .having(func.count() >= no_below)
             .having(func.count() <= no_above_abs)
         )
-        papers = corpus_query.all()
-        records = []
-        pks = pkq.all()
-        for p in tqdm(papers):
-            kwd_ids = [k.keyword_id for k in p.keywords]
-            for k in pks:
-                if k.keyword_id in kwd_ids:  # Don't add keyword if its already there.
-                    continue
-                elif k.raw_keyword.lower() in p.lemma_text:
-                        r = self.get_pk_dict(p, k)
-                        records.append(r)
-                else:
-                    continue
+        papers = [p.to_dict() for p in corpus_query.all()]
+        pks = [pk.to_dict() for pk in pkq.all()]
+
+        def make_batch(papers, paper_kwds, pbar):
+            sub_results = []
+            for p in papers:
+                sub_results.append(self.f(p, paper_kwds, pbar))
+            return sub_results
+
+        batches = []
+        pbar = tqdm(papers)
+        batch_size = ceil(len(papers) / npartitions)
+        for i in range(0, len(papers), batch_size):
+            sub_papers = papers[i : i + batch_size]
+            result_batch = dask.delayed(make_batch)(sub_papers, pks, pbar)
+            batches.append(result_batch)
+
+        records_batches = dask.compute(*batches)
+        records = [
+            r for batch in records_batches for paper_set in batch for r in paper_set
+        ]
         return records
 
     @staticmethod
-    def get_pk_dict(p: Paper, paper_kwd: PaperKeywords) -> Dict[str, Union[str, int]]:
-        count = p.lemma_text.count(paper_kwd.raw_keyword.lower())
+    def get_pk_dict(paper_dict: Dict, paper_kwd: Dict) -> Dict[str, Union[str, int]]:
+        count = paper_dict["lemma_text"].count(paper_kwd["raw_keyword"].lower())
         record = {
-            "raw_keyword": paper_kwd.raw_keyword,
-            "keyword_id": paper_kwd.keyword.id,
-            "paper_bibcode": p.bibcode,
+            "raw_keyword": paper_kwd["raw_keyword"],
+            "keyword_id": paper_kwd["keyword_id"],
+            "paper_bibcode": paper_dict["bibcode"],
             "count": count,
         }
         return record
@@ -330,16 +374,14 @@ class PaperOrganizer:
         self.corpus = [self.dictionary.doc2bow(ts) for ts in tokens]
 
         @dask.delayed
-        def make_topic_model(n_topics):
+        def make_topic_model(n_topics, dct, **kwargs):
             LOG.warning(f"Making topic model with {n_topics} topics.")
-            lda = LdaModel(
-                self.corpus, id2word=self.dictionary, num_topics=n_topics, **kwargs
-            )
+            lda = LdaModel(self.corpus, id2word=dct, num_topics=n_topics, **kwargs)
             return lda
 
         jobs = []
         for t in topic_range:
-            j = make_topic_model(t)
+            j = make_topic_model(t, self.dictionary, **kwargs)
             jobs.append(j)
         ldas = dask.compute(jobs)[0]
         return ldas

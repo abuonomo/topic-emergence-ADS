@@ -270,10 +270,7 @@ class PaperOrganizer:
         years = years_query.all()
         yd = dict(years)
         fy = {}
-        years = [y for y, c in self.get_year_counts(session)]
-        year_min = min(years)
-        year_max = max(years)
-        for y in range(year_min, year_max):
+        for y in range(self.year_min, self.year_max):
             if y in yd:
                 c = yd[y]
             else:

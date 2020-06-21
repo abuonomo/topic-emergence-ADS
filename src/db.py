@@ -75,14 +75,6 @@ class Paper(BASE):
         text = strip_tags(text)
         return text
 
-    def get_tokens(self):
-        tokens0 = [
-            [pk.keyword.keyword] * pk.count
-            for pk in p.keywords
-            if pk.keyword_id in kwd_ids
-        ]
-        tokens = [t for ts in tokens0 for t in ts]
-
 
 class Keyword(BASE):
     __tablename__ = "keywords"
@@ -181,7 +173,8 @@ class PaperKeywordExtractor:
             list of dictionaries, each a record to be added to the PaperKeywords table.
 
         """
-        corpus_size = session.query(Paper).count()
+        corpus_query = session.query(Paper)
+        corpus_size = corpus_query.count()
         no_above_abs = int(no_above * corpus_size)
         pkq = (
             session.query(PaperKeywords)
@@ -189,29 +182,19 @@ class PaperKeywordExtractor:
             .having(func.count() >= no_below)
             .having(func.count() <= no_above_abs)
         )
+        papers = corpus_query.all()
         records = []
-        with session.no_autoflush:
-            pbar = tqdm(pkq, total=pkq.count())
-            for paper_kwd in pbar:
-                pbar.set_description(paper_kwd.raw_keyword)
-                q = (
-                    session.query(Paper)
-                    .filter(
-                        ~Paper.keywords.any(
-                            PaperKeywords.keyword_id == paper_kwd.keyword_id
-                        )
-                    )
-                    .filter(
-                        or_(
-                            Paper.title.contains(paper_kwd.raw_keyword),
-                            Paper.abstract.contains(paper_kwd.raw_keyword),
-                        )
-                    )
-                )
-                papers = q.all()
-                for p in papers:
-                    d = self.get_pk_dict(p, paper_kwd)
-                    records.append(d)
+        pks = pkq.all()
+        for p in tqdm(papers):
+            kwd_ids = [k.keyword_id for k in p.keywords]
+            for k in pks:
+                if k.keyword_id in kwd_ids:  # Don't add keyword if its already there.
+                    continue
+                elif k.raw_keyword.lower() in p.lemma_text:
+                        r = self.get_pk_dict(p, k)
+                        records.append(r)
+                else:
+                    continue
         return records
 
     @staticmethod
@@ -442,7 +425,13 @@ def get_keywords_from_texts(db_loc):
 
 @cli.command()
 @click.option("--db_loc", type=Path)
-def add_missed_locations(db_loc):
+@click.option("--config_loc", type=Path)
+def add_missed_locations(db_loc, config_loc):
+    with open(config_loc, "r") as f0:
+        config = yaml.safe_load(f0)
+    no_below = config["extraction"]["no_below"]
+    no_above = config["extraction"]["no_above"]
+
     engine = create_engine(f"sqlite:///{db_loc}")
 
     Session = sessionmaker(bind=engine)
@@ -451,11 +440,13 @@ def add_missed_locations(db_loc):
     try:
         nlp = get_spacy_nlp()
         pm = PaperKeywordExtractor(nlp)
-        records = pm.get_missed_keyword_locations(session, no_below=100, no_above=0.25)
+        records = pm.get_missed_keyword_locations(
+            session, no_below=no_below, no_above=no_above
+        )
         session.commit()
         LOG.info(f"Got records for PaperKeywords to be added.")
     except:
-        LOG.warning(f"Aborted extracting keywords.")
+        LOG.warning(f"Aborted finding missed locations.")
         session.rollback()
         raise
     finally:

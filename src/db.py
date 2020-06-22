@@ -268,7 +268,10 @@ class PaperOrganizer:
         self.min_mean_score = min_mean_score
         self.year_min = year_min
         self.year_max = year_max
-        self.journal_blacklist = journal_blacklist
+        if journal_blacklist is not None:
+            self.journal_blacklist = journal_blacklist
+        else:
+            self.journal_blacklist = []
         self.dictionary = None
         self.corpus = None
 

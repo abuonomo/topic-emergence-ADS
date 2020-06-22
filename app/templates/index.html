@@ -183,13 +183,16 @@
       .then(function (data){
         console.log(data['count_min']);
         console.log(data['count_max']);
+
+        let third_stand = Math.trunc(data['count_mean'] + 3 * data['count_std']);
+
         sliderSimple = d3
         .sliderBottom()
         .min(data['count_min'])
-        .max(data['count_max'])
+        .max(d3.min([data['count_max'], third_stand]))
         .width(150)
         .ticks(5)
-        .tickFormat(d3.format(".1s"))
+        .tickFormat(d3.format(".2s"))
         .step(1)
         .default(0);
 

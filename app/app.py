@@ -237,6 +237,8 @@ def get_count_range():
     d = {
         'count_min': int(app.config['SC_DF']['count'].min()),
         'count_max': int(app.config['SC_DF']['count'].max()),
+        'count_std': float(app.config['SC_DF']['count'].std()),
+        'count_mean': float(app.config['SC_DF']['count'].mean())
     }
     return jsonify(d)
 

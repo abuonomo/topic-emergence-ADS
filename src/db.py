@@ -272,9 +272,10 @@ class PaperOrganizer:
         self.dictionary = None
         self.corpus = None
 
-    @staticmethod
-    def get_year_counts(session):
+    def get_year_counts(self, session):
         q = session.query(Paper.year, func.count(Paper.year))
+        for j in self.journal_blacklist:
+            q = q.filter(~Paper.bibcode.contains(j))
         return q.group_by(Paper.year).all()
 
     def get_all_kwd_years(self, session):

@@ -112,8 +112,10 @@ def init():
     app.config["SC_DF"]["kmeans_cluster"] = app.config["KMEANS"].labels_
     log_count = np.log(app.config["SC_DF"]["count"])
 
-    import ipdb; ipdb.set_trace()
-    app.config["KWD_SC_DF"]["kmeans_cluster"] = app.config["KWD_KMEANS"].labels_
+    try:
+        app.config["KWD_SC_DF"]["kmeans_cluster"] = app.config["KWD_KMEANS"].labels_
+    except ValueError:
+        app.config["KWD_SC_DF"]["kmeans_cluster"] = 0
 
     scaler = MinMaxScaler(feature_range=(3, 10))
     app.config["SC_DF"]["scaled_counts"] = scaler.fit_transform(

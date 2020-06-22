@@ -232,6 +232,24 @@ def get_time_data_inner(data, n_df, sc_df):
     return ts_recs
 
 
+@app.route("/get-count-range", methods=['GET'])
+def get_count_range():
+    d = {
+        'count_min': int(app.config['SC_DF']['count'].min()),
+        'count_max': int(app.config['SC_DF']['count'].max()),
+    }
+    return jsonify(d)
+
+
+@app.route("/get-score-range", methods=['GET'])
+def get_score_range():
+    d = {
+        'score_min': int(app.config['SC_DF']['score_mean'].min()),
+        'score_max': int(app.config['SC_DF']['score_mean'].max()),
+    }
+    return jsonify(d)
+
+
 @app.route("/get-time-data", methods=["GET", "POST"])
 def get_time_data():
     data = request.json

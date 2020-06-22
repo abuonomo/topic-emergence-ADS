@@ -1,10 +1,9 @@
 import json
 from html import unescape
+from pprint import pformat
 
 import click
-import dask.bag as db
 import dask
-from math import ceil
 import logging
 import pandas as pd
 import spacy
@@ -13,18 +12,19 @@ from gensim.corpora import Dictionary
 from gensim.corpora import MmCorpus
 from gensim.models.coherencemodel import CoherenceModel
 from gensim.models.ldamodel import LdaModel
+from math import ceil
 from pathlib import Path
 from spacy.lang.char_classes import ALPHA, ALPHA_LOWER, ALPHA_UPPER
 from spacy.lang.char_classes import CONCAT_QUOTES, LIST_ELLIPSES, LIST_ICONS
 from spacy.util import compile_infix_regex
 from sqlalchemy import Column, Integer, String, ForeignKey, Boolean, Float
-from sqlalchemy import create_engine, func, or_
+from sqlalchemy import create_engine, func
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy.orm import sessionmaker
 from textacy.ke import textrank
 from tqdm import tqdm
-from typing import Dict, Union
+from typing import Dict, Union, Generator
 
 from extract_keywords import strip_tags
 
@@ -345,22 +345,24 @@ class PaperOrganizer:
             kwd_query = kwd_query.filter(~Paper.bibcode.contains(j))
         return kwd_query
 
-    def get_tokens(self, session):
+    def get_tokens(self, session) -> Generator:
         kwds = self.get_filtered_keywords(session)
         q = session.query(Paper)
         for j in self.journal_blacklist:
             q = q.filter(~Paper.bibcode.contains(j))
         kwd_ids = [k.id for k, _, _ in kwds]
-        tokens = []
-        for p in tqdm(q, total=q.count()):
-            tokens0 = [
-                [pk.keyword.keyword] * pk.count
-                for pk in p.keywords
-                if pk.keyword_id in kwd_ids
-            ]
-            paper_tokens = [t for ts in tokens0 for t in ts]
-            tokens.append(paper_tokens)
+        tokens = (self.get_doc_tokens(p, kwd_ids) for p in tqdm(q, total=q.count()))
         return tokens
+
+    @staticmethod
+    def get_doc_tokens(p, kwd_ids):
+        tokens0 = [
+            [pk.keyword.keyword] * pk.count
+            for pk in p.keywords
+            if pk.keyword_id in kwd_ids
+        ]
+        paper_tokens = [t for ts in tokens0 for t in ts]
+        return paper_tokens
 
     def make_all_topic_models(self, session, topic_range, **kwargs):
         # cluster = LocalCluster(silence_logs=False)
@@ -371,6 +373,7 @@ class PaperOrganizer:
         LOG.setLevel(logging.DEBUG)
         tokens = self.get_tokens(session)
         self.dictionary = Dictionary(tokens)
+        tokens = self.get_tokens(session)
         self.corpus = [self.dictionary.doc2bow(ts) for ts in tokens]
 
         @dask.delayed
@@ -511,7 +514,7 @@ def make_topic_models(db_loc, config_loc, out_models_dir):
     session = Session()
 
     try:
-        LOG.info(f"Running with config: {config}")
+        LOG.info(f"Running with config: \n {pformat(config)}")
         po = PaperOrganizer(**config["paper_organizer"])
         models = po.make_all_topic_models(
             session, config["topic_range"], **config["lda"],

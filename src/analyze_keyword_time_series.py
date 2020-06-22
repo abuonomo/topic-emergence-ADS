@@ -140,7 +140,6 @@ def dtw_to_tboard(normed_kwd_years, dtw_df, c=6, lim=1000):
     # TODO: Used elbow to determine, but not being placed programmatically
     LOG.info(f"Performing kmeans with {c} clusters.")
     m = KMeans(n_clusters=c)
-    dtw_df = dtw_df.fillna(0)
     m.fit(dtw_df.values)
     return m
 

@@ -530,7 +530,7 @@ def run_gensim_lda_mult(
     if len(topic_range) == 0:
         ValueError("Topic range is an empty list.")
 
-    c_measures = ["u_mass", "c_v"]
+    c_measures = ["u_mass"]
     df = run_gensim_lda_mult_inner(
         topic_range,
         dct,

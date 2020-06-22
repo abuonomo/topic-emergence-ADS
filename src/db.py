@@ -5,15 +5,18 @@ from pprint import pformat
 import click
 import dask
 import logging
+import numpy as np
 import pandas as pd
 import spacy
 import yaml
 from gensim.corpora import Dictionary
 from gensim.corpora import MmCorpus
+from gensim.matutils import Sparse2Corpus
 from gensim.models.coherencemodel import CoherenceModel
 from gensim.models.ldamodel import LdaModel
 from math import ceil
 from pathlib import Path
+from scipy.sparse import coo_matrix
 from spacy.lang.char_classes import ALPHA, ALPHA_LOWER, ALPHA_UPPER
 from spacy.lang.char_classes import CONCAT_QUOTES, LIST_ELLIPSES, LIST_ICONS
 from spacy.util import compile_infix_regex
@@ -272,8 +275,6 @@ class PaperOrganizer:
             self.journal_blacklist = journal_blacklist
         else:
             self.journal_blacklist = []
-        self.dictionary = None
-        self.corpus = None
 
     def get_year_counts(self, session):
         q = session.query(Paper.year, func.count(Paper.year))
@@ -368,27 +369,71 @@ class PaperOrganizer:
         paper_tokens = [t for ts in tokens0 for t in ts]
         return paper_tokens
 
-    def make_all_topic_models(self, session, topic_range, **kwargs):
+    def get_corpus_and_dictionary(self, session):
+        LOG.info("Getting filtered keywords")
+        kwd_query = self._get_filtered_keywords(session)
+        kwds, _, _ = zip(*kwd_query.all())
+        kwd_ids = [k.id for k in kwds]
+
+        q = (
+            session.query(
+                PaperKeywords.paper_bibcode,
+                PaperKeywords.keyword_id,
+                PaperKeywords.count,
+            )
+            .filter(PaperKeywords.keyword_id.in_(kwd_ids))
+            .group_by(PaperKeywords.paper_bibcode)
+            .order_by(PaperKeywords.paper_bibcode)
+        )
+
+        LOG.info("Getting bibcode, keyword, counts")
+        bibs, keyword_ids, counts = zip(*q)
+
+        ind2sql = {
+            "corp2bib": {i: b for i, b in enumerate(set(bibs))},
+            "dct2kwd": {i: k for i, k in enumerate(set(keyword_ids))},
+        }
+        sql2ind = {
+            "bib2corp": {b: i for i, b in ind2sql['corp2bib'].items()},
+            "kwd2dct": {k: i for i, k in ind2sql['dct2kwd'].items()},
+        }
+        corp_inds = [sql2ind['bib2corp'][b] for b in bibs]
+        dct_inds = [sql2ind['kwd2dct'][k] for k in keyword_ids]
+
+        LOG.info("Getting gensim corpus.")
+        coo_corpus = ((b, k, c) for b, k, c in zip(corp_inds, dct_inds, counts))
+        a = np.fromiter(coo_corpus, dtype=[("row", int), ("col", int), ("value", int)])
+        mat = coo_matrix((a["value"], (a["row"], a["col"])))
+        corpus = Sparse2Corpus(mat)
+
+        q = session.query(Keyword.id, Keyword.keyword).filter(
+            Keyword.id.in_(set(keyword_ids))
+        )
+
+        LOG.info("Getting gensim dictionary.")
+        id2word = {sql2ind['kwd2dct'][i]: k for i, k in q}
+        dct = Dictionary.from_corpus(corpus, id2word=id2word)
+
+        return corpus, dct, ind2sql, sql2ind
+
+    @staticmethod
+    def make_all_topic_models(corpus, dct, topic_range, **kwargs):
         # cluster = LocalCluster(silence_logs=False)
         # client = Client(cluster)
         # LOG.info(f"Dask dashboard: {client.dashboard_link}")
         gensim_logger = logging.getLogger("gensim")
         gensim_logger.setLevel(logging.DEBUG)
         LOG.setLevel(logging.DEBUG)
-        tokens = self.get_tokens(session)
-        self.dictionary = Dictionary(tokens)
-        tokens = self.get_tokens(session)
-        self.corpus = [self.dictionary.doc2bow(ts) for ts in tokens]
 
         @dask.delayed
-        def make_topic_model(n_topics, dct, **kwargs):
+        def make_topic_model(n_topics, c, d, **kwargs):
             LOG.warning(f"Making topic model with {n_topics} topics.")
-            lda = LdaModel(self.corpus, id2word=dct, num_topics=n_topics, **kwargs)
+            lda = LdaModel(c, id2word=d, num_topics=n_topics, **kwargs)
             return lda
 
         jobs = []
         for t in topic_range:
-            j = make_topic_model(t, self.dictionary, **kwargs)
+            j = make_topic_model(t, corpus, dct, **kwargs)
             jobs.append(j)
         ldas = dask.compute(jobs)[0]
         return ldas
@@ -445,6 +490,45 @@ def get_spacy_nlp():
 @click.group()
 def cli():
     pass
+
+
+@cli.command()
+@click.option("--db_loc", type=Path)
+@click.option("--config_loc", type=Path)
+@click.option("--prepared_data_dir", type=Path)
+def prepare_for_lda(db_loc, config_loc, prepared_data_dir):
+
+    with open(config_loc, 'r') as f0:
+        config = yaml.safe_load(f0)
+    LOG.info(f"Using config: \n {pformat(config)}")
+
+    engine = create_engine(f"sqlite:///{db_loc}")
+
+    Session = sessionmaker(bind=engine)
+    session = Session()
+
+    try:
+        po = PaperOrganizer(**config["paper_organizer"])
+        corpus, dct, ind2sql, sql2ind = po.get_corpus_and_dictionary(session)
+    except:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+    out_corp = prepared_data_dir / "corpus.mm"
+    out_dct = prepared_data_dir / "dct.mm"
+    out_ind2sql = prepared_data_dir / "ind2sql.json"
+    out_sql2ind = prepared_data_dir / "sql2ind.json"
+
+    LOG.info(f"Writing corpus, dct, ind2sql, sql2ind to {prepared_data_dir}")
+    prepared_data_dir.mkdir(exist_ok=True)
+    MmCorpus.serialize(str(out_corp), corpus)
+    dct.save(str(out_dct))
+    with open(out_ind2sql, 'w') as f0:
+        json.dump(ind2sql, f0)
+    with open(out_sql2ind, 'w') as f0:
+        json.dump(sql2ind, f0)
 
 
 @cli.command()

@@ -254,6 +254,8 @@
             .text(function (d) { return d; }) // text showed in the menu
             .attr("value", function (d) { return d; }); // corresponding value returned by the button
 
+            d3.select('#selectButtonX').property('value', 'nasa_afil');
+
             d3.select("#selectButtonY")
             .selectAll('myOptions')
             .data(options)
@@ -261,6 +263,8 @@
             .append('option')
             .text(function (d) { return d; }) // text showed in the menu
             .attr("value", function (d) { return d; }); // corresponding value returned by the button
+
+            d3.select('#selectButtonY').property('value', 'cagr');
 
             d3.select("#selectButtonXScale")
             .selectAll('myOptions')

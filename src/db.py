@@ -1,6 +1,7 @@
 import json
 from html import unescape
 from pprint import pformat
+from functools import reduce
 
 import click
 import dask
@@ -336,6 +337,7 @@ class PaperOrganizer:
             args = [Keyword, func.count(Keyword.id), func.avg(PaperKeywords.score)]
         corpus_size = session.query(Paper).count()
         no_above_abs = int(self.no_above * corpus_size)
+
         kwd_query = (
             session.query(*args)
             .join(PaperKeywords)
@@ -369,23 +371,32 @@ class PaperOrganizer:
         paper_tokens = [t for ts in tokens0 for t in ts]
         return paper_tokens
 
-    def get_corpus_and_dictionary(self, session):
+    def get_corpus_and_dictionary(self, session, batch_size=999):
+        if batch_size > 999:
+            raise ValueError(
+                f"{batch_size} greater than maximum number of SQLite variables"
+            )
         LOG.info("Getting filtered keywords")
         kwd_query = self._get_filtered_keywords(session, Keyword.id)
 
-        q = (
-            session.query(
-                PaperKeywords.paper_bibcode,
-                PaperKeywords.keyword_id,
-                PaperKeywords.count,
+        num_kwds = kwd_query.count()
+        records = []
+        for i in tqdm(range(0, num_kwds, batch_size)):
+            kwds_batch = [k[0] for k in kwd_query[i: i + batch_size]]
+            q = (
+                session.query(
+                    PaperKeywords.paper_bibcode,
+                    PaperKeywords.keyword_id,
+                    PaperKeywords.count,
+                )
+                .join(Keyword)
+                .filter(PaperKeywords.keyword_id.in_(kwds_batch))
+                .order_by(PaperKeywords.paper_bibcode)
             )
-            .join(Keyword)
-            .filter(PaperKeywords.keyword_id.in_(kwd_query))
-            .order_by(PaperKeywords.paper_bibcode)
-        )
+            records = records + q.all()
 
         LOG.info("Getting bibcode, keyword, counts")
-        bibs, keyword_ids, counts = zip(*q)
+        bibs, keyword_ids, counts = zip(*records)
 
         ind2sql = {
             "corp2bib": {i: b for i, b in enumerate(set(bibs))},

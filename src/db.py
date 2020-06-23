@@ -327,17 +327,17 @@ class PaperOrganizer:
             fy[y] = c
         return fy
 
-    def get_filtered_keywords(self, session):
-        kwd_query = self._get_filtered_keywords(session)
+    def get_filtered_keywords(self, session, *args):
+        kwd_query = self._get_filtered_keywords(session, *args)
         return kwd_query.all()
 
-    def _get_filtered_keywords(self, session):
+    def _get_filtered_keywords(self, session, *args):
+        if len(args) == 0:
+            args = [Keyword, func.count(Keyword.id), func.avg(PaperKeywords.score)]
         corpus_size = session.query(Paper).count()
         no_above_abs = int(self.no_above * corpus_size)
         kwd_query = (
-            session.query(
-                Keyword, func.count(Keyword.id), func.avg(PaperKeywords.score)
-            )
+            session.query(*args)
             .join(PaperKeywords)
             .join(Paper)
             .group_by(Keyword.id)
@@ -371,20 +371,7 @@ class PaperOrganizer:
 
     def get_corpus_and_dictionary(self, session):
         LOG.info("Getting filtered keywords")
-        corpus_size = session.query(Paper).count()
-        no_above_abs = int(self.no_above * corpus_size)
-        kwd_query = (
-            session.query(Keyword.id)
-            .join(PaperKeywords)
-            .join(Paper)
-            .group_by(Keyword.id)
-            .order_by(func.avg(PaperKeywords.score).desc())
-            .having(func.count() >= self.no_below)
-            .having(func.count() <= no_above_abs)
-            .having(func.avg(PaperKeywords.score) >= self.min_mean_score)
-        )
-        for j in self.journal_blacklist:
-            kwd_query = kwd_query.filter(~Paper.bibcode.contains(j))
+        kwd_query = self._get_filtered_keywords(session, Keyword.id)
 
         q = (
             session.query(

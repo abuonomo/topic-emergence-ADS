@@ -371,6 +371,22 @@ class PaperOrganizer:
         paper_tokens = [t for ts in tokens0 for t in ts]
         return paper_tokens
 
+    @staticmethod
+    def get_keyword_batch_records(session, kwds_batch, pbar=None):
+        q = (
+            session.query(
+                PaperKeywords.paper_bibcode,
+                PaperKeywords.keyword_id,
+                PaperKeywords.count,
+            )
+            .join(Keyword)
+            .filter(PaperKeywords.keyword_id.in_(kwds_batch))
+            .order_by(PaperKeywords.paper_bibcode)
+        )
+        if pbar is not None:
+            pbar.update(1)
+        return q.all()
+
     def get_corpus_and_dictionary(self, session, batch_size=999):
         if batch_size > 999:
             raise ValueError(
@@ -380,23 +396,15 @@ class PaperOrganizer:
         kwd_query = self._get_filtered_keywords(session, Keyword.id)
 
         num_kwds = kwd_query.count()
-        records = []
-        for i in tqdm(range(0, num_kwds, batch_size)):
-            kwds_batch = [k[0] for k in kwd_query[i: i + batch_size]]
-            q = (
-                session.query(
-                    PaperKeywords.paper_bibcode,
-                    PaperKeywords.keyword_id,
-                    PaperKeywords.count,
-                )
-                .join(Keyword)
-                .filter(PaperKeywords.keyword_id.in_(kwds_batch))
-                .order_by(PaperKeywords.paper_bibcode)
-            )
-            records = records + q.all()
+        all_records = []
+        pbar = tqdm(range(0, num_kwds, batch_size))
+        for i in pbar:
+            kwds_batch = [k[0] for k in kwd_query[i : i + batch_size]]
+            records = self.get_keyword_batch_records(session, kwds_batch)
+            all_records = all_records + records
 
         LOG.info("Getting bibcode, keyword, counts")
-        bibs, keyword_ids, counts = zip(*records)
+        bibs, keyword_ids, counts = zip(*all_records)
 
         ind2sql = {
             "corp2bib": {i: b for i, b in enumerate(set(bibs))},

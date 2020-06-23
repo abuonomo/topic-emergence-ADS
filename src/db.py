@@ -1,7 +1,9 @@
 import json
 from html import unescape
 from pprint import pformat
+import sqlite3
 from functools import reduce
+from contextlib import closing
 
 import click
 import dask
@@ -397,7 +399,8 @@ class PaperOrganizer:
 
         num_kwds = kwd_query.count()
         all_records = []
-        pbar = tqdm(range(0, num_kwds, batch_size))
+        kwd_batches = range(0, num_kwds, batch_size)
+        pbar = tqdm(kwd_batches)
         for i in pbar:
             kwds_batch = [k[0] for k in kwd_query[i : i + batch_size]]
             records = self.get_keyword_batch_records(session, kwds_batch)
@@ -423,12 +426,16 @@ class PaperOrganizer:
         mat = coo_matrix((a["value"], (a["row"], a["col"])))
         corpus = Sparse2Corpus(mat)
 
-        q = session.query(Keyword.id, Keyword.keyword).filter(
-            Keyword.id.in_(set(keyword_ids))
-        )
+        all_ki = []
+        for i in tqdm(kwd_batches):
+            kwds_batch = [k[0] for k in kwd_query[i : i + batch_size]]
+            q = session.query(Keyword.id, Keyword.keyword).filter(
+                Keyword.id.in_(kwds_batch)
+            )
+            all_ki = all_ki + q.all()
 
         LOG.info("Getting gensim dictionary.")
-        id2word = {sql2ind["kwd2dct"][i]: k for i, k in q}
+        id2word = {sql2ind["kwd2dct"][i]: k for i, k in all_ki}
         dct = Dictionary.from_corpus(corpus, id2word=id2word)
 
         return corpus, dct, ind2sql, sql2ind
@@ -504,6 +511,18 @@ def get_spacy_nlp():
     return nlp
 
 
+# taken from: https://stackoverflow.com/questions/31191727/moving-back-and-forth-between-an-on-disk-database-and-a-fast-in-memory-database/31212306
+def copy_database(source_connection, dest_dbname=":memory:", uri=False):
+    """
+        Return a connection to a new copy of an existing database.
+        Raises an sqlite3.OperationalError if the destination already exists.
+    """
+    script = "".join(source_connection.iterdump())
+    dest_conn = sqlite3.connect(dest_dbname, uri=uri)
+    dest_conn.executescript(script)
+    return dest_conn
+
+
 @click.group()
 def cli():
     pass
@@ -513,13 +532,20 @@ def cli():
 @click.option("--db_loc", type=Path)
 @click.option("--config_loc", type=Path)
 @click.option("--prepared_data_dir", type=Path)
-def prepare_for_lda(db_loc, config_loc, prepared_data_dir):
-
+@click.option("--db_in_memory/--no_db_in_memory", default=False)
+def prepare_for_lda(db_loc, config_loc, prepared_data_dir, db_in_memory=False):
     with open(config_loc, "r") as f0:
         config = yaml.safe_load(f0)
     LOG.info(f"Using config: \n {pformat(config)}")
 
-    engine = create_engine(f"sqlite:///{db_loc}")
+    if db_in_memory is True:
+        LOG.info("Dumping database into memory.")
+        with closing(sqlite3.connect(db_loc)) as disk_db:
+            mem_db = copy_database(disk_db, "file::memory:?cache=shared", uri=True)
+        creator = lambda: sqlite3.connect('file::memory:?cache=shared', uri=True)
+        engine = create_engine('sqlite://', creator=creator)
+    else:
+        engine = create_engine(f"sqlite:///{db_loc}")
 
     Session = sessionmaker(bind=engine)
     session = Session()
@@ -532,6 +558,8 @@ def prepare_for_lda(db_loc, config_loc, prepared_data_dir):
         raise
     finally:
         session.close()
+        if db_in_memory is True:
+            mem_db.close()
 
     out_corp = prepared_data_dir / "corpus.mm"
     out_dct = prepared_data_dir / "dct.mm"

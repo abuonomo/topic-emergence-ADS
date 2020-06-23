@@ -371,9 +371,20 @@ class PaperOrganizer:
 
     def get_corpus_and_dictionary(self, session):
         LOG.info("Getting filtered keywords")
-        kwd_query = self._get_filtered_keywords(session)
-        kwds, _, _ = zip(*kwd_query.all())
-        kwd_ids = [k.id for k in kwds]
+        corpus_size = session.query(Paper).count()
+        no_above_abs = int(self.no_above * corpus_size)
+        kwd_query = (
+            session.query(Keyword.id)
+            .join(PaperKeywords)
+            .join(Paper)
+            .group_by(Keyword.id)
+            .order_by(func.avg(PaperKeywords.score).desc())
+            .having(func.count() >= self.no_below)
+            .having(func.count() <= no_above_abs)
+            .having(func.avg(PaperKeywords.score) >= self.min_mean_score)
+        )
+        for j in self.journal_blacklist:
+            kwd_query = kwd_query.filter(~Paper.bibcode.contains(j))
 
         q = (
             session.query(
@@ -381,8 +392,8 @@ class PaperOrganizer:
                 PaperKeywords.keyword_id,
                 PaperKeywords.count,
             )
-            .filter(PaperKeywords.keyword_id.in_(kwd_ids))
-            .group_by(PaperKeywords.paper_bibcode)
+            .join(Keyword)
+            .filter(PaperKeywords.keyword_id.in_(kwd_query))
             .order_by(PaperKeywords.paper_bibcode)
         )
 
@@ -394,11 +405,11 @@ class PaperOrganizer:
             "dct2kwd": {i: k for i, k in enumerate(set(keyword_ids))},
         }
         sql2ind = {
-            "bib2corp": {b: i for i, b in ind2sql['corp2bib'].items()},
-            "kwd2dct": {k: i for i, k in ind2sql['dct2kwd'].items()},
+            "bib2corp": {b: i for i, b in ind2sql["corp2bib"].items()},
+            "kwd2dct": {k: i for i, k in ind2sql["dct2kwd"].items()},
         }
-        corp_inds = [sql2ind['bib2corp'][b] for b in bibs]
-        dct_inds = [sql2ind['kwd2dct'][k] for k in keyword_ids]
+        corp_inds = [sql2ind["bib2corp"][b] for b in bibs]
+        dct_inds = [sql2ind["kwd2dct"][k] for k in keyword_ids]
 
         LOG.info("Getting gensim corpus.")
         coo_corpus = ((b, k, c) for b, k, c in zip(corp_inds, dct_inds, counts))
@@ -411,7 +422,7 @@ class PaperOrganizer:
         )
 
         LOG.info("Getting gensim dictionary.")
-        id2word = {sql2ind['kwd2dct'][i]: k for i, k in q}
+        id2word = {sql2ind["kwd2dct"][i]: k for i, k in q}
         dct = Dictionary.from_corpus(corpus, id2word=id2word)
 
         return corpus, dct, ind2sql, sql2ind
@@ -498,7 +509,7 @@ def cli():
 @click.option("--prepared_data_dir", type=Path)
 def prepare_for_lda(db_loc, config_loc, prepared_data_dir):
 
-    with open(config_loc, 'r') as f0:
+    with open(config_loc, "r") as f0:
         config = yaml.safe_load(f0)
     LOG.info(f"Using config: \n {pformat(config)}")
 
@@ -525,9 +536,9 @@ def prepare_for_lda(db_loc, config_loc, prepared_data_dir):
     prepared_data_dir.mkdir(exist_ok=True)
     MmCorpus.serialize(str(out_corp), corpus)
     dct.save(str(out_dct))
-    with open(out_ind2sql, 'w') as f0:
+    with open(out_ind2sql, "w") as f0:
         json.dump(ind2sql, f0)
-    with open(out_sql2ind, 'w') as f0:
+    with open(out_sql2ind, "w") as f0:
         json.dump(sql2ind, f0)
 
 

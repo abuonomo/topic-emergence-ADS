@@ -381,7 +381,6 @@ class PaperOrganizer:
                 PaperKeywords.keyword_id,
                 PaperKeywords.count,
             )
-            .join(Keyword)
             .filter(PaperKeywords.keyword_id.in_(kwds_batch))
             .order_by(PaperKeywords.paper_bibcode)
         )
@@ -396,13 +395,14 @@ class PaperOrganizer:
             )
         LOG.info("Getting filtered keywords")
         kwd_query = self._get_filtered_keywords(session, Keyword.id)
+        all_kwd_ids = kwd_query.all()
 
-        num_kwds = kwd_query.count()
+        num_kwds = len(all_kwd_ids)
         all_records = []
         kwd_batches = range(0, num_kwds, batch_size)
         pbar = tqdm(kwd_batches)
         for i in pbar:
-            kwds_batch = [k[0] for k in kwd_query[i : i + batch_size]]
+            kwds_batch = [k[0] for k in all_kwd_ids[i : i + batch_size]]
             records = self.get_keyword_batch_records(session, kwds_batch)
             all_records = all_records + records
 
@@ -428,7 +428,7 @@ class PaperOrganizer:
 
         all_ki = []
         for i in tqdm(kwd_batches):
-            kwds_batch = [k[0] for k in kwd_query[i : i + batch_size]]
+            kwds_batch = [k[0] for k in all_kwd_ids[i : i + batch_size]]
             q = session.query(Keyword.id, Keyword.keyword).filter(
                 Keyword.id.in_(kwds_batch)
             )

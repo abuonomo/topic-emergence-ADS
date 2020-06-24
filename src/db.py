@@ -373,8 +373,7 @@ class PaperOrganizer:
         paper_tokens = [t for ts in tokens0 for t in ts]
         return paper_tokens
 
-    @staticmethod
-    def get_keyword_batch_records(session, kwds_batch, pbar=None):
+    def get_keyword_batch_records(self, session, kwds_batch, pbar=None):
         q = (
             session.query(
                 PaperKeywords.paper_bibcode,
@@ -384,27 +383,51 @@ class PaperOrganizer:
             .filter(PaperKeywords.keyword_id.in_(kwds_batch))
             .order_by(PaperKeywords.paper_bibcode)
         )
+        for j in self.journal_blacklist:
+            q = q.filter(~PaperKeywords.paper_bibcode.contains(j))
         if pbar is not None:
             pbar.update(1)
         return q.all()
 
-    def get_corpus_and_dictionary(self, session, batch_size=999):
+    def get_paper_keyword_records(
+        self, session, all_kwd_ids, batch_size, in_memory=False
+    ):
+        if in_memory is True:
+            LOG.info("Loading all paper_keywords into memory, then filtering.")
+            all_paper_keywords = session.query(
+                PaperKeywords.paper_bibcode,
+                PaperKeywords.keyword_id,
+                PaperKeywords.count,
+            ).all()
+            all_records = [
+                (b, k, c)
+                for b, k, c in all_paper_keywords
+                if (k in all_kwd_ids)
+                and not any([j in b for j in self.journal_blacklist])
+            ]
+        else:
+            num_kwds = len(all_kwd_ids)
+            all_records = []
+            kwd_batches = range(0, num_kwds, batch_size)
+            pbar = tqdm(kwd_batches)
+            for i in pbar:
+                kwds_batch = all_kwd_ids[i : i + batch_size]
+                records = self.get_keyword_batch_records(session, kwds_batch)
+                all_records = all_records + records
+        return all_records
+
+    def get_corpus_and_dictionary(self, session, batch_size=999, in_memory=False):
         if batch_size > 999:
             raise ValueError(
                 f"{batch_size} greater than maximum number of SQLite variables"
             )
         LOG.info("Getting filtered keywords")
-        kwd_query = self._get_filtered_keywords(session, Keyword.id)
-        all_kwd_ids = kwd_query.all()
-
-        num_kwds = len(all_kwd_ids)
-        all_records = []
-        kwd_batches = range(0, num_kwds, batch_size)
-        pbar = tqdm(kwd_batches)
-        for i in pbar:
-            kwds_batch = [k[0] for k in all_kwd_ids[i : i + batch_size]]
-            records = self.get_keyword_batch_records(session, kwds_batch)
-            all_records = all_records + records
+        kwd_query = self._get_filtered_keywords(session, Keyword.id, Keyword.keyword)
+        all_ki = kwd_query.all()
+        all_kwd_ids = [i for i, k in all_ki]
+        all_records = self.get_paper_keyword_records(
+            session, all_kwd_ids, batch_size, in_memory=in_memory
+        )
 
         LOG.info("Getting bibcode, keyword, counts")
         bibs, keyword_ids, counts = zip(*all_records)
@@ -426,14 +449,6 @@ class PaperOrganizer:
         mat = coo_matrix((a["value"], (a["row"], a["col"])))
         corpus = Sparse2Corpus(mat, documents_columns=False)
 
-        all_ki = []
-        for i in tqdm(kwd_batches):
-            kwds_batch = [k[0] for k in all_kwd_ids[i : i + batch_size]]
-            q = session.query(Keyword.id, Keyword.keyword).filter(
-                Keyword.id.in_(kwds_batch)
-            )
-            all_ki = all_ki + q.all()
-
         LOG.info("Getting gensim dictionary.")
         id2word = {sql2ind["kwd2dct"][i]: k for i, k in all_ki}
         dct = Dictionary.from_corpus(corpus, id2word=id2word)
@@ -442,7 +457,6 @@ class PaperOrganizer:
 
 
 class TopicModeler:
-
     def __init__(self, dictionary, corpus):
         self.dictionary = dictionary
         self.corpus = corpus
@@ -589,7 +603,10 @@ def add_missed_locations(db_loc, config_loc):
 @click.option("--config_loc", type=Path)
 @click.option("--prepared_data_dir", type=Path)
 @click.option("--db_in_memory/--no_db_in_memory", default=False)
-def prepare_for_lda(db_loc, config_loc, prepared_data_dir, db_in_memory=False):
+@click.option("--in_memory/--no_in_memory", default=False)
+def prepare_for_lda(
+    db_loc, config_loc, prepared_data_dir, db_in_memory=False, in_memory=False
+):
     with open(config_loc, "r") as f0:
         config = yaml.safe_load(f0)
     LOG.info(f"Using config: \n {pformat(config)}")
@@ -598,8 +615,8 @@ def prepare_for_lda(db_loc, config_loc, prepared_data_dir, db_in_memory=False):
         LOG.info("Dumping database into memory.")
         with closing(sqlite3.connect(db_loc)) as disk_db:
             mem_db = copy_database(disk_db, "file::memory:?cache=shared", uri=True)
-        creator = lambda: sqlite3.connect('file::memory:?cache=shared', uri=True)
-        engine = create_engine('sqlite://', creator=creator)
+        creator = lambda: sqlite3.connect("file::memory:?cache=shared", uri=True)
+        engine = create_engine("sqlite://", creator=creator)
     else:
         engine = create_engine(f"sqlite:///{db_loc}")
 
@@ -608,7 +625,9 @@ def prepare_for_lda(db_loc, config_loc, prepared_data_dir, db_in_memory=False):
 
     try:
         po = PaperOrganizer(**config["paper_organizer"])
-        corpus, dct, ind2sql, sql2ind = po.get_corpus_and_dictionary(session)
+        corpus, dct, ind2sql, sql2ind = po.get_corpus_and_dictionary(
+            session, in_memory=in_memory
+        )
     except:
         session.rollback()
         raise
@@ -640,9 +659,9 @@ def read_from_prepared_data(prepared_data_dir):
 
     corpus = MmCorpus(str(in_corp))
     dictionary = Dictionary.load(str(in_dct))
-    with open(in_ind2sql, 'r') as f0:
+    with open(in_ind2sql, "r") as f0:
         ind2sql = json.load(f0)
-    with open(in_sql2ind, 'r') as f0:
+    with open(in_sql2ind, "r") as f0:
         sql2ind = json.load(f0)
 
     return corpus, dictionary, ind2sql, sql2ind
@@ -659,7 +678,7 @@ def make_topic_models(prepared_data_dir, config_loc, out_models_dir):
 
     LOG.info(f"Running with config: \n {pformat(config)}")
     tm = TopicModeler(dictionary, corpus)
-    models = tm.make_all_topic_models(config['topic_range'], **config['lda'])
+    models = tm.make_all_topic_models(config["topic_range"], **config["lda"])
 
     out_models_dir.mkdir(exist_ok=True)
     for m in models:

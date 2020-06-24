@@ -462,9 +462,6 @@ class TopicModeler:
         self.corpus = corpus
 
     def make_all_topic_models(self, topic_range, **kwargs):
-        # cluster = LocalCluster(silence_logs=False)
-        # client = Client(cluster)
-        # LOG.info(f"Dask dashboard: {client.dashboard_link}")
         gensim_logger = logging.getLogger("gensim")
         gensim_logger.setLevel(logging.DEBUG)
         LOG.setLevel(logging.DEBUG)

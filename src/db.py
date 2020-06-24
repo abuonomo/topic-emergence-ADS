@@ -654,7 +654,6 @@ def read_from_prepared_data(prepared_data_dir):
 @click.option("--out_models_dir", type=Path)
 def make_topic_models(prepared_data_dir, config_loc, out_models_dir):
     corpus, dictionary, ind2sql, sql2ind = read_from_prepared_data(prepared_data_dir)
-    import ipdb; ipdb.set_trace()
     with open(config_loc, "r") as f0:
         config = yaml.safe_load(f0)
 

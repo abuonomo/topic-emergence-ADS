@@ -424,7 +424,7 @@ class PaperOrganizer:
         coo_corpus = ((b, k, c) for b, k, c in zip(corp_inds, dct_inds, counts))
         a = np.fromiter(coo_corpus, dtype=[("row", int), ("col", int), ("value", int)])
         mat = coo_matrix((a["value"], (a["row"], a["col"])))
-        corpus = Sparse2Corpus(mat)
+        corpus = Sparse2Corpus(mat, documents_columns=False)
 
         all_ki = []
         for i in tqdm(kwd_batches):
@@ -440,8 +440,14 @@ class PaperOrganizer:
 
         return corpus, dct, ind2sql, sql2ind
 
-    @staticmethod
-    def make_all_topic_models(corpus, dct, topic_range, **kwargs):
+
+class TopicModeler:
+
+    def __init__(self, dictionary, corpus):
+        self.dictionary = dictionary
+        self.corpus = corpus
+
+    def make_all_topic_models(self, topic_range, **kwargs):
         # cluster = LocalCluster(silence_logs=False)
         # client = Client(cluster)
         # LOG.info(f"Dask dashboard: {client.dashboard_link}")
@@ -457,7 +463,7 @@ class PaperOrganizer:
 
         jobs = []
         for t in topic_range:
-            j = make_topic_model(t, corpus, dct, **kwargs)
+            j = make_topic_model(t, self.corpus, self.dictionary, **kwargs)
             jobs.append(j)
         ldas = dask.compute(jobs)[0]
         return ldas
@@ -477,13 +483,6 @@ class PaperOrganizer:
             coherences.append(coherence)
 
         return coherences
-
-    def set_dictionary(self, session):
-        tokens = self.get_tokens(session)
-        self.dct = Dictionary(tokens)
-
-    def get_corpus(self, session):
-        return [self.dct.doc2bow(d) for d in self.get_tokens(session)]
 
 
 def get_spacy_nlp():
@@ -526,54 +525,6 @@ def copy_database(source_connection, dest_dbname=":memory:", uri=False):
 @click.group()
 def cli():
     pass
-
-
-@cli.command()
-@click.option("--db_loc", type=Path)
-@click.option("--config_loc", type=Path)
-@click.option("--prepared_data_dir", type=Path)
-@click.option("--db_in_memory/--no_db_in_memory", default=False)
-def prepare_for_lda(db_loc, config_loc, prepared_data_dir, db_in_memory=False):
-    with open(config_loc, "r") as f0:
-        config = yaml.safe_load(f0)
-    LOG.info(f"Using config: \n {pformat(config)}")
-
-    if db_in_memory is True:
-        LOG.info("Dumping database into memory.")
-        with closing(sqlite3.connect(db_loc)) as disk_db:
-            mem_db = copy_database(disk_db, "file::memory:?cache=shared", uri=True)
-        creator = lambda: sqlite3.connect('file::memory:?cache=shared', uri=True)
-        engine = create_engine('sqlite://', creator=creator)
-    else:
-        engine = create_engine(f"sqlite:///{db_loc}")
-
-    Session = sessionmaker(bind=engine)
-    session = Session()
-
-    try:
-        po = PaperOrganizer(**config["paper_organizer"])
-        corpus, dct, ind2sql, sql2ind = po.get_corpus_and_dictionary(session)
-    except:
-        session.rollback()
-        raise
-    finally:
-        session.close()
-        if db_in_memory is True:
-            mem_db.close()
-
-    out_corp = prepared_data_dir / "corpus.mm"
-    out_dct = prepared_data_dir / "dct.mm"
-    out_ind2sql = prepared_data_dir / "ind2sql.json"
-    out_sql2ind = prepared_data_dir / "sql2ind.json"
-
-    LOG.info(f"Writing corpus, dct, ind2sql, sql2ind to {prepared_data_dir}")
-    prepared_data_dir.mkdir(exist_ok=True)
-    MmCorpus.serialize(str(out_corp), corpus)
-    dct.save(str(out_dct))
-    with open(out_ind2sql, "w") as f0:
-        json.dump(ind2sql, f0)
-    with open(out_sql2ind, "w") as f0:
-        json.dump(sql2ind, f0)
 
 
 @cli.command()
@@ -634,46 +585,88 @@ def add_missed_locations(db_loc, config_loc):
 
 
 @cli.command()
-@click.option("--config_loc", type=Path)
-@click.option("--out_models_dir", type=Path)
 @click.option("--db_loc", type=Path)
-def make_topic_models(db_loc, config_loc, out_models_dir):
+@click.option("--config_loc", type=Path)
+@click.option("--prepared_data_dir", type=Path)
+@click.option("--db_in_memory/--no_db_in_memory", default=False)
+def prepare_for_lda(db_loc, config_loc, prepared_data_dir, db_in_memory=False):
     with open(config_loc, "r") as f0:
         config = yaml.safe_load(f0)
+    LOG.info(f"Using config: \n {pformat(config)}")
 
-    engine = create_engine(f"sqlite:///{db_loc}")
+    if db_in_memory is True:
+        LOG.info("Dumping database into memory.")
+        with closing(sqlite3.connect(db_loc)) as disk_db:
+            mem_db = copy_database(disk_db, "file::memory:?cache=shared", uri=True)
+        creator = lambda: sqlite3.connect('file::memory:?cache=shared', uri=True)
+        engine = create_engine('sqlite://', creator=creator)
+    else:
+        engine = create_engine(f"sqlite:///{db_loc}")
 
     Session = sessionmaker(bind=engine)
     session = Session()
 
     try:
-        LOG.info(f"Running with config: \n {pformat(config)}")
         po = PaperOrganizer(**config["paper_organizer"])
-        models = po.make_all_topic_models(
-            session, config["topic_range"], **config["lda"],
-        )
-        session.commit()
-        LOG.info(f"Got records for PaperKeywords to be added.")
+        corpus, dct, ind2sql, sql2ind = po.get_corpus_and_dictionary(session)
     except:
-        LOG.warning(f"Aborted extracting keywords.")
         session.rollback()
         raise
     finally:
         session.close()
+        if db_in_memory is True:
+            mem_db.close()
+
+    out_corp = prepared_data_dir / "corpus.mm"
+    out_dct = prepared_data_dir / "dct.mm"
+    out_ind2sql = prepared_data_dir / "ind2sql.json"
+    out_sql2ind = prepared_data_dir / "sql2ind.json"
+
+    LOG.info(f"Writing corpus, dct, ind2sql, sql2ind to {prepared_data_dir}")
+    prepared_data_dir.mkdir(exist_ok=True)
+    MmCorpus.serialize(str(out_corp), corpus)
+    dct.save(str(out_dct))
+    with open(out_ind2sql, "w") as f0:
+        json.dump(ind2sql, f0)
+    with open(out_sql2ind, "w") as f0:
+        json.dump(sql2ind, f0)
+
+
+def read_from_prepared_data(prepared_data_dir):
+    in_corp = prepared_data_dir / "corpus.mm"
+    in_dct = prepared_data_dir / "dct.mm"
+    in_ind2sql = prepared_data_dir / "ind2sql.json"
+    in_sql2ind = prepared_data_dir / "sql2ind.json"
+
+    corpus = MmCorpus(str(in_corp))
+    dictionary = Dictionary.load(str(in_dct))
+    with open(in_ind2sql, 'r') as f0:
+        ind2sql = json.load(f0)
+    with open(in_sql2ind, 'r') as f0:
+        sql2ind = json.load(f0)
+
+    return corpus, dictionary, ind2sql, sql2ind
+
+
+@cli.command()
+@click.option("--prepared_data_dir", type=Path)
+@click.option("--config_loc", type=Path)
+@click.option("--out_models_dir", type=Path)
+def make_topic_models(prepared_data_dir, config_loc, out_models_dir):
+    corpus, dictionary, ind2sql, sql2ind = read_from_prepared_data(prepared_data_dir)
+    import ipdb; ipdb.set_trace()
+    with open(config_loc, "r") as f0:
+        config = yaml.safe_load(f0)
+
+    LOG.info(f"Running with config: \n {pformat(config)}")
+    tm = TopicModeler(dictionary, corpus)
+    models = tm.make_all_topic_models(config['topic_range'], **config['lda'])
 
     out_models_dir.mkdir(exist_ok=True)
     for m in models:
         mp = out_models_dir / f"topic_model{m.num_topics}"
         LOG.info(f"Writing model to {mp}")
         m.save(str(mp))
-
-    od = out_models_dir / "dictionary"
-    LOG.info(f"Writing dictionary to {od}")
-    po.dictionary.save(str(od))
-
-    oc = out_models_dir / "corpus.mm"
-    LOG.info(f"Writing corpus to {oc}")
-    MmCorpus.serialize((str(oc)), po.corpus)
 
 
 @cli.command()

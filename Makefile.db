@@ -1,0 +1,101 @@
+BUCKET=datasquad-low/home/DataSquad/topic-emergence-ADS/
+PROFILE=moderate
+export LOGLEVEL=INFO
+
+# Set parameters depending on whether running test or full data
+RAW_DIR=data/raw
+CONFIG_FILE=config/config.yaml
+TIMESTAMP=$$(date +%Y-%m-%d_%H:%M:%S)
+include $(CONFIG_FILE) # This file may overwrite some defaults variables above
+
+all: write-ads-to-db get-keywords-from-texts add-missed-locations prepare-for-lda make-topic-models
+
+## Write kwds.jsonl files to sqlite database
+write-ads-to-db:
+	python src/db.py write-ads-to-db \
+		--infile data/test_singlerank_05_18_2020/kwds.jsonl \
+		--db_loc scratch/test.sqlite
+
+## Extract keywords from papers using SingleRank and insert into database
+get-keywords-from-texts:
+	python src/db.py get-keywords-from-texts --db_loc scratch/test.sqlite
+
+## Find missed keyword locations
+add-missed-locations:
+	python src/db.py add-missed-locations --db_loc scratch/test.sqlite --config_loc config/config.yaml
+
+## Transform data into gensim corpus and dictionary for LDA training
+prepare-for-lda:
+	python src/db.py prepare-for-lda \
+		--db_loc scratch/test.sqlite \
+		--config_loc config/config.yaml \
+		--prepared_data_dir scratch/prepared_data
+
+## Train topic models
+make-topic-models:
+	python src/db.py make-topic-models \
+		--prepared_data_dir scratch/prepared_data \
+		--config_loc config/config.yaml \
+		--out_models_dir scratch/tmodels \
+		--out_coh_csv scratch/coherence.csv
+
+#################################################################################
+# Self Documenting Commands                                                     #
+#################################################################################
+
+.DEFAULT_GOAL := help
+
+# Inspired by <http://marmelab.com/blog/2016/02/29/auto-documented-makefile.html>
+# sed script explained:
+# /^##/:
+# 	* save line in hold space
+# 	* purge line
+# 	* Loop:
+# 		* append newline + line to hold space
+# 		* go to next line
+# 		* if line starts with doc comment, strip comment character off and loop
+# 	* remove target prerequisites
+# 	* append hold space (+ newline) to line
+# 	* replace newline plus comments by `---`
+# 	* print line
+# Separate expressions are necessary because labels cannot be delimited by
+# semicolon; see <http://stackoverflow.com/a/11799865/1968>
+.PHONY: help
+help:
+	@echo "$$(tput bold)Available rules:$$(tput sgr0)"
+	@echo
+	@sed -n -e "/^## / { \
+		h; \
+		s/.*//; \
+		:doc" \
+		-e "H; \
+		n; \
+		s/^## //; \
+		t doc" \
+		-e "s/:.*//; \
+		G; \
+		s/\\n## /---/; \
+		s/\\n/ /g; \
+		p; \
+	}" ${MAKEFILE_LIST} \
+	| LC_ALL='C' sort --ignore-case \
+	| awk -F '---' \
+		-v ncol=$$(tput cols) \
+		-v indent=19 \
+		-v col_on="$$(tput setaf 6)" \
+		-v col_off="$$(tput sgr0)" \
+	'{ \
+		printf "%s%*s%s ", col_on, -indent, $$1, col_off; \
+		n = split($$2, words, " "); \
+		line_length = ncol - indent; \
+		for (i = 1; i <= n; i++) { \
+			line_length -= length(words[i]) + 1; \
+			if (line_length <= 0) { \
+				line_length = ncol - indent - length(words[i]) - 1; \
+				printf "\n%*s ", -indent, " "; \
+			} \
+			printf "%s ", words[i]; \
+		} \
+		printf "\n"; \
+	}' \
+	| more $(shell test $(shell uname) = Darwin && echo '--no-init --raw-control-chars')

@@ -300,9 +300,16 @@ class PaperOrganizer:
         elif type(keyword_blacklist) == list:
             self.__keyword_blacklist = keyword_blacklist
         else:
-            with open(keyword_blacklist, "r") as f0:
-                self.__keyword_blacklist = [l for l in f0.read().splitlines()]
-            LOG.info(f"Loaded {len(self.__keyword_blacklist)} blacklisted keywords.")
+            p = Path(keyword_blacklist)
+            LOG.info(f"Loading keyword_blacklist from {p}")
+            if not p.exists():
+                raise ValueError(f"{p} does not exist."
+                                 f"Please provide list of keywords or path to"
+                                 f"a text file with one keyword per line.")
+            else:
+                with open(p, "r") as f0:
+                    self.__keyword_blacklist = [l for l in f0.read().splitlines()]
+                LOG.info(f"Loaded {len(self.__keyword_blacklist)} blacklisted keywords.")
 
     def add_journal_blacklist_to_query(self, q):
         for j in self.journal_blacklist:
@@ -694,7 +701,8 @@ def read_from_prepared_data(prepared_data_dir):
 @click.option("--prepared_data_dir", type=Path)
 @click.option("--config_loc", type=Path)
 @click.option("--out_models_dir", type=Path)
-def make_topic_models(prepared_data_dir, config_loc, out_models_dir):
+@click.option("--out_coh_csv", type=Path)
+def make_topic_models(prepared_data_dir, config_loc, out_models_dir, out_coh_csv):
     corpus, dictionary, ind2sql, sql2ind = read_from_prepared_data(prepared_data_dir)
     with open(config_loc, "r") as f0:
         config = yaml.safe_load(f0)
@@ -702,6 +710,13 @@ def make_topic_models(prepared_data_dir, config_loc, out_models_dir):
     LOG.info(f"Running with config: \n {pformat(config)}")
     tm = TopicModeler(dictionary, corpus)
     models = tm.make_all_topic_models(config["topic_range"], **config["lda"])
+    coherences = tm.get_coherences(models)
+    n_topics = [m.num_topics for m in models]
+    df = pd.DataFrame(zip(n_topics, coherences))
+
+    LOG.info(f"Writing coherence scores to {out_coh_csv}.")
+    df.columns = ['num_topics', 'coherence (u_mass)']
+    df.to_csv(out_coh_csv)
 
     out_models_dir.mkdir(exist_ok=True)
     for m in models:

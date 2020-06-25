@@ -136,7 +136,6 @@ def is_nu_like(s):
 class PaperKeywordExtractor:
     def __init__(self, nlp):
         self.nlp = nlp
-        self.dct = None
 
     def extract_all_keywords(
         self, session, batch_size=100, n_process=-1,
@@ -277,7 +276,6 @@ class PaperOrganizer:
         self.year_max = year_max
         self.journal_blacklist = journal_blacklist
         self.keyword_blacklist = keyword_blacklist
-        # TODO: add keyword blacklist here.
 
     @property
     def journal_blacklist(self):

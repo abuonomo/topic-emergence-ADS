@@ -180,7 +180,7 @@ class PaperKeywordExtractor:
         kwd_counts = [(k, v, text.count(k)) for k, v in kwds]
         return text, kwd_counts
 
-    def f(self, paper_dict, paper_kwds, pbar):
+    def get_new_paper_records(self, paper_dict, paper_kwds, pbar):
         records = []
         for k in paper_kwds:
             if (
@@ -229,7 +229,8 @@ class PaperKeywordExtractor:
         def make_batch(papers, paper_kwds, pbar):
             sub_results = []
             for p in papers:
-                sub_results.append(self.f(p, paper_kwds, pbar))
+                p_results = self.get_new_paper_records(p, paper_kwds, pbar)
+                sub_results.append(p_results)
             return sub_results
 
         batches = []
@@ -252,8 +253,7 @@ class PaperKeywordExtractor:
         record = {
             "raw_keyword": paper_kwd["raw_keyword"],
             "keyword_id": paper_kwd["keyword_id"],
-            "paper_id": paper_dict["bibcode"],
-            # TODO: fix this now using paper_id
+            "paper_id": paper_dict["id"],
             "count": count,
         }
         return record

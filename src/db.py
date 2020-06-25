@@ -44,22 +44,21 @@ BASE = declarative_base()
 class PaperKeywords(BASE):
     __tablename__ = "paper_keywords"
 
-    paper_bibcode = Column(
-        String(19), ForeignKey("papers.bibcode"), primary_key=True, nullable=False
+    paper_id = Column(
+        Integer, ForeignKey("papers.bibcode"), primary_key=True, nullable=False
     )
     keyword_id = Column(
         Integer, ForeignKey("keywords.id"), primary_key=True, nullable=False
     )
     score = Column(Float)
-    raw_keyword = Column(
-        String
-    )  # TODO: redundant in current implementation, same as keyword.keyword
+    raw_keyword = Column(String, index=True)
+    # TODO: redundant in current implementation, same as keyword.keyword
     count = Column(Integer)
     paper = relationship("Paper", back_populates="keywords")
     keyword = relationship("Keyword", back_populates="papers")
 
     def __repr__(self):
-        return f'<PaperKeywords(paper_bibcode="{self.paper_bibcode}", keyword.keyword="{self.keyword.keyword}")>'
+        return f'<PaperKeywords(paper_id="{self.paper_id}", keyword.keyword="{self.keyword.keyword}")>'
 
     def to_dict(self):
         return {
@@ -72,11 +71,12 @@ class PaperKeywords(BASE):
 class Paper(BASE):
     __tablename__ = "papers"
 
-    bibcode = Column(String(19), primary_key=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    bibcode = Column(String(19), index=True)
     title = Column(String)
     abstract = Column(String)
     citation_count = Column(Integer)
-    year = Column(Integer)
+    year = Column(Integer, index=True)
     nasa_affiliation = Column(Boolean)
     lemma_text = Column(String)
     keywords = relationship("PaperKeywords", back_populates="paper")
@@ -103,8 +103,8 @@ class Paper(BASE):
 class Keyword(BASE):
     __tablename__ = "keywords"
 
-    id = Column(Integer, primary_key=True)
-    keyword = Column(String, nullable=False, unique=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    keyword = Column(String, nullable=False, unique=True, index=True)
     papers = relationship("PaperKeywords", back_populates="keyword")
 
     def __init__(self, keyword):
@@ -252,7 +252,8 @@ class PaperKeywordExtractor:
         record = {
             "raw_keyword": paper_kwd["raw_keyword"],
             "keyword_id": paper_kwd["keyword_id"],
-            "paper_bibcode": paper_dict["bibcode"],
+            "paper_id": paper_dict["bibcode"],
+            # TODO: fix this now using paper_id
             "count": count,
         }
         return record
@@ -299,14 +300,17 @@ class PaperOrganizer:
         elif type(keyword_blacklist) == list:
             self.__keyword_blacklist = keyword_blacklist
         else:
-            with open(keyword_blacklist, 'r') as f0:
+            with open(keyword_blacklist, "r") as f0:
                 self.__keyword_blacklist = [l for l in f0.read().splitlines()]
             LOG.info(f"Loaded {len(self.__keyword_blacklist)} blacklisted keywords.")
 
-    def get_year_counts(self, session):
-        q = session.query(Paper.year, func.count(Paper.year))
+    def add_journal_blacklist_to_query(self, q):
         for j in self.journal_blacklist:
             q = q.filter(~Paper.bibcode.contains(j))
+        return q
+
+    def get_year_counts(self, session):
+        q = session.query(Paper.year, func.count(Paper.year))
         return q.group_by(Paper.year).all()
 
     def get_all_kwd_years(self, session):
@@ -320,8 +324,7 @@ class PaperOrganizer:
             .group_by(Keyword.id)
             .group_by(Paper.year)
         )
-        for j in self.journal_blacklist:
-            years_query = years_query.filter(~Paper.bibcode.contains(j))
+        years_query = self.add_journal_blacklist_to_query(years_query)
         if self.year_min is not None:
             years_query = years_query.filter(Paper.year >= self.year_min)
         if self.year_max is not None:
@@ -361,7 +364,8 @@ class PaperOrganizer:
     def _get_filtered_keywords(self, session, *args):
         if len(args) == 0:
             args = [Keyword, func.count(Keyword.id), func.avg(PaperKeywords.score)]
-        corpus_size = session.query(Paper).count()
+        corpus_size = session.query(Paper.id).count()
+        # TODO: decide whether to count with limiting by journal blacklist
         no_above_abs = int(self.no_above * corpus_size)
 
         kwd_query = (
@@ -375,8 +379,7 @@ class PaperOrganizer:
             .having(func.count() <= no_above_abs)
             .having(func.avg(PaperKeywords.score) >= self.min_mean_score)
         )
-        for j in self.journal_blacklist:
-            kwd_query = kwd_query.filter(~Paper.bibcode.contains(j))
+        kwd_query = self.add_journal_blacklist_to_query(kwd_query)
         return kwd_query
 
     def get_tokens(self, session) -> Generator:
@@ -401,15 +404,13 @@ class PaperOrganizer:
     def get_keyword_batch_records(self, session, kwds_batch, pbar=None):
         q = (
             session.query(
-                PaperKeywords.paper_bibcode,
+                PaperKeywords.paper_id,
                 PaperKeywords.keyword_id,
                 PaperKeywords.count,
             )
             .filter(PaperKeywords.keyword_id.in_(kwds_batch))
-            .order_by(PaperKeywords.paper_bibcode)
         )
-        for j in self.journal_blacklist:
-            q = q.filter(~PaperKeywords.paper_bibcode.contains(j))
+        # q = self.add_journal_blacklist_to_query(q)
         if pbar is not None:
             pbar.update(1)
         return q.all()
@@ -420,7 +421,7 @@ class PaperOrganizer:
         if in_memory is True:
             LOG.info("Loading all paper_keywords into memory, then filtering.")
             all_paper_keywords = session.query(
-                PaperKeywords.paper_bibcode,
+                PaperKeywords.paper_id,
                 PaperKeywords.keyword_id,
                 PaperKeywords.count,
             ).all()
@@ -428,7 +429,7 @@ class PaperOrganizer:
                 (b, k, c)
                 for b, k, c in all_paper_keywords
                 if (k in all_kwd_ids)
-                and not any([j in b for j in self.journal_blacklist])
+                # and not any([j in b for j in self.journal_blacklist])
             ]
         else:
             num_kwds = len(all_kwd_ids)
@@ -479,7 +480,6 @@ class PaperOrganizer:
         dct = Dictionary.from_corpus(corpus, id2word=id2word)
 
         return corpus, dct, ind2sql, sql2ind
-
 
 
 class TopicModeler:
@@ -714,7 +714,7 @@ def make_topic_models(prepared_data_dir, config_loc, out_models_dir):
 @click.option("--infile", type=Path)
 @click.option("--db_loc", type=Path, default=":memory:")
 def write_ads_to_db(infile, db_loc=":memory:"):
-    engine = create_engine(f"sqlite:///{db_loc}", echo=True)
+    engine = create_engine(f"sqlite:///{db_loc}")
     BASE.metadata.create_all(engine)
 
     Session = sessionmaker(bind=engine)

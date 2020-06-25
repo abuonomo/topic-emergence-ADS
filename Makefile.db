@@ -13,7 +13,7 @@ all: write-ads-to-db get-keywords-from-texts add-missed-locations prepare-for-ld
 ## Write kwds.jsonl files to sqlite database
 write-ads-to-db:
 	python src/db.py write-ads-to-db \
-		--infile data/test_singlerank_05_18_2020/kwds.jsonl \
+		--infile scratch/kwds.jsonl \
 		--db_loc scratch/test.sqlite
 
 ## Extract keywords from papers using SingleRank and insert into database

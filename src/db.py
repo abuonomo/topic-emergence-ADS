@@ -170,15 +170,15 @@ class PaperKeywordExtractor:
         kwds = textrank(
             doc,
             normalize="lemma",
-            topn=999,  # This could cause issues with a huge abstract
+            topn=999_999,  # This could cause issues with a huge abstract
             window_size=10,
             edge_weighting="count",
             position_bias=False,
         )
         # Remove keywords which are 1 character long or are numbers
-        kwds = [(k, v) for k, v in kwds if (not is_nu_like(k)) and (len(k) > 1)]
+        kwds = [(k.lower(), v) for k, v in kwds if (not is_nu_like(k)) and (len(k) > 1)]
         text = " ".join([t.lemma_.lower() for t in doc])
-        kwd_counts = [(k, v, text.count(k.lower())) for k, v in kwds]
+        kwd_counts = [(k, v, text.count(k)) for k, v in kwds]
         return text, kwd_counts
 
     def f(self, paper_dict, paper_kwds, pbar):
@@ -268,16 +268,42 @@ class PaperOrganizer:
         year_min=None,
         year_max=None,
         journal_blacklist=None,
+        keyword_blacklist=None,
     ):
         self.no_below = no_below
         self.no_above = no_above
         self.min_mean_score = min_mean_score
         self.year_min = year_min
         self.year_max = year_max
-        if journal_blacklist is not None:
-            self.journal_blacklist = journal_blacklist
+        self.journal_blacklist = journal_blacklist
+        self.keyword_blacklist = keyword_blacklist
+        # TODO: add keyword blacklist here.
+
+    @property
+    def journal_blacklist(self):
+        return self.__journal_blacklist
+
+    @journal_blacklist.setter
+    def journal_blacklist(self, journal_blacklist):
+        if journal_blacklist is None:
+            self.__journal_blacklist = []
         else:
-            self.journal_blacklist = []
+            self.__journal_blacklist = journal_blacklist
+
+    @property
+    def keyword_blacklist(self):
+        return self.__keyword_blacklist
+
+    @keyword_blacklist.setter
+    def keyword_blacklist(self, keyword_blacklist):
+        if keyword_blacklist is None:
+            self.__keyword_blacklist = []
+        elif type(keyword_blacklist) == list:
+            self.__keyword_blacklist = keyword_blacklist
+        else:
+            with open(keyword_blacklist, 'r') as f0:
+                self.__keyword_blacklist = [l for l in f0.read().splitlines()]
+            LOG.info(f"Loaded {len(self.__keyword_blacklist)} blacklisted keywords.")
 
     def get_year_counts(self, session):
         q = session.query(Paper.year, func.count(Paper.year))
@@ -344,6 +370,7 @@ class PaperOrganizer:
             session.query(*args)
             .join(PaperKeywords)
             .join(Paper)
+            .filter(~Keyword.keyword.in_(self.keyword_blacklist))
             .group_by(Keyword.id)
             .order_by(func.avg(PaperKeywords.score).desc())
             .having(func.count() >= self.no_below)
@@ -454,6 +481,7 @@ class PaperOrganizer:
         dct = Dictionary.from_corpus(corpus, id2word=id2word)
 
         return corpus, dct, ind2sql, sql2ind
+
 
 
 class TopicModeler:

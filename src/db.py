@@ -1,9 +1,7 @@
 import json
+from contextlib import closing
 from html import unescape
 from pprint import pformat
-import sqlite3
-from functools import reduce
-from contextlib import closing
 
 import click
 import dask
@@ -11,6 +9,7 @@ import logging
 import numpy as np
 import pandas as pd
 import spacy
+import sqlite3
 import yaml
 from gensim.corpora import Dictionary
 from gensim.corpora import MmCorpus
@@ -45,7 +44,7 @@ class PaperKeywords(BASE):
     __tablename__ = "paper_keywords"
 
     paper_id = Column(
-        Integer, ForeignKey("papers.bibcode"), primary_key=True, nullable=False
+        Integer, ForeignKey("papers.id"), primary_key=True, nullable=False
     )
     keyword_id = Column(
         Integer, ForeignKey("keywords.id"), primary_key=True, nullable=False
@@ -140,7 +139,6 @@ class PaperKeywordExtractor:
     def extract_all_keywords(
         self, session, batch_size=100, n_process=-1,
     ):
-        # TODO: go back through to find keywords which were missed by singlerank
         papers = session.query(Paper).all()
         LOG.info(f"Extracting keywords from {len(papers)} documents.")
         texts = (p.get_feature_text() for p in papers)
@@ -303,13 +301,19 @@ class PaperOrganizer:
             p = Path(keyword_blacklist)
             LOG.info(f"Loading keyword_blacklist from {p}")
             if not p.exists():
-                raise ValueError(f"{p} does not exist."
-                                 f"Please provide list of keywords or path to"
-                                 f"a text file with one keyword per line.")
+                raise ValueError(
+                    f"{p} does not exist."
+                    f"Please provide list of keywords or path to"
+                    f"a text file with one keyword per line."
+                )
             else:
                 with open(p, "r") as f0:
                     self.__keyword_blacklist = [l for l in f0.read().splitlines()]
-                LOG.info(f"Loaded {len(self.__keyword_blacklist)} blacklisted keywords.")
+                LOG.info(
+                    f"Loaded {len(self.__keyword_blacklist)} blacklisted keywords."
+                    f"[{self.__keyword_blacklist[0:3]}"
+                    f"...{self.__keyword_blacklist[-3:-1]}]"
+                )
 
     def add_journal_blacklist_to_query(self, q):
         for j in self.journal_blacklist:
@@ -409,14 +413,9 @@ class PaperOrganizer:
         return paper_tokens
 
     def get_keyword_batch_records(self, session, kwds_batch, pbar=None):
-        q = (
-            session.query(
-                PaperKeywords.paper_id,
-                PaperKeywords.keyword_id,
-                PaperKeywords.count,
-            )
-            .filter(PaperKeywords.keyword_id.in_(kwds_batch))
-        )
+        q = session.query(
+            PaperKeywords.paper_id, PaperKeywords.keyword_id, PaperKeywords.count,
+        ).filter(PaperKeywords.keyword_id.in_(kwds_batch))
         # q = self.add_journal_blacklist_to_query(q)
         if pbar is not None:
             pbar.update(1)
@@ -428,9 +427,7 @@ class PaperOrganizer:
         if in_memory is True:
             LOG.info("Loading all paper_keywords into memory, then filtering.")
             all_paper_keywords = session.query(
-                PaperKeywords.paper_id,
-                PaperKeywords.keyword_id,
-                PaperKeywords.count,
+                PaperKeywords.paper_id, PaperKeywords.keyword_id, PaperKeywords.count,
             ).all()
             all_records = [
                 (b, k, c)
@@ -462,18 +459,18 @@ class PaperOrganizer:
             session, all_kwd_ids, batch_size, in_memory=in_memory
         )
 
-        LOG.info("Getting bibcode, keyword, counts")
-        bibs, keyword_ids, counts = zip(*all_records)
+        LOG.info("Getting paper_ids, keyword_ids, counts")
+        paper_ids, keyword_ids, counts = zip(*all_records)
 
         ind2sql = {
-            "corp2bib": {i: b for i, b in enumerate(set(bibs))},
+            "corp2paper": {i: b for i, b in enumerate(set(paper_ids))},
             "dct2kwd": {i: k for i, k in enumerate(set(keyword_ids))},
         }
         sql2ind = {
-            "bib2corp": {b: i for i, b in ind2sql["corp2bib"].items()},
+            "paper2corp": {b: i for i, b in ind2sql["corp2paper"].items()},
             "kwd2dct": {k: i for i, k in ind2sql["dct2kwd"].items()},
         }
-        corp_inds = [sql2ind["bib2corp"][b] for b in bibs]
+        corp_inds = [sql2ind["paper2corp"][b] for b in paper_ids]
         dct_inds = [sql2ind["kwd2dct"][k] for k in keyword_ids]
 
         LOG.info("Getting gensim corpus.")
@@ -573,7 +570,9 @@ def cli():
 
 @cli.command()
 @click.option("--db_loc", type=Path)
-def get_keywords_from_texts(db_loc):
+@click.option("--batch_size", type=int, default=1000)
+@click.option("--n_process", type=int, default=-1)
+def get_keywords_from_texts(db_loc, batch_size=1000, n_process=-1):
     engine = create_engine(f"sqlite:///{db_loc}")
 
     Session = sessionmaker(bind=engine)
@@ -582,7 +581,7 @@ def get_keywords_from_texts(db_loc):
     try:
         nlp = get_spacy_nlp()
         pm = PaperKeywordExtractor(nlp)
-        pm.extract_all_keywords(session)
+        pm.extract_all_keywords(session, batch_size=batch_size, n_process=n_process)
         session.commit()
         LOG.info(f"Added extracted keywords to papers.")
     except:
@@ -715,7 +714,7 @@ def make_topic_models(prepared_data_dir, config_loc, out_models_dir, out_coh_csv
     df = pd.DataFrame(zip(n_topics, coherences))
 
     LOG.info(f"Writing coherence scores to {out_coh_csv}.")
-    df.columns = ['num_topics', 'coherence (u_mass)']
+    df.columns = ["num_topics", "coherence (u_mass)"]
     df.to_csv(out_coh_csv)
 
     out_models_dir.mkdir(exist_ok=True)

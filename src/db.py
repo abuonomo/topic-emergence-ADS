@@ -311,8 +311,8 @@ class PaperOrganizer:
                     self.__keyword_blacklist = [l for l in f0.read().splitlines()]
                 LOG.info(
                     f"Loaded {len(self.__keyword_blacklist)} blacklisted keywords."
-                    f"[{self.__keyword_blacklist[0:3]}"
-                    f"...{self.__keyword_blacklist[-3:-1]}]"
+                    f"{self.__keyword_blacklist[0:3]}"
+                    f"...{self.__keyword_blacklist[-3:-1]}"
                 )
 
     def add_journal_blacklist_to_query(self, q):
@@ -445,15 +445,17 @@ class PaperOrganizer:
             kwd_batches = range(0, num_kwds, batch_size)
             pbar = tqdm(kwd_batches)
             for i in pbar:
-                kwds_batch = all_kwd_ids[i : i + batch_size]
+                kwds_batch = all_kwd_ids[i: i + batch_size]
                 records = self.get_keyword_batch_records(session, kwds_batch)
                 all_records = all_records + records
         return all_records
 
-    def get_corpus_and_dictionary(self, session, batch_size=999, in_memory=False):
-        if batch_size > 999:
+    def get_corpus_and_dictionary(self, session, batch_size=990, in_memory=False):
+        max_batch_size = 999 - len(self.journal_blacklist)
+        if batch_size > max_batch_size:
             raise ValueError(
-                f"{batch_size} greater than maximum number of SQLite variables"
+                f"{batch_size} (batch_size - len(self.journal_blacklist)) "
+                f"greater than maximum number of SQLite variables"
             )
         LOG.info("Getting filtered keywords")
         kwd_query = self._get_filtered_keywords(session, Keyword.id, Keyword.keyword)

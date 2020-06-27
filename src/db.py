@@ -413,10 +413,14 @@ class PaperOrganizer:
         return paper_tokens
 
     def get_keyword_batch_records(self, session, kwds_batch, pbar=None):
-        q = session.query(
-            PaperKeywords.paper_id, PaperKeywords.keyword_id, PaperKeywords.count,
-        ).filter(PaperKeywords.keyword_id.in_(kwds_batch))
-        # q = self.add_journal_blacklist_to_query(q)
+        q = (
+            session.query(
+                PaperKeywords.paper_id, PaperKeywords.keyword_id, PaperKeywords.count,
+            )
+            .filter(PaperKeywords.keyword_id.in_(kwds_batch))
+            .join(Paper)  # for the journal blacklist removal
+        )
+        q = self.add_journal_blacklist_to_query(q)
         if pbar is not None:
             pbar.update(1)
         return q.all()
@@ -433,7 +437,7 @@ class PaperOrganizer:
                 (b, k, c)
                 for b, k, c in all_paper_keywords
                 if (k in all_kwd_ids)
-                # and not any([j in b for j in self.journal_blacklist])
+                and not any([j in b for j in self.journal_blacklist])
             ]
         else:
             num_kwds = len(all_kwd_ids)
@@ -483,7 +487,10 @@ class PaperOrganizer:
         id2word = {sql2ind["kwd2dct"][i]: k for i, k in all_ki}
         dct = Dictionary.from_corpus(corpus, id2word=id2word)
 
-        return corpus, dct, ind2sql, sql2ind
+        corp2paper = [(c, p) for c, p in ind2sql['corp2paper'].items()]
+        dct2kwd = [(d, k) for d, k in ind2sql['dct2kwd'].items()]
+
+        return corpus, dct, corp2paper, dct2kwd
 
 
 class TopicModeler:
@@ -509,21 +516,27 @@ class TopicModeler:
         ldas = dask.compute(jobs)[0]
         return ldas
 
+    def get_coherence_model(self, model):
+        cm = CoherenceModel(
+            model, corpus=self.corpus, coherence="u_mass", dictionary=self.dictionary
+        )  # only u_mass because tokens out of order and overlapping
+        return cm
+
     def get_coherences(self, lda_models):
         coherences = []
         coh_pbar = tqdm(lda_models)
         for lda_model in coh_pbar:
             coh_pbar.set_description(f"n_topics={lda_model.num_topics}")
-            cm = CoherenceModel(
-                model=lda_model,
-                corpus=self.corpus,
-                coherence="u_mass",  # Only u_mass because tokens overlap and are out of order
-                dictionary=self.dictionary,
-            )
+            cm = self.get_coherence_model(lda_model)
             coherence = cm.get_coherence()  # get coherence value
             coherences.append(coherence)
 
         return coherences
+
+    def get_inference(self, model):
+        tc = model.get_document_topics(self.corpus, minimum_probability=0)
+        embedding = np.vstack([[v for t, v in r] for r in tqdm(tc)])
+        return embedding
 
 
 def get_spacy_nlp():
@@ -654,7 +667,7 @@ def prepare_for_lda(
 
     try:
         po = PaperOrganizer(**config["paper_organizer"])
-        corpus, dct, ind2sql, sql2ind = po.get_corpus_and_dictionary(
+        corpus, dct, corp2paper, dct2kwd = po.get_corpus_and_dictionary(
             session, in_memory=in_memory
         )
     except:
@@ -667,33 +680,33 @@ def prepare_for_lda(
 
     out_corp = prepared_data_dir / "corpus.mm"
     out_dct = prepared_data_dir / "dct.mm"
-    out_ind2sql = prepared_data_dir / "ind2sql.json"
-    out_sql2ind = prepared_data_dir / "sql2ind.json"
+    out_corp2paper = prepared_data_dir / "corp2paper.json"
+    out_dct2kwd = prepared_data_dir / "dct2kwd.json"
 
     LOG.info(f"Writing corpus, dct, ind2sql, sql2ind to {prepared_data_dir}")
     prepared_data_dir.mkdir(exist_ok=True)
     MmCorpus.serialize(str(out_corp), corpus)
     dct.save(str(out_dct))
-    with open(out_ind2sql, "w") as f0:
-        json.dump(ind2sql, f0)
-    with open(out_sql2ind, "w") as f0:
-        json.dump(sql2ind, f0)
+    with open(out_corp2paper, "w") as f0:
+        json.dump(corp2paper, f0)
+    with open(out_dct2kwd, "w") as f0:
+        json.dump(dct2kwd, f0)
 
 
 def read_from_prepared_data(prepared_data_dir):
     in_corp = prepared_data_dir / "corpus.mm"
     in_dct = prepared_data_dir / "dct.mm"
-    in_ind2sql = prepared_data_dir / "ind2sql.json"
-    in_sql2ind = prepared_data_dir / "sql2ind.json"
+    in_corp2paper = prepared_data_dir / "corp2paper.json"
+    in_dct2kwd = prepared_data_dir / "dct2kwd.json"
 
     corpus = MmCorpus(str(in_corp))
     dictionary = Dictionary.load(str(in_dct))
-    with open(in_ind2sql, "r") as f0:
-        ind2sql = json.load(f0)
-    with open(in_sql2ind, "r") as f0:
-        sql2ind = json.load(f0)
+    with open(in_corp2paper, "r") as f0:
+        corp2paper = json.load(f0)
+    with open(in_dct2kwd, "r") as f0:
+        dct2kwd = json.load(f0)
 
-    return corpus, dictionary, ind2sql, sql2ind
+    return corpus, dictionary, corp2paper, dct2kwd
 
 
 @cli.command()
@@ -702,7 +715,7 @@ def read_from_prepared_data(prepared_data_dir):
 @click.option("--out_models_dir", type=Path)
 @click.option("--out_coh_csv", type=Path)
 def make_topic_models(prepared_data_dir, config_loc, out_models_dir, out_coh_csv):
-    corpus, dictionary, ind2sql, sql2ind = read_from_prepared_data(prepared_data_dir)
+    corpus, dictionary, _, _ = read_from_prepared_data(prepared_data_dir)
     with open(config_loc, "r") as f0:
         config = yaml.safe_load(f0)
 

@@ -9,6 +9,7 @@ import logging
 import numpy as np
 import pandas as pd
 import pyLDAvis
+import pyLDAvis.gensim
 import yaml
 from gensim.corpora import MmCorpus, Dictionary
 from gensim.models import LdaModel, CoherenceModel

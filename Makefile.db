@@ -10,31 +10,31 @@ include $(CONFIG_FILE) # This file may overwrite some defaults variables above
 
 all: write-ads-to-db get-keywords-from-texts add-missed-locations prepare-for-lda make-topic-models
 
-## Write kwds.jsonl files to sqlite database
-write-ads-to-db:
+## 1. Write kwds.jsonl files to sqlite database
+1-write-ads-to-db:
 	python src/db.py write-ads-to-db \
 		--infile scratch/kwds.jsonl \
 		--db_loc scratch/test.sqlite
 
 BATCH_SIZE=1000
-## Extract keywords from papers using SingleRank and insert into database
-get-keywords-from-texts:
+## 2. Extract keywords from papers using SingleRank and insert into database
+2-get-keywords-from-texts:
 	python src/db.py get-keywords-from-texts --db_loc scratch/test.sqlite \
 		--batch_size $(BATCH_SIZE)
 
-## Find missed keyword locations
-add-missed-locations:
+## 3. Find missed keyword locations
+3-add-missed-locations:
 	python src/db.py add-missed-locations --db_loc scratch/test.sqlite --config_loc config/config.yaml
 
-## Transform data into gensim corpus and dictionary for LDA training
-prepare-for-lda:
+## 4. Transform data into gensim corpus and dictionary for LDA training
+4-prepare-for-lda:
 	python src/db.py prepare-for-lda \
 		--db_loc scratch/test.sqlite \
 		--config_loc config/config.yaml \
 		--prepared_data_dir scratch/prepared_data
 
-## Train topic models
-make-topic-models:
+## 5. Train topic models
+5-make-topic-models:
 	python src/model.py make-topic-models \
 		--prepared_data_dir scratch/prepared_data \
 		--config_loc config/config.yaml \
@@ -42,16 +42,16 @@ make-topic-models:
 		--out_coh_csv scratch/coherence.csv
 
 N_TOPICS=500
-## Prepare visualization data
-prepare-for-topic-model-viz:
+## 6. Prepare visualization data
+6-prepare-for-topic-model-viz:
 	python src/model.py prepare-for-topic-model-viz \
 		--db_loc scratch/test.sqlite \
 		--prepared_data_dir  scratch/prepared_data \
 		--tmodel_loc scratch/tmodels/topic_model$(N_TOPICS) \
 		--vis_data_loc scratch/vis_data.hdf5
 
-## Get time and characteristics
-get-time-chars:
+## 7. Get time and characteristics
+7-get-time-chars:
 	python src/model.py get-time-chars \
 		--vis_data_loc scratch/vis_data.hdf5
 

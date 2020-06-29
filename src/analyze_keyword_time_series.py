@@ -73,13 +73,16 @@ def to_tboard(dtw_df, m, images, lim):
     LOG.info('Use "tensorboard --logdir runs" command to see visualization.')
 
 
-def yellow_plot_kmd(X, out_plot, c_min=2, c_max=20):
+def yellow_plot_kmd(X, out_plot=None, c_min=2, c_max=20):
     LOG.info(f"Trying kmeans n_clusters from {c_min} to {c_max}")
     model = KMeans()
     visualizer = KElbowVisualizer(model, k=(c_min, c_max))
     visualizer.fit(X)  # Fit the data to the visualizer
     LOG.info(f"Writing elbow to {out_plot}.")
-    visualizer.show(out_plot)
+    if out_plot is None:
+        return visualizer
+    else:
+        visualizer.show(out_plot)
 
 
 def plot_kmeans_distortions(X, out_plot, c_min=2, c_max=20):

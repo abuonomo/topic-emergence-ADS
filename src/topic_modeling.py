@@ -727,7 +727,7 @@ def get_topic_years(records_loc, in_bib, topic_cohs_loc, map_loc, out_years, yea
     coh_df = pd.read_csv(topic_cohs_loc, index_col=0)
 
     LOG.info("Transforming...")
-    topics = bib_df.set_index("bibcode").values.argmax(axis=1)  # Could add thresh
+    topics = bib_df.set_index("bibcode").values.argmax(axis=1)  # Could add min_topic_prob_thresh
     # Thresh in addition to argmax? Too limiting but everything is complicate if one doc
     # can be a part of multiple topics for the counts over time.
     ndf = pd.DataFrame(topics)

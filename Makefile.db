@@ -41,6 +41,14 @@ make-topic-models:
 		--out_models_dir scratch/tmodels \
 		--out_coh_csv scratch/coherence.csv
 
+## Prepare visualization data
+prepare-for-topic-model-viz:
+	python src/db.py prepare-for-topic-model-viz \
+		--db_loc scratch/test.sqlite \
+		--prepared_data_dir  scratch/prepared_data \
+		--tmodel_loc scratch/tmodels/topic_model20 \
+		--vis_data_loc scratch/vis_data.hdf5
+
 #################################################################################
 # Self Documenting Commands                                                     #
 #################################################################################

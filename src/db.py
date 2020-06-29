@@ -14,8 +14,6 @@ import yaml
 from gensim.corpora import Dictionary
 from gensim.corpora import MmCorpus
 from gensim.matutils import Sparse2Corpus
-from gensim.models.coherencemodel import CoherenceModel
-from gensim.models.ldamodel import LdaModel
 from math import ceil
 from pathlib import Path
 from scipy.sparse import coo_matrix
@@ -445,7 +443,7 @@ class PaperOrganizer:
             kwd_batches = range(0, num_kwds, batch_size)
             pbar = tqdm(kwd_batches)
             for i in pbar:
-                kwds_batch = all_kwd_ids[i: i + batch_size]
+                kwds_batch = all_kwd_ids[i : i + batch_size]
                 records = self.get_keyword_batch_records(session, kwds_batch)
                 all_records = all_records + records
         return all_records
@@ -489,56 +487,10 @@ class PaperOrganizer:
         id2word = {sql2ind["kwd2dct"][i]: k for i, k in all_ki}
         dct = Dictionary.from_corpus(corpus, id2word=id2word)
 
-        corp2paper = [(c, p) for c, p in ind2sql['corp2paper'].items()]
-        dct2kwd = [(d, k) for d, k in ind2sql['dct2kwd'].items()]
+        corp2paper = [(c, p) for c, p in ind2sql["corp2paper"].items()]
+        dct2kwd = [(d, k) for d, k in ind2sql["dct2kwd"].items()]
 
         return corpus, dct, corp2paper, dct2kwd
-
-
-class TopicModeler:
-    def __init__(self, dictionary, corpus):
-        self.dictionary = dictionary
-        self.corpus = corpus
-
-    def make_all_topic_models(self, topic_range, **kwargs):
-        gensim_logger = logging.getLogger("gensim")
-        gensim_logger.setLevel(logging.DEBUG)
-        LOG.setLevel(logging.DEBUG)
-
-        @dask.delayed
-        def make_topic_model(n_topics, c, d, **kwargs):
-            LOG.warning(f"Making topic model with {n_topics} topics.")
-            lda = LdaModel(c, id2word=d, num_topics=n_topics, **kwargs)
-            return lda
-
-        jobs = []
-        for t in topic_range:
-            j = make_topic_model(t, self.corpus, self.dictionary, **kwargs)
-            jobs.append(j)
-        ldas = dask.compute(jobs)[0]
-        return ldas
-
-    def get_coherence_model(self, model):
-        cm = CoherenceModel(
-            model, corpus=self.corpus, coherence="u_mass", dictionary=self.dictionary
-        )  # only u_mass because tokens out of order and overlapping
-        return cm
-
-    def get_coherences(self, lda_models):
-        coherences = []
-        coh_pbar = tqdm(lda_models)
-        for lda_model in coh_pbar:
-            coh_pbar.set_description(f"n_topics={lda_model.num_topics}")
-            cm = self.get_coherence_model(lda_model)
-            coherence = cm.get_coherence()  # get coherence value
-            coherences.append(coherence)
-
-        return coherences
-
-    def get_inference(self, model):
-        tc = model.get_document_topics(self.corpus, minimum_probability=0)
-        embedding = np.vstack([[v for t, v in r] for r in tqdm(tc)])
-        return embedding
 
 
 def get_spacy_nlp():
@@ -581,6 +533,42 @@ def copy_database(source_connection, dest_dbname=":memory:", uri=False):
 @click.group()
 def cli():
     pass
+
+
+@cli.command()
+@click.option("--infile", type=Path)
+@click.option("--db_loc", type=Path, default=":memory:")
+def write_ads_to_db(infile, db_loc=":memory:"):
+    engine = create_engine(f"sqlite:///{db_loc}")
+    BASE.metadata.create_all(engine)
+
+    Session = sessionmaker(bind=engine)
+    session = Session()
+
+    try:
+        t = 0
+        with open(infile, "r") as f0:
+            for cnt, line in tqdm(enumerate(f0)):
+                r = json.loads(line)
+                affil = r["nasa_afil"] == "YES"
+                p = Paper(
+                    bibcode=r["bibcode"],
+                    title=r["title"],
+                    abstract=r["abstract"],
+                    year=r["year"],
+                    citation_count=r["citation_count"],
+                    nasa_affiliation=affil,
+                )
+                session.add(p)
+                t += 1
+        session.commit()
+        LOG.info(f"Added {t} papers to database.")
+    except:
+        session.rollback()
+        LOG.warning(f"Aborted adding papers to database.")
+        raise
+    finally:
+        session.close()
 
 
 @cli.command()
@@ -693,86 +681,6 @@ def prepare_for_lda(
         json.dump(corp2paper, f0)
     with open(out_dct2kwd, "w") as f0:
         json.dump(dct2kwd, f0)
-
-
-def read_from_prepared_data(prepared_data_dir):
-    in_corp = prepared_data_dir / "corpus.mm"
-    in_dct = prepared_data_dir / "dct.mm"
-    in_corp2paper = prepared_data_dir / "corp2paper.json"
-    in_dct2kwd = prepared_data_dir / "dct2kwd.json"
-
-    corpus = MmCorpus(str(in_corp))
-    dictionary = Dictionary.load(str(in_dct))
-    with open(in_corp2paper, "r") as f0:
-        corp2paper = json.load(f0)
-    with open(in_dct2kwd, "r") as f0:
-        dct2kwd = json.load(f0)
-
-    return corpus, dictionary, corp2paper, dct2kwd
-
-
-@cli.command()
-@click.option("--prepared_data_dir", type=Path)
-@click.option("--config_loc", type=Path)
-@click.option("--out_models_dir", type=Path)
-@click.option("--out_coh_csv", type=Path)
-def make_topic_models(prepared_data_dir, config_loc, out_models_dir, out_coh_csv):
-    corpus, dictionary, _, _ = read_from_prepared_data(prepared_data_dir)
-    with open(config_loc, "r") as f0:
-        config = yaml.safe_load(f0)
-
-    LOG.info(f"Running with config: \n {pformat(config)}")
-    tm = TopicModeler(dictionary, corpus)
-    models = tm.make_all_topic_models(config["topic_range"], **config["lda"])
-    coherences = tm.get_coherences(models)
-    n_topics = [m.num_topics for m in models]
-    df = pd.DataFrame(zip(n_topics, coherences))
-
-    LOG.info(f"Writing coherence scores to {out_coh_csv}.")
-    df.columns = ["num_topics", "coherence (u_mass)"]
-    df.to_csv(out_coh_csv)
-
-    out_models_dir.mkdir(exist_ok=True)
-    for m in models:
-        mp = out_models_dir / f"topic_model{m.num_topics}"
-        LOG.info(f"Writing model to {mp}")
-        m.save(str(mp))
-
-
-@cli.command()
-@click.option("--infile", type=Path)
-@click.option("--db_loc", type=Path, default=":memory:")
-def write_ads_to_db(infile, db_loc=":memory:"):
-    engine = create_engine(f"sqlite:///{db_loc}")
-    BASE.metadata.create_all(engine)
-
-    Session = sessionmaker(bind=engine)
-    session = Session()
-
-    try:
-        t = 0
-        with open(infile, "r") as f0:
-            for cnt, line in tqdm(enumerate(f0)):
-                r = json.loads(line)
-                affil = r["nasa_afil"] == "YES"
-                p = Paper(
-                    bibcode=r["bibcode"],
-                    title=r["title"],
-                    abstract=r["abstract"],
-                    year=r["year"],
-                    citation_count=r["citation_count"],
-                    nasa_affiliation=affil,
-                )
-                session.add(p)
-                t += 1
-        session.commit()
-        LOG.info(f"Added {t} papers to database.")
-    except:
-        session.rollback()
-        LOG.warning(f"Aborted adding papers to database.")
-        raise
-    finally:
-        session.close()
 
 
 if __name__ == "__main__":

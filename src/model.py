@@ -14,10 +14,14 @@ from gensim.corpora import MmCorpus, Dictionary
 from gensim.models import LdaModel, CoherenceModel
 from matplotlib import pyplot as plt
 from pathlib import Path
+from sklearn.cluster import KMeans
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from tqdm import tqdm
 from tsfresh import extract_features
+from yellowbrick.cluster import KElbowVisualizer
+from yellowbrick.features import Manifold
+from dtw_time_analysis import dtw_kwds
 
 from db import Paper
 
@@ -113,6 +117,9 @@ class VisPrepper:
         self.embedding_df = None
         self.paper2years = None
         self.topic_coherences = None
+        self.characteristics = None
+        self.kmeans = None
+        self.manifold = None
 
     def read_hdf(self, vis_data_loc):
 
@@ -130,14 +137,7 @@ class VisPrepper:
         self.embedding_df = embedding_df
         self.topic_coherences = topic_coherences
 
-    def get_time_features(self, min_topic_prob_thresh, year_min, year_max):
-        # vis_data_loc = "../scratch/vis_data.hdf5"
-        # min_topic_prob_thresh = 0.3
-        # year_min = 1997
-        # year_max = 2010
-        #
-        # embedding_df, pby, topic_coherences = load_vis_data(vis_data_loc)
-
+    def get_time_characteristics(self, min_topic_prob_thresh, year_min, year_max):
         all_time_series = []
         for topic in tqdm(self.embedding_df.columns):
             tf = self.embedding_df.loc[:, topic] >= min_topic_prob_thresh
@@ -170,6 +170,46 @@ class VisPrepper:
         features_df["CAGR"] = ts_df.apply(cagr, axis=1)
 
         return ts_df, features_df
+
+    @staticmethod
+    def get_dynamic_time_warp_clusters(ts_df):
+        dtw_df = dtw_kwds(ts_df)
+        visualizer = yellow_plot_kmd(dtw_df)
+        n_clusters = visualizer.elbow_value_
+        kmeans = dtw_to_tboard(ts_df, dtw_df, c=n_clusters)
+        dtw_man = dtw_to_manifold(dtw_df)
+        return kmeans, dtw_man
+
+
+def dtw_to_manifold(dtw_df, out_plot=None):
+    LOG.info("Computing tsne manifold.")
+    viz = Manifold(manifold="tsne")
+    dtw_man = viz.fit_transform(dtw_df)  # Fit the data to the visualizer
+    if out_plot is not None:
+        LOG.info(f"Writing tsne manifold plot to {out_plot}.")
+        viz.show(out_plot)  # Finalize and render the figure
+    return dtw_man
+
+
+def dtw_to_tboard(normed_kwd_years, dtw_df, c=6, lim=1000):
+    """Use pre-computed dynamic time warp values and calculate kmeans."""
+    # TODO: Used elbow to determine, but not being placed programmatically
+    LOG.info(f"Performing kmeans with {c} clusters.")
+    m = KMeans(n_clusters=c)
+    m.fit(dtw_df.values)
+    return m
+
+
+def yellow_plot_kmd(X, out_plot=None, c_min=2, c_max=20):
+    LOG.info(f"Trying kmeans n_clusters from {c_min} to {c_max}")
+    model = KMeans()
+    visualizer = KElbowVisualizer(model, k=(c_min, c_max))
+    visualizer.fit(X)  # Fit the data to the visualizer
+    LOG.info(f"Writing elbow to {out_plot}.")
+    if out_plot is None:
+        return visualizer
+    else:
+        visualizer.show(out_plot)
 
 
 @click.group()
@@ -243,6 +283,15 @@ def prepare_for_topic_model_viz(db_loc, prepared_data_dir, tmodel_loc, vis_data_
     pby.to_hdf(vis_data_loc, key="paper2bibcode2year")
 
 
+@cli.command()
+@click.option("--vis_data_loc", type=Path)
+def get_time_chars(vis_data_loc):
+    vp = VisPrepper()
+    vp.read_hdf(vis_data_loc)
+    ts_df, chars_df = vp.get_time_characteristics(0.1, year_min=1997, year_max=2010)
+    kmeans, dtw_man = vp.get_dynamic_time_warp_clusters(ts_df)
+
+
 def get_coherence_plot(df):
     # df = pd.read_csv(infile, index_col=0)
     xlab = "num_topics"
@@ -254,3 +303,7 @@ def get_coherence_plot(df):
     plt.title("Topic Model Coherence versus Number of Topics")
     fig = plt.gcf()
     return fig
+
+
+if __name__ == "__main__":
+    cli()

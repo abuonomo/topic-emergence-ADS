@@ -35,7 +35,7 @@ prepare-for-lda:
 
 ## Train topic models
 make-topic-models:
-	python src/db.py make-topic-models \
+	python src/model.py make-topic-models \
 		--prepared_data_dir scratch/prepared_data \
 		--config_loc config/config.yaml \
 		--out_models_dir scratch/tmodels \
@@ -43,10 +43,15 @@ make-topic-models:
 
 ## Prepare visualization data
 prepare-for-topic-model-viz:
-	python src/db.py prepare-for-topic-model-viz \
+	python src/model.py prepare-for-topic-model-viz \
 		--db_loc scratch/test.sqlite \
 		--prepared_data_dir  scratch/prepared_data \
 		--tmodel_loc scratch/tmodels/topic_model20 \
+		--vis_data_loc scratch/vis_data.hdf5
+
+## Get time and characteristics
+get-time-chars:
+	python src/model.py get-time-chars \
 		--vis_data_loc scratch/vis_data.hdf5
 
 #################################################################################

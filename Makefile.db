@@ -41,12 +41,13 @@ make-topic-models:
 		--out_models_dir scratch/tmodels \
 		--out_coh_csv scratch/coherence.csv
 
+N_TOPICS=500
 ## Prepare visualization data
 prepare-for-topic-model-viz:
 	python src/model.py prepare-for-topic-model-viz \
 		--db_loc scratch/test.sqlite \
 		--prepared_data_dir  scratch/prepared_data \
-		--tmodel_loc scratch/tmodels/topic_model20 \
+		--tmodel_loc scratch/tmodels/topic_model$(N_TOPICS) \
 		--vis_data_loc scratch/vis_data.hdf5
 
 ## Get time and characteristics

@@ -114,7 +114,7 @@ def cagr(x_row):
 
 class VisPrepper:
     def __init__(self):
-        self.feature_table = None
+        self.pyLDAvis_data = None
         self.embedding_df = None
         self.paper2years = None
         self.topic_coherences = None
@@ -129,7 +129,6 @@ class VisPrepper:
             topic_coherences = f0["topic_coherences"][:]
             paper_inds = f0["paper_inds"][:]
 
-        self.feature_table = pd.read_hdf(vis_data_loc, key="pyLDAvis_features")
         self.paper2years = pd.read_hdf(vis_data_loc, key="paper2bibcode2year")
 
         embedding_df = pd.DataFrame(embedding)
@@ -137,6 +136,10 @@ class VisPrepper:
 
         self.embedding_df = embedding_df
         self.topic_coherences = topic_coherences
+
+    def read_pyLDAvis_data(self, pyLDAvis_data_loc):
+        with open(pyLDAvis_data_loc, 'r') as f0:
+            self.pyLDAvis_data = json.load(f0)
 
     def get_time_characteristics(self, min_topic_prob_thresh, year_min, year_max):
         all_time_series = []
@@ -251,7 +254,10 @@ def make_topic_models(prepared_data_dir, config_loc, out_models_dir, out_coh_csv
 @click.option("--prepared_data_dir", type=Path)
 @click.option("--tmodel_loc", type=Path)
 @click.option("--vis_data_loc", type=Path)
-def prepare_for_topic_model_viz(db_loc, prepared_data_dir, tmodel_loc, vis_data_loc):
+@click.option("--pdLDAvis_data_loc", type=Path)
+def prepare_for_topic_model_viz(
+    db_loc, prepared_data_dir, tmodel_loc, vis_data_loc, pyLDAvis_data_loc
+):
     corpus, dictionary, corp2paper, dct2kwd = read_from_prepared_data(prepared_data_dir)
 
     lda_model = LdaModel.load(str(tmodel_loc))
@@ -280,7 +286,8 @@ def prepare_for_topic_model_viz(db_loc, prepared_data_dir, tmodel_loc, vis_data_
         f0.create_dataset("embedding", dtype=np.float, data=embedding)
         f0.create_dataset("topic_coherences", dtype=np.float, data=coh_per_topic)
         f0.create_dataset("paper_inds", dtype=np.int, data=paper_inds)
-    viz_data[2].to_hdf(vis_data_loc, key="pyLDAvis_features")
+    with open(pyLDAvis_data_loc, "w") as f0:
+        json.dump(viz_data.to_json(), f0)
     pby.to_hdf(vis_data_loc, key="paper2bibcode2year")
 
 

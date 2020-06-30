@@ -253,17 +253,20 @@ def make_topic_models(prepared_data_dir, config_loc, out_models_dir, out_coh_csv
 @click.option("--db_loc", type=Path)
 @click.option("--prepared_data_dir", type=Path)
 @click.option("--tmodel_loc", type=Path)
-@click.option("--vis_data_loc", type=Path)
-@click.option("--pdLDAvis_data_loc", type=Path)
+@click.option("--vis_data_dir", type=Path)
 def prepare_for_topic_model_viz(
-    db_loc, prepared_data_dir, tmodel_loc, vis_data_loc, pyLDAvis_data_loc
+    db_loc, prepared_data_dir, tmodel_loc, vis_data_dir
 ):
+    LOG.info(f"Loading from {prepared_data_dir} and {tmodel_loc}")
     corpus, dictionary, corp2paper, dct2kwd = read_from_prepared_data(prepared_data_dir)
 
     lda_model = LdaModel.load(str(tmodel_loc))
     tm = TopicModeler(dictionary, corpus)
+
+    LOG.info("Getting embedding and transforming data.")
     embedding = tm.get_inference(lda_model)
     coh_per_topic = tm.get_coherence_model(lda_model).get_coherence_per_topic()
+
     viz_data = pyLDAvis.gensim.prepare(
         lda_model,
         tm.corpus,
@@ -279,16 +282,26 @@ def prepare_for_topic_model_viz(
     Session = sessionmaker(bind=engine)
     session = Session()
 
+    LOG.info(f"Reading paper info from database at {db_loc}")
     st = session.query(Paper.id, Paper.bibcode, Paper.year).statement
     pby = pd.read_sql(st, con=engine)
+
+    LOG.info(f"Writing data to {vis_data_dir}")
+    vis_data_dir.mkdir(exist_ok=True)
+
+    vis_data_loc = vis_data_dir / "vis_data.hdf5"
+    pyldavis_data_loc = vis_data_dir / "pyLDAvis_data.json"
 
     with h5py.File(vis_data_loc, "w") as f0:
         f0.create_dataset("embedding", dtype=np.float, data=embedding)
         f0.create_dataset("topic_coherences", dtype=np.float, data=coh_per_topic)
         f0.create_dataset("paper_inds", dtype=np.int, data=paper_inds)
-    with open(pyLDAvis_data_loc, "w") as f0:
-        json.dump(viz_data.to_json(), f0)
     pby.to_hdf(vis_data_loc, key="paper2bibcode2year")
+    LOG.info(vis_data_loc)
+
+    with open(pyldavis_data_loc, "w") as f0:
+        json.dump(viz_data.to_json(), f0)
+    LOG.info(pyldavis_data_loc)
 
 
 @cli.command()

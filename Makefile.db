@@ -48,8 +48,7 @@ N_TOPICS=500
 		--db_loc scratch/test.sqlite \
 		--prepared_data_dir  scratch/prepared_data \
 		--tmodel_loc scratch/tmodels/topic_model$(N_TOPICS) \
-		--vis_data_loc scratch/vis_data.hdf5 \
-		--pdLDAvis_data_loc scratch/pyLDAvis_data.json
+		--vis_data_dir scratch/vis_data \
 
 ## 7. Get time and characteristics
 7-get-time-chars:

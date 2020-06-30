@@ -4,6 +4,7 @@ from pprint import pformat
 
 import click
 import dask
+from typing import List
 import h5py
 import logging
 import numpy as np
@@ -24,7 +25,7 @@ from yellowbrick.cluster import KElbowVisualizer
 from yellowbrick.features import Manifold
 from dtw_time_analysis import dtw_kwds
 
-from db import Paper
+from db import Paper, Keyword, PaperKeywords
 
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
@@ -121,20 +122,27 @@ class VisPrepper:
         self.characteristics = None
         self.kmeans = None
         self.manifold = None
+        self.kwd_ts_df = None
 
     def read_hdf(self, vis_data_loc):
 
         with h5py.File(vis_data_loc, "r") as f0:
             embedding = f0["embedding"][:]
             topic_coherences = f0["topic_coherences"][:]
-            paper_inds = f0["paper_inds"][:]
+            paper_ids = f0["paper_ids"][:]
+            keyword_ids = f0["keyword_ids"][:]
+            kwd_ts_values = f0["keyword_ts_values"][:]
 
         self.paper2years = pd.read_hdf(vis_data_loc, key="paper2bibcode2year")
 
         embedding_df = pd.DataFrame(embedding)
-        embedding_df.index = paper_inds
-
+        embedding_df.index = paper_ids
         self.embedding_df = embedding_df
+
+        kwd_ts_df = pd.DataFrame(kwd_ts_values)
+        kwd_ts_df.index = keyword_ids
+        self.kwd_ts_df = kwd_ts_df
+
         self.topic_coherences = topic_coherences
 
     def read_pyLDAvis_data(self, pyLDAvis_data_loc):
@@ -249,6 +257,43 @@ def make_topic_models(prepared_data_dir, config_loc, out_models_dir, out_coh_csv
         m.save(str(mp))
 
 
+def get_pby(session, paper_ids: List, batch_size=990):
+    batches = range(0, len(paper_ids), batch_size)
+    pbar = tqdm(batches)
+    all_records = []
+    for i in pbar:
+        paper_id_batch = paper_ids[i: i + batch_size]
+        q = (
+            session.query(Paper.id, Paper.bibcode, Paper.year)
+            .filter(Paper.id.in_(paper_id_batch))
+        )
+        all_records = all_records + q.all()
+    df = pd.DataFrame(all_records)
+    df.columns = ['id', 'bibcode', 'year']
+    return df
+
+
+def get_kwd_ts_df(session, keyword_ids: List, batch_size=990):
+    batches = range(0, len(keyword_ids), batch_size)
+    pbar = tqdm(batches)
+    all_records = []
+    for i in pbar:
+        kwd_id_batch = keyword_ids[i: i + batch_size]
+        q = (
+            session.query(PaperKeywords)
+            .join(Keyword)
+            .filter(Keyword.id.in_(kwd_id_batch))
+        )
+        records = [{'keyword': pk.keyword.keyword, 'year': pk.paper.year} for pk in q]
+        all_records = all_records + records
+    df = pd.DataFrame(all_records)
+    df.columns = ["keyword", 'year']
+    df['count'] = 1
+    cdf = df.groupby(['keyword', 'year']).count().reset_index()
+    kwd_ts_df = cdf.pivot(index="keyword", columns='year', values='count').fillna(0)
+    return kwd_ts_df
+
+
 @cli.command()
 @click.option("--db_loc", type=Path)
 @click.option("--prepared_data_dir", type=Path)
@@ -276,15 +321,16 @@ def prepare_for_topic_model_viz(
         mds="mmds",
         start_index=0,
     )
-    corpus_inds, paper_inds = zip(*corp2paper)
+    corpus_inds, paper_ids = zip(*corp2paper)
+    dct_inds, keyword_ids = zip(*dct2kwd)
 
     engine = create_engine(f"sqlite:///{db_loc}")
     Session = sessionmaker(bind=engine)
     session = Session()
 
     LOG.info(f"Reading paper info from database at {db_loc}")
-    st = session.query(Paper.id, Paper.bibcode, Paper.year).statement
-    pby = pd.read_sql(st, con=engine)
+    pby = get_pby(session, paper_ids)
+    kwd_ts_df = get_kwd_ts_df(session, keyword_ids)
 
     LOG.info(f"Writing data to {vis_data_dir}")
     vis_data_dir.mkdir(exist_ok=True)
@@ -292,10 +338,14 @@ def prepare_for_topic_model_viz(
     vis_data_loc = vis_data_dir / "vis_data.hdf5"
     pyldavis_data_loc = vis_data_dir / "pyLDAvis_data.json"
 
+    dt = h5py.string_dtype()
     with h5py.File(vis_data_loc, "w") as f0:
         f0.create_dataset("embedding", dtype=np.float, data=embedding)
         f0.create_dataset("topic_coherences", dtype=np.float, data=coh_per_topic)
-        f0.create_dataset("paper_inds", dtype=np.int, data=paper_inds)
+        f0.create_dataset("paper_ids", dtype=np.int, data=paper_ids)
+        f0.create_dataset("keyword_ids", dtype=np.int, data=keyword_ids)
+        f0.create_dataset("keyword_ts_values", dtype=np.int, data=kwd_ts_df.values)
+        f0.create_dataset("keywords", dtype=dt, data=kwd_ts_df.index)
     pby.to_hdf(vis_data_loc, key="paper2bibcode2year")
     LOG.info(vis_data_loc)
 

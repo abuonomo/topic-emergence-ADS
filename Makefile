@@ -190,7 +190,12 @@ link-data-to-app:
 ## Run app for visualize results in development mode
 app-dev: | $(APP_DATA_FILES)
 	export VERSION=$$(python version.py); \
-	export FLASK_ENV=development APP_DATA_DIR=data export VERSION=$$(python version.py) && cd app && flask run
+	export FLASK_ENV=development; \
+	export APP_DATA_DIR=data; \
+	export VERSION=$$(python version.py); \
+	cd app; \
+	export PYTHONPATH=$${PYTHONPATH}:../src/; \
+	flask run
 
 ## Run app for visualize results in production mode
 PORT=5000

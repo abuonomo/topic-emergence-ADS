@@ -11,6 +11,8 @@ import requests
 from flask import Flask, render_template, jsonify, request
 from sklearn.preprocessing import MinMaxScaler
 
+from model import VisPrepper
+
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
@@ -37,17 +39,19 @@ except KeyError:
 ADS_TOKEN = os.environ['ADS_TOKEN']
 
 app.config.update(
-    SC_LOC=DATA_DIR / f"slope_complex.csv",
-    N_LOC=DATA_DIR / f"all_keywords_threshold.jsonl",
-    KWD_SC_LOC=DATA_DIR / f"kwd_slope_complex.csv",
-    KWD_N_LOC=DATA_DIR / f"kwd_all_keywords_threshold.jsonl",
+    VIS_DATA_LOC=DATA_DIR / "vis_data.hdf5",
+    VP=None,
+    # SC_LOC=DATA_DIR / f"slope_complex.csv",
+    # N_LOC=DATA_DIR / f"all_keywords_threshold.jsonl",
+    # KWD_SC_LOC=DATA_DIR / f"kwd_slope_complex.csv",
+    # KWD_N_LOC=DATA_DIR / f"kwd_all_keywords_threshold.jsonl",
     YC_LOC=DATA_DIR / "year_counts.csv",
-    KMEANS_LOC=DATA_DIR / "kmeans.jbl",
-    KWD_KMEANS_LOC=DATA_DIR / "kwd_kmeans.jbl",
-    MAN_LOC=DATA_DIR / "dtw_manifold_proj.jbl",
-    TOPIC_DISTRIB_LOC=DATA_DIR / "topic_distribs_to_bibcodes.hdf5",
+    # KMEANS_LOC=DATA_DIR / "kmeans.jbl",
+    # KWD_KMEANS_LOC=DATA_DIR / "kwd_kmeans.jbl",
+    # MAN_LOC=DATA_DIR / "dtw_manifold_proj.jbl",
+    # TOPIC_DISTRIB_LOC=DATA_DIR / "topic_distribs_to_bibcodes.hdf5",
     TOPIC_YEARS_LOC=DATA_DIR / "topic_years.csv",
-    VIZ_DATA_LOC=DATA_DIR / "viz_data.json",
+    PYLDAVIS_DATA_LOC=DATA_DIR / "viz_data.json",
     SC_DF=None,
     N_DF=None,
     KWD_SC_DF=None,
@@ -85,42 +89,52 @@ def get_paper_from_bibcode(bibcode):
 
 @app.before_first_request
 def init():
-    LOG.info(f'Reading derived time series measure from {app.config["SC_LOC"]}.')
-    app.config["SC_DF"] = pd.read_csv(app.config["SC_LOC"], index_col=0)
+    app.config['VP'] = VisPrepper()
+    app.config['VP'].read_hdf(app.config['VIS_DATA_LOC'])
+    ts_df, features_df = app.config['VP'].get_time_characteristics(0.1, 1997, 2010)
+    kmeans, dtw_man = app.config['VP'].get_dynamic_time_warp_clusters(ts_df)
+    app.config['SC_DF'] = features_df
+    app.config['SC_DF']['kmeans_cluster'] = kmeans.labels_
+    import ipdb; ipdb.set_trace()
 
-    LOG.info(f'Reading full stem time series from {app.config["N_LOC"]}.')
-    app.config["N_DF"] = pd.read_json(app.config["N_LOC"], orient="records", lines=True)
+    # LOG.info(f'Reading derived time series measure from {app.config["SC_LOC"]}.')
+    # app.config["SC_DF"] = pd.read_csv(app.config["SC_LOC"], index_col=0)
 
-    LOG.info(f'Reading derived time series measure from {app.config["KWD_SC_LOC"]}.')
-    app.config["KWD_SC_DF"] = pd.read_csv(app.config["KWD_SC_LOC"], index_col=0)
+    # LOG.info(f'Reading full stem time series from {app.config["N_LOC"]}.')
+    # app.config["N_DF"] = pd.read_json(app.config["N_LOC"], orient="records", lines=True)
+    app.config["N_DF"] = ts_df
 
-    LOG.info(f'Reading full stem time series from {app.config["KWD_N_LOC"]}.')
-    app.config["KWD_N_DF"] = pd.read_json(app.config["KWD_N_LOC"], orient="records", lines=True)
+    # LOG.info(f'Reading derived time series measure from {app.config["KWD_SC_LOC"]}.')
+    # app.config["KWD_SC_DF"] = pd.read_csv(app.config["KWD_SC_LOC"], index_col=0)
 
-    LOG.info(f"Reading kmeans model from {app.config['KMEANS_LOC']}")
-    app.config["KMEANS"] = joblib.load(app.config["KMEANS_LOC"])
+    # LOG.info(f'Reading full stem time series from {app.config["KWD_N_LOC"]}.')
+    # app.config["KWD_N_DF"] = pd.read_json(app.config["KWD_N_LOC"], orient="records", lines=True)
+    app.config['KWD_N_DF'] = app.config['VP'].kwd_ts_df
 
-    LOG.info(f"Reading kmeans model from {app.config['KWD_KMEANS_LOC']}")
-    app.config["KWD_KMEANS"] = joblib.load(app.config["KWD_KMEANS_LOC"])
+    # LOG.info(f"Reading kmeans model from {app.config['KMEANS_LOC']}")
+    # app.config["KMEANS"] = joblib.load(app.config["KMEANS_LOC"])
+
+    # LOG.info(f"Reading kmeans model from {app.config['KWD_KMEANS_LOC']}")
+    # app.config["KWD_KMEANS"] = joblib.load(app.config["KWD_KMEANS_LOC"])
 
     manifold_data = joblib.load(app.config["MAN_LOC"])
     app.config["YEAR_COUNTS"] = pd.read_csv(app.config["YC_LOC"], index_col=0)
 
-    app.config["SC_DF"]["kmeans_cluster"] = app.config["KMEANS"].labels_
+    # app.config["SC_DF"]["kmeans_cluster"] = app.config["KMEANS"].labels_
     log_count = np.log(app.config["SC_DF"]["count"])
 
-    app.config["KWD_SC_DF"]["kmeans_cluster"] = app.config["KWD_KMEANS"].labels_
+    # app.config["KWD_SC_DF"]["kmeans_cluster"] = app.config["KWD_KMEANS"].labels_
     # log_count = np.log(app.config["KWD_SC_DF"]["count"])
 
     scaler = MinMaxScaler(feature_range=(3, 10))
     app.config["SC_DF"]["scaled_counts"] = scaler.fit_transform(
         log_count.values.reshape(-1, 1)
     )
-    app.config["SC_DF"]["manifold_x"] = manifold_data[:, 0]
-    app.config["SC_DF"]["manifold_y"] = manifold_data[:, 1]
+    app.config["SC_DF"]["manifold_x"] = dtw_man[:, 0]
+    app.config["SC_DF"]["manifold_y"] = dtw_man[:, 1]
 
-    with open(app.config['VIZ_DATA_LOC'], 'r') as f0:
-        app.config['VIZ_DATA'] = json.load(f0)
+    with open(app.config['PYLDAVIS_DATA_LOC'], 'r') as f0:
+        app.config['PYLADVIS_DATA'] = json.load(f0)
 
     LOG.info(f"Ready")
 
@@ -134,7 +148,7 @@ def index():
 @app.route("/lda", methods=["GET"])
 def lda():
     LOG.info("Serving LDA viz.")
-    return jsonify(app.config['VIZ_DATA'])
+    return jsonify(app.config['PYLDAVIS_DATA'])
 
 
 def load_topic_distributions(loc: os.PathLike, t: int):

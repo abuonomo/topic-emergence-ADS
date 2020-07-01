@@ -7,6 +7,7 @@ from pathlib import Path
 import joblib
 import numpy as np
 import pandas as pd
+import yaml
 import requests
 from flask import Flask, render_template, jsonify, request
 from sklearn.preprocessing import MinMaxScaler
@@ -39,6 +40,7 @@ except KeyError:
 ADS_TOKEN = os.environ['ADS_TOKEN']
 
 app.config.update(
+    PARAM_CONFIG_LOC=DATA_DIR / "config.yaml",
     VIS_DATA_LOC=DATA_DIR / "vis_data.hdf5",
     VP=None,
     # SC_LOC=DATA_DIR / f"slope_complex.csv",
@@ -89,9 +91,13 @@ def get_paper_from_bibcode(bibcode):
 
 @app.before_first_request
 def init():
+    with open(app.config['PARAM_CONFIG_LOC'], 'r') as f0:
+        config = yaml.load(f0)
+
     app.config['VP'] = VisPrepper()
     app.config['VP'].read_hdf(app.config['VIS_DATA_LOC'])
-    ts_df, features_df = app.config['VP'].get_time_characteristics(0.1, 1997, 2010)
+    app.config['VP'].read_pyldavis_data(app.config['PYLDAVIS_DATA_LOC'])
+    ts_df, features_df = app.config['VP'].get_time_characteristics(**config['app'])
     kmeans, dtw_man = app.config['VP'].get_dynamic_time_warp_clusters(ts_df)
     app.config['SC_DF'] = features_df
     app.config['SC_DF']['kmeans_cluster'] = kmeans.labels_

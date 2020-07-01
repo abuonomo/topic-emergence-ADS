@@ -1,6 +1,7 @@
 import json
 from contextlib import closing
 from html import unescape
+from html.parser import HTMLParser
 from pprint import pformat
 
 import click
@@ -29,13 +30,30 @@ from textacy.ke import textrank
 from tqdm import tqdm
 from typing import Dict, Union, Generator
 
-from extract_keywords import strip_tags
-
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
 
 BASE = declarative_base()
+
+
+class MLStripper(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.reset()
+        self.fed = []
+
+    def handle_data(self, d):
+        self.fed.append(d)
+
+    def get_data(self):
+        return "".join(self.fed)
+
+
+def strip_tags(html):
+    s = MLStripper()
+    s.feed(html)
+    return s.get_data()
 
 
 class PaperKeywords(BASE):

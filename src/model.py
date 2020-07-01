@@ -124,16 +124,16 @@ class VisPrepper:
         self.manifold = None
         self.kwd_ts_df = None
 
-    def read_hdf(self, vis_data_loc):
+    def read_hdf(self, viz_data_loc):
 
-        with h5py.File(vis_data_loc, "r") as f0:
+        with h5py.File(viz_data_loc, "r") as f0:
             embedding = f0["embedding"][:]
             topic_coherences = f0["topic_coherences"][:]
             paper_ids = f0["paper_ids"][:]
             keyword_ids = f0["keyword_ids"][:]
             kwd_ts_values = f0["keyword_ts_values"][:]
 
-        self.paper2years = pd.read_hdf(vis_data_loc, key="paper2bibcode2year")
+        self.paper2years = pd.read_hdf(viz_data_loc, key="paper2bibcode2year")
 
         embedding_df = pd.DataFrame(embedding)
         embedding_df.index = paper_ids
@@ -145,7 +145,7 @@ class VisPrepper:
 
         self.topic_coherences = topic_coherences
 
-    def read_pyLDAvis_data(self, pyLDAvis_data_loc):
+    def read_pyldavis_data(self, pyLDAvis_data_loc):
         with open(pyLDAvis_data_loc, 'r') as f0:
             self.pyLDAvis_data = json.load(f0)
 
@@ -164,7 +164,8 @@ class VisPrepper:
                 .groupby("year")
                 .count()["id"]
             )
-            year_counts = year_counts.reset_index().to_records()
+            year_counts_df = year_counts.reset_index()
+            year_counts = year_counts_df.to_records()
             ycd = defaultdict(int, {y: c for _, y, c in year_counts})
             topic_time_series = [
                 {"topic": topic, "year": y, "count": ycd[y]}
@@ -298,9 +299,9 @@ def get_kwd_ts_df(session, keyword_ids: List, batch_size=990):
 @click.option("--db_loc", type=Path)
 @click.option("--prepared_data_dir", type=Path)
 @click.option("--tmodel_loc", type=Path)
-@click.option("--vis_data_dir", type=Path)
+@click.option("--viz_data_dir", type=Path)
 def prepare_for_topic_model_viz(
-    db_loc, prepared_data_dir, tmodel_loc, vis_data_dir
+    db_loc, prepared_data_dir, tmodel_loc, viz_data_dir
 ):
     LOG.info(f"Loading from {prepared_data_dir} and {tmodel_loc}")
     corpus, dictionary, corp2paper, dct2kwd = read_from_prepared_data(prepared_data_dir)
@@ -332,34 +333,37 @@ def prepare_for_topic_model_viz(
     pby = get_pby(session, paper_ids)
     kwd_ts_df = get_kwd_ts_df(session, keyword_ids)
 
-    LOG.info(f"Writing data to {vis_data_dir}")
-    vis_data_dir.mkdir(exist_ok=True)
+    LOG.info(f"Writing data to {viz_data_dir}")
+    viz_data_dir.mkdir(exist_ok=True)
 
-    vis_data_loc = vis_data_dir / "vis_data.hdf5"
-    pyldavis_data_loc = vis_data_dir / "pyLDAvis_data.json"
+    viz_data_loc = viz_data_dir / "viz_data.hdf5"
+    pyldaviz_data_loc = viz_data_dir / "pyLDAviz_data.json"
 
     dt = h5py.string_dtype()
-    with h5py.File(vis_data_loc, "w") as f0:
+    with h5py.File(viz_data_loc, "w") as f0:
         f0.create_dataset("embedding", dtype=np.float, data=embedding)
         f0.create_dataset("topic_coherences", dtype=np.float, data=coh_per_topic)
         f0.create_dataset("paper_ids", dtype=np.int, data=paper_ids)
         f0.create_dataset("keyword_ids", dtype=np.int, data=keyword_ids)
         f0.create_dataset("keyword_ts_values", dtype=np.int, data=kwd_ts_df.values)
         f0.create_dataset("keywords", dtype=dt, data=kwd_ts_df.index)
-    pby.to_hdf(vis_data_loc, key="paper2bibcode2year")
-    LOG.info(vis_data_loc)
+    pby.to_hdf(viz_data_loc, key="paper2bibcode2year")
+    LOG.info(viz_data_loc)
 
-    with open(pyldavis_data_loc, "w") as f0:
+    with open(pyldaviz_data_loc, "w") as f0:
         json.dump(viz_data.to_json(), f0)
-    LOG.info(pyldavis_data_loc)
+    LOG.info(pyldaviz_data_loc)
 
 
 @cli.command()
-@click.option("--vis_data_loc", type=Path)
-def get_time_chars(vis_data_loc):
+@click.option("--viz_data_loc", type=Path)
+@click.option("--config_loc", type=Path)
+def get_time_chars(viz_data_loc, config_loc):
+    with open(config_loc, 'r') as f0:
+        config = yaml.safe_load(f0)
     vp = VisPrepper()
-    vp.read_hdf(vis_data_loc)
-    ts_df, chars_df = vp.get_time_characteristics(0.1, year_min=1997, year_max=2010)
+    vp.read_hdf(viz_data_loc)
+    ts_df, chars_df = vp.get_time_characteristics(**config['app'])
     kmeans, dtw_man = vp.get_dynamic_time_warp_clusters(ts_df)
 
 

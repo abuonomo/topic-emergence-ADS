@@ -18,7 +18,7 @@ db: 0-join-and-clean \
 	3-add-missed-locations
 
 lda: 4-prepare-for-lda \
-	5-make-topic-models
+	 5-make-topic-models
 
 .PHONY: requirements \
 		sync-raw-data-from-s3 \

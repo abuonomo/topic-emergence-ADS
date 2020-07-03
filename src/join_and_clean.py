@@ -33,7 +33,7 @@ def load_records_to_dataframe(
     """
     records = []
     LOG.info(f"Loading from directory: {data_dir}")
-    if limit is not None:
+    if (limit is not None) and (limit > 0):
         LOG.info(f"Limiting to {limit} records per year for testing.")
     pbar = tqdm(list(data_dir.iterdir()))
     for p in pbar:
@@ -43,7 +43,7 @@ def load_records_to_dataframe(
         if first_year is not None:
             if int(r["year"]) < first_year:
                 continue
-        if limit is not None:
+        if (limit is not None) and (limit > 0):
             docs = pd.DataFrame(r["docs"][0:limit])
         else:
             docs = pd.DataFrame(r["docs"])

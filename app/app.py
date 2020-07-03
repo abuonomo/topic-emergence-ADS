@@ -144,7 +144,6 @@ def topic_bibcodes():
 
 @app.route("/keyword_distribs", methods=["GET"])
 def keyword_distribs():
-    import ipdb; ipdb.set_trace()
     df = pd.DataFrame(app.config['PYLDAVIS_DATA']['token.table'])
     records = df.to_dict(orient='records')
     return jsonify(records)

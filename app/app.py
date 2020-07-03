@@ -99,62 +99,21 @@ def load_kwd_ts_df(viz_data_loc):
 
 @app.before_first_request
 def init():
-    # with open(app.config['PARAM_CONFIG_LOC'], 'r') as f0:
-    #     config = yaml.load(f0)
-
-    # app.config['VP'] = VizPrepper()
-    # app.config['VP'].read_hdf(app.config['VIZ_DATA_LOC'])
-    # app.config['VP'].read_pyldavis_data(app.config['PYLDAVIS_DATA_LOC'])
-    # app.config['PYLDAVIS_DATA'] = app.config['VP'].pyLDAvis_data
     with open(app.config['PYLDAVIS_DATA_LOC'], 'r') as f0:
         app.config['PYLDAVIS_DATA'] = json.load(f0)
-
-    # ts_df, features_df = app.config['VP'].get_time_characteristics(**config['app'])
-    # kmeans, dtw_man = app.config['VP'].get_dynamic_time_warp_clusters(ts_df)
-    # app.config['SC_DF'] = features_df
-    # app.config['SC_DF']['kmeans_cluster'] = kmeans.labels_
-
     LOG.info(f'Reading derived time series measure from {app.config["SC_LOC"]}.')
     app.config["SC_DF"] = pd.read_csv(app.config["SC_LOC"], index_col=0)
-
-    # app.config["N_DF"] = pd.read_json(app.config["N_LOC"], orient="records", lines=True)
     app.config["N_DF"] = pd.read_csv(app.config["N_LOC"], index_col=0)
-
-    # LOG.info(f'Reading derived time series measure from {app.config["KWD_SC_LOC"]}.')
-    # app.config["KWD_SC_DF"] = pd.read_csv(app.config["KWD_SC_LOC"], index_col=0)
-
-    # LOG.info(f'Reading full stem time series from {app.config["KWD_N_LOC"]}.')
-    # app.config["KWD_N_DF"] = pd.read_json(app.config["KWD_N_LOC"], orient="records", lines=True)
     app.config['KWD_N_DF'] = load_kwd_ts_df(app.config['VIZ_DATA_LOC'])
-    # app.config['KWD_N_DF'] = app.config['VP'].kwd_ts_df
-
-    # LOG.info(f"Reading kmeans model from {app.config['KMEANS_LOC']}")
-    # app.config["KMEANS"] = joblib.load(app.config["KMEANS_LOC"])
-
-    # LOG.info(f"Reading kmeans model from {app.config['KWD_KMEANS_LOC']}")
-    # app.config["KWD_KMEANS"] = joblib.load(app.config["KWD_KMEANS_LOC"])
-
-    # manifold_data = joblib.load(app.config["MAN_LOC"])
     app.config["YEAR_COUNTS"] = pd.read_csv(app.config["YC_LOC"], index_col=0)
 
-    # app.config["SC_DF"]["kmeans_cluster"] = app.config["KMEANS"].labels_
     log_count = np.log(app.config["SC_DF"]["count"])
     log_count = log_count.replace([np.inf, -np.inf], 0)
-
-    # app.config["KWD_SC_DF"]["kmeans_cluster"] = app.config["KWD_KMEANS"].labels_
-    # app.config["KWD_SC_DF"]["kmeans_cluster"] = app.config["KWD_KMEANS"].labels_
-    # log_count = np.log(app.config["KWD_SC_DF"]["count"])
 
     scaler = MinMaxScaler(feature_range=(3, 10))
     app.config["SC_DF"]["scaled_counts"] = scaler.fit_transform(
         log_count.values.reshape(-1, 1)
     )
-    # app.config["SC_DF"]["manifold_x"] = dtw_man[:, 0]
-    # app.config["SC_DF"]["manifold_y"] = dtw_man[:, 1]
-
-    # with open(app.config['PYLDAVIS_DATA_LOC'], 'r') as f0:
-    #     app.config['PYLADVIS_DATA'] = json.load(f0)
-
     LOG.info(f"Ready")
 
 

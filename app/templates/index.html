@@ -16,6 +16,7 @@
     <script src="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/js/select2.min.js"></script>
     <script src='https://cdnjs.cloudflare.com/ajax/libs/spin.js/2.0.1/spin.min.js'></script>
       <script src="https://unpkg.com/jam-icons/js/jam.min.js"></script>
+      <script src="https://unpkg.com/d3-simple-slider"></script>
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.21/css/jquery.dataTables.css">
     <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.js"></script>
   </head>
@@ -65,11 +66,20 @@
               </tr>
               <tr>
                   <td>min count</td>
-                  <td><input id="minCountInput" value="0" type="number"></input></td>
+                  <td>
+                    <div class="row align-items-center">
+                        <div class="col-sm"><div id="minCountInput"></div></div>
+                    </div>
+                  </td>
               </tr>
               <tr>
                   <td>min coherence</td>
-                  <td><input id="minRakeInput" value="-99" type="number"></input></td>
+                  <td>
+                      <div class="row align-items-center">
+                          <div class="col-sm"><div id="minRakeInput"></div></div>
+                      </div>
+<!--                      <input id="minRakeInput" type="range" min="-100" max="100" value="-99" type="number"></input>-->
+                  </td>
               </tr>
           </table>
       </div>
@@ -101,7 +111,9 @@
                 <div id="ldavis_el1"></div>
             </div>
         </div>
-        <div id='table_container' style="width: 15%; float:right; margin-right: 3%; position: relative; height: 600px">
+        <div style="width: 15%; float:right; margin-right: 3%; position: relative; height: 800px">
+            <div id='table_container' style="display: block; min-height: 600px;"></div>
+            <div id='kwd_table_container' style="display: block; height: 100%"></div>
         </div>
     </div>
     <br>
@@ -164,6 +176,61 @@
       var min_count = 1;
       var minRake= -999;
 
+      var sliderSimple;
+      var sliderScore;
+
+      d3.json(window.location.pathname + "get-count-range")
+      .then(function (data){
+        console.log(data['count_min']);
+        console.log(data['count_max']);
+
+        let third_stand = Math.trunc(data['count_mean'] + 3 * data['count_std']);
+
+        sliderSimple = d3
+        .sliderBottom()
+        .min(data['count_min'])
+        .max(d3.min([data['count_max'], third_stand]))
+        .width(150)
+        .ticks(5)
+        .tickFormat(d3.format(".2s"))
+        .step(1)
+        .default(0);
+
+        var gSimple = d3
+        .select('#minCountInput')
+        .append('svg')
+        .attr('width', 300)
+        .attr('height', 70)
+        .append('g')
+        .attr('transform', 'translate(30,30)');
+
+        gSimple.call(sliderSimple);
+      });
+
+      d3.json(window.location.pathname + "get-score-range")
+      .then(function (data){
+        console.log(data['score_min']);
+        console.log(data['score_max']);
+        sliderScore = d3
+        .sliderBottom()
+        .min(data['score_min'])
+        .max(data['score_max'])
+        .width(150)
+        .ticks(5)
+        .step(0.1)
+        .default(-99);
+
+        var gSimple = d3
+        .select('#minRakeInput')
+        .append('svg')
+        .attr('width', 300)
+        .attr('height', 70)
+        .append('g')
+        .attr('transform', 'translate(30,30)');
+
+        gSimple.call(sliderScore);
+      });
+
       d3.json(window.location.pathname + "get-scatter-data", {
             method:"POST",
             body: JSON.stringify({
@@ -190,6 +257,8 @@
             .text(function (d) { return d; }) // text showed in the menu
             .attr("value", function (d) { return d; }); // corresponding value returned by the button
 
+            d3.select('#selectButtonX').property('value', 'nasa_afil');
+
             d3.select("#selectButtonY")
             .selectAll('myOptions')
             .data(options)
@@ -197,6 +266,8 @@
             .append('option')
             .text(function (d) { return d; }) // text showed in the menu
             .attr("value", function (d) { return d; }); // corresponding value returned by the button
+
+            d3.select('#selectButtonY').property('value', 'cagr');
 
             d3.select("#selectButtonXScale")
             .selectAll('myOptions')
@@ -210,8 +281,8 @@
               // recover the option that has been chosen
               var selectedX = d3.select("#selectButtonX").property("value");
               var selectedY = d3.select("#selectButtonY").property("value");
-              var min_count = d3.select("#minCountInput").property("value");
-              var minRake = d3.select("#minRakeInput").property("value");
+              var min_count = sliderSimple.value();
+              var minRake = sliderScore.value();
               var selectedXScale = d3.select("#selectButtonXScale").property("value");
               if (selectedXScale === '^0.1') {
                 var xScale = d3.scalePow().exponent(0.1)
@@ -288,38 +359,29 @@
               }
       );
 
-      // $('#pyLDAvis').on( 'load', function() {
-      //   var iframeElementx = document.getElementById("pyLDAvis"),
-      //           iframeElementy = (iframeElementx.contentWindow || iframeElementx.contentDocument),
-      //           iframeElementz = iframeElementy.document.body;
-      //   var svg = d3.select(iframeElementz);
-      //   svg.style('margin', 0).style('padding', 0);
-      //   var nTopics = svg.selectAll('.dot').size();
-      //   console.log(nTopics);s
-      //   svg.selectAll(".dot").each(function(d, i) {
-      //     d3.select(this).on("click", onTopicClick);
-      //     svg.style('margin', 0).style('padding', 0);
-      //     var nTopics = svg.selectAll('.dot').size();
-      //     console.log(nTopics);
-      //     svg.selectAll(".dot").each(function(d, i) {
-      //       d3.select(this).on("click", onTopicClick);
-      //     });
-      //     svg.selectAll('.terms').each(function (d, i) {
-      //       d3.select(this).on("click", onRectClick);
-      //     })
-      //   });
-      //   svg.selectAll('.terms').each(function (d, i) {
-      //     d3.select(this).on("click", onRectClick);
-      //   })
-      // });
-
-      onTopicClick({'topics': '2'});
+      var opts = {
+        lines: 9, // The number of lines to draw
+        length: 9, // The length of each line
+        width: 5, // The line thickness
+        radius: 14, // The radius of the inner circle
+        color: "gainsboro", // #rgb or #rrggbb or array of colors
+        speed: 1.9, // Rounds per second
+        trail: 40, // Afterglow percentage
+        className: 'spinner', // The CSS class to assign to the spinner
+        top: '100px', // Top position relative to parent in px
+        left: '50%' // Left position relative to parent in px
+      };
+      var target = document.getElementById('table_container');
+      var spinner = new Spinner(opts).spin(target);
+      postBibcode(0, spinner, limit=100)
+      getKeywordTable()
 
     </script>
 
 <script type="text/javascript">
 d3.json(page_url + "lda").then(function(data){
-  var ldavis_el1_data = JSON.parse(data);
+  // var ldavis_el1_data = JSON.parse(data);
+  var ldavis_el1_data = data;
 
   function LDAvis_load_lib(url, callback){
     var s = document.createElement('script');
@@ -332,7 +394,7 @@ d3.json(page_url + "lda").then(function(data){
 
     // require.js not available: dynamically load d3 & LDAvis
     LDAvis_load_lib("https://d3js.org/d3.v5.min.js", function(){
-      LDAvis_load_lib(page_url + "/static/js/ldavis.js", function(){
+      LDAvis_load_lib(page_url + "static/js/ldavis.js", function(){
         new LDAvis("#" + "ldavis_el1", ldavis_el1_data);
         var svg = d3.select("#ldavis_el1");
         svg.style('margin', 0).style('padding', 0);

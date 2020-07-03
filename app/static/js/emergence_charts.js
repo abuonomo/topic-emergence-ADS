@@ -31,6 +31,23 @@ function highlightTopic(topic, labelName, sizeVal, duration=1000) {
 }
 
 
+function getKeywordTable() {
+  d3.json(page_url + "keyword_distribs").then(function(data) {
+    spinner.stop();
+    var header =  Object.keys(data[0]);
+    var table = kwd_tabulate(data, header, "kwd_table");
+    $('#kwd_table').DataTable({
+      pageLength: 10,
+      order: [[ 1, "desc" ]],
+      columnDefs: [
+        {render: $.fn.dataTable.render.number(',', '.', 3),
+          targets: [0]}
+      ],
+    });
+  });
+}
+
+
 function postBibcode(topic, spinner, limit=0) {
     d3.json(page_url + "topic_bibcodes", {
       method:"POST",
@@ -45,7 +62,7 @@ function postBibcode(topic, spinner, limit=0) {
       var header =  Object.keys(data[0]);
       var table = tabulate(data, header, "doc_table", topic, limit);
       $('#doc_table').DataTable({
-        pageLength: 30,
+        pageLength: 10,
         order: [[ 1, "desc" ]],
         columnDefs: [
           {render: $.fn.dataTable.render.number(',', '.', 3),
@@ -686,6 +703,39 @@ $(".selector").select2({
 });
 
 
+function tabulate_inner(table, data, columns, onClick=null) {
+  var thead = table.append('thead');
+  var	tbody = table.append('tbody');
+
+  // append the header row
+  thead.append('tr')
+  .selectAll('th')
+  .data(columns).enter()
+  .append('th')
+  .text(function (column) { return column; });
+
+  // create a row for each object in the data
+  var rows = tbody.selectAll('tr')
+  .data(data)
+  .enter()
+  .append('tr')
+  .on("click", onClick);
+
+  // create a cell in each row for each column
+  var cells = rows.selectAll('td')
+  .data(function (row) {
+    return columns.map(function (column) {
+      return {column: column, value: row[column]};
+    });
+  })
+  .enter()
+  .append('td')
+  .text(function (d) { return d.value; });
+
+  return table;
+}
+
+
 // from here: https://gist.github.com/jfreels/6733593
 function tabulate(data, columns, id, topic="", limit=0) {
 	var table = d3.select('#table_container').append('table')
@@ -716,38 +766,20 @@ function tabulate(data, columns, id, topic="", limit=0) {
 	    postBibcode(topic, spinner, limit=0)
 	  });
   }
-	var thead = table.append('thead');
-	var	tbody = table.append('tbody');
-
-	// append the header row
-	thead.append('tr')
-	  .selectAll('th')
-	  .data(columns).enter()
-	  .append('th')
-	    .text(function (column) { return column; });
-
-	// create a row for each object in the data
-	var rows = tbody.selectAll('tr')
-	  .data(data)
-	  .enter()
-	  .append('tr')
-    .on("click", onBibClick);
-
-	// create a cell in each row for each column
-	var cells = rows.selectAll('td')
-	  .data(function (row) {
-	    return columns.map(function (column) {
-	      return {column: column, value: row[column]};
-	    });
-	  })
-	  .enter()
-	  .append('td')
-	    .text(function (d) { return d.value; });
-
-  return table;
+  var table = tabulate_inner(table, data, columns, onClick=onBibClick);
+  return table
 }
 
 
+function kwd_tabulate(data, columns, id) {
+  var table = d3.select('#kwd_table_container').append('table')
+  .attr('id', id)
+  .attr('class', 'display');
+
+  var caption = table.append('caption').text(`Keywords`);
+  var table = tabulate_inner(table, data, columns);
+  return table
+}
 
 
 function onBibClick(d){

@@ -20,8 +20,6 @@ from contextualized_topic_models.datasets.dataset import CTMDataset
 from contextualized_topic_models.models.ctm import CTM
 from contextualized_topic_models.utils.data_preparation import bert_embeddings_from_file
 
-# from enstop import PLSA, EnsembleTopics
-# from enstop.utils import coherence
 from gensim.corpora import Dictionary
 from gensim.corpora import MmCorpus
 from gensim.models import LdaMulticore, LdaModel
@@ -34,7 +32,6 @@ from tqdm import tqdm
 
 from extract_keywords import binarize_years, get_stem_aggs
 
-# LOGLEVEL = os.environ.get('LOGLEVEL', 'WARNING').upper()
 logging.basicConfig(level=logging.DEBUG)
 LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.DEBUG)
@@ -213,9 +210,25 @@ def get_doc_len_from_file(infile,):
     return doc_lens
 
 
+class OnlyPerplexityAndConvergenceFilter(logging.Filter):
+    def filter(self, record):
+        tf = any(x in record.getMessage() for x in ['perplex', 'converg'])
+        return tf
+
+
 @click.group()
-def cli():
-    pass
+@click.option('--loglevel', default='INFO')
+@click.option('--logfile', default=None)
+def cli(loglevel, logfile=None):
+    numeric_level = getattr(logging, loglevel.upper(), None)
+    if not isinstance(numeric_level, int):
+        raise ValueError('Invalid log level: %s' % loglevel)
+    LOG.setLevel(level=numeric_level)
+    if logfile is not None:
+        gensim_log = logging.getLogger("gensim")
+        fileHandler = logging.FileHandler(filename=logfile)
+        fileHandler.addFilter(OnlyPerplexityAndConvergenceFilter())
+        gensim_log.addHandler(fileHandler)
 
 
 @cli.command()
@@ -443,13 +456,10 @@ def make_tmodel_n(pbar, corpus, dct, n_topics, c_measures, texts, tmodels_dir):
         corpus,
         id2word=dct,
         num_topics=n_topics,
-        passes=5,
-        iterations=200,
-        chunksize=100_000,
-        # passes=1,
-        # iterations=50,
-        # eval_every=1,
-        eval_every=10,
+        passes=8,
+        iterations=1000,
+        chunksize=400_000,
+        eval_every=1,
         alpha="auto",
         eta="auto",
     )
@@ -489,6 +499,7 @@ def run_gensim_lda_mult_inner(
 ):
     jobs = []
     pbar = tqdm(topic_range)
+    LOG.debug("Starting...")
     for n_topics in topic_range:
         j = dask.delayed(make_tmodel_n)(
             pbar, corpus, dct, n_topics, c_measures, texts, tmodels_dir
@@ -501,33 +512,25 @@ def run_gensim_lda_mult_inner(
 
 @cli.command()
 @click.option("--plot_loc", type=Path)
-@click.option("--tokens_loc", type=Path, default="")
 @click.option("--topic_range_loc", type=Path)
 @click.option("--tmodels_dir", type=Path)
 @click.option("--coherence_loc", type=Path)
 @click.option("--dct_loc", type=Path)
 @click.option("--corp_loc", type=Path)
 def run_gensim_lda_mult(
-    plot_loc, tokens_loc, topic_range_loc, tmodels_dir, coherence_loc, dct_loc, corp_loc
+    plot_loc, topic_range_loc, tmodels_dir, coherence_loc, dct_loc, corp_loc
 ):
     LOG.info(f"Loading dictionary from {dct_loc}")
     dct = Dictionary.load(str(dct_loc))
     LOG.info(f"Loading corpus from {corp_loc}")
     corpus = MmCorpus(str(corp_loc))
-    if tokens_loc != Path("."):
-        with open(tokens_loc, "r") as f0:
-            # Load only the keywords without their scores from each line.
-            tokens = [
-                [k for k, v in json.loads(line)] for line in f0.read().splitlines()
-            ]
-    else:
-        tokens = None
+    tokens = None
     with open(topic_range_loc, "r") as f0:
         topic_range = json.load(f0)
     if len(topic_range) == 0:
         ValueError("Topic range is an empty list.")
 
-    c_measures = ["u_mass", "c_v"]
+    c_measures = ["u_mass"]
     df = run_gensim_lda_mult_inner(
         topic_range,
         dct,

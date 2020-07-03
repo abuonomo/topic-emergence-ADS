@@ -108,6 +108,7 @@ bootstrap: $(RECORDS_LOC)
 
 
 FILT_KWDS_LOC=$(DATA_DIR)/all_keywords_threshold_$(FREQ)_$(SCORE)_$(HARD).jsonl
+DROP_FEATURE_LOC=config/drop_features.json
 ## Filter keywords by total frequency and rake score. Also provide hard limit.
 get-filtered-kwds: $(FILT_KWDS_LOC)
 $(FILT_KWDS_LOC): $(ALL_KWDS_LOC)
@@ -116,7 +117,8 @@ $(FILT_KWDS_LOC): $(ALL_KWDS_LOC)
 		--infile $(ALL_KWDS_LOC) \
 		--out_loc $(FILT_KWDS_LOC) \
 		--threshold $(FREQ) --score_thresh=$(SCORE) --hard_limit $(HARD) \
-		--year_count_loc $(YEAR_COUNT_LOC) --year_min $(YEAR_MIN)
+		--year_count_loc $(YEAR_COUNT_LOC) --year_min $(YEAR_MIN) \
+		--drop_feature_loc $(DROP_FEATURE_LOC)
 
 
 NORM_KWDS_LOC=$(DATA_DIR)/all_keywords_norm_threshold_$(FREQ)_$(SCORE)_$(HARD).jsonl
@@ -254,18 +256,18 @@ COHERENCE_LOC=$(VIZ_DIR)/coherence$(TIMESTAMP).csv
 DCT_TOK_LOC=$(MODEL_DIR)/gensim_tok_dct.mm
 CORP_TOK_LOC=$(MODEL_DIR)/gensim_tok_corpus.mm
 TMODEL0 = $(TMODEL_DIR)/gensim_topic_model$(N_TOPICS)
+TMODELS_LOG = $(TMODEL_DIR)/model_convergence.log
 ## Make topic models using gensim's LdaMulticore
 run-gensim-lda-mult: $(COH_PLT_LOC) $(TMODEL0)
 $(COH_PLT_LOC) $(TMODEL0): $(DCT_LOC) $(CORP_LOC) $(MAP_LOC)
 	mkdir -p $(TMODEL_DIR); \
-	python src/topic_modeling.py run-gensim-lda-mult \
+	python src/topic_modeling.py --loglevel DEBUG --logfile $(TMODELS_LOG) run-gensim-lda-mult \
 		--plot_loc $(COH_PLT_LOC) \
 		--topic_range_loc $(TOPIC_RANGE_FILE) \
 		--tmodels_dir $(TMODEL_DIR) \
 		--coherence_loc $(COHERENCE_LOC) \
 		--dct_loc $(DCT_LOC) \
-		--corp_loc $(CORP_LOC) \
-		--tokens_loc $(KWD_TOKENS_LOC)
+		--corp_loc $(CORP_LOC)
 
 
 ## Get coherences for gensim topic models
@@ -536,6 +538,19 @@ docker-run-app: | $(APP_DATA_FILES)
 		-v $$(pwd)/static/html:/home/static/html/ \
 		-v $$(pwd)/data:/home/data/ \
 		$(IMAGE_NAME):$$VERSION
+
+
+#===== Data Exports ==========#
+
+KWD_EXPORT=scratch/kwd_export_$(EXP_NAME).csv
+export-keywords:
+	python src/exports.py keywords \
+		--in_slope_complex $(TS_FEATURES_LOC) \
+		--viz_data_loc $(VIZ_DATA_LOC) \
+		--filt_kwds_loc $(FILT_KWDS_LOC) \
+		--kwd_export_loc $(KWD_EXPORT)
+
+
 
 #===== S3 Bucket Syncing =====#
 

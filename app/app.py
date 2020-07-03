@@ -7,12 +7,9 @@ from pathlib import Path
 import joblib
 import numpy as np
 import pandas as pd
-import yaml
 import requests
 from flask import Flask, render_template, jsonify, request
 from sklearn.preprocessing import MinMaxScaler
-
-from model import VizPrepper
 
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
@@ -145,6 +142,13 @@ def topic_bibcodes():
     return jsonify(records)
 
 
+@app.route("/keyword_distribs", methods=["GET"])
+def keyword_distribs():
+    df = pd.DataFrame(app.config['PYLDAVIS_DATA']['token.table'])
+    records = df.to_dict(orient='records')
+    return jsonify(records)
+
+
 @app.route("/get-scatter-data", methods=["GET", "POST"])
 def get_scatter_data():
     in_data = request.json
@@ -188,6 +192,26 @@ def _trans_time(ts, kwd, clus):
     ts = ts.loc[:, ["stem", "kmeans_cluster", "year", "count", "norm_count"]]
     ts_recs = ts.to_dict(orient="records")
     return ts_recs
+
+
+@app.route("/get-count-range", methods=['GET'])
+def get_count_range():
+    d = {
+        'count_min': int(app.config['SC_DF']['count'].min()),
+        'count_max': int(app.config['SC_DF']['count'].max()),
+        'count_std': float(app.config['SC_DF']['count'].std()),
+        'count_mean': float(app.config['SC_DF']['count'].mean())
+    }
+    return jsonify(d)
+
+
+@app.route("/get-score-range", methods=['GET'])
+def get_score_range():
+    d = {
+        'score_min': int(app.config['SC_DF']['score_mean'].min()),
+        'score_max': int(app.config['SC_DF']['score_mean'].max()),
+    }
+    return jsonify(d)
 
 
 @app.route("/get-time-data", methods=["GET", "POST"])

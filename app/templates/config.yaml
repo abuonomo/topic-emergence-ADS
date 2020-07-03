@@ -1,0 +1,23 @@
+extraction:
+  no_below: 50
+  no_above: 0.5
+paper_organizer:
+  no_below: 100
+  no_above: 0.25
+  min_mean_score: 0.015
+  year_min: 1997
+  year_max: 2010
+  journal_blacklist: ["arXiv"]
+  keyword_blacklist: "config/drop_features.txt"
+topic_range: [20, 30, 50]
+lda:
+  alpha: "auto"
+  eta: "auto"
+  iterations: 200
+  passes: 10
+  chunksize: 5000
+  eval_every: 1
+app:
+  year_min: 1997
+  year_max: 2010
+  min_topic_prob_thresh: 0.1

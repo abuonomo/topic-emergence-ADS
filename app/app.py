@@ -1,14 +1,13 @@
 import json
-import h5py
 import logging
 import os
 from pathlib import Path
 
-import joblib
+import h5py
 import numpy as np
 import pandas as pd
 import requests
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, send_from_directory
 from sklearn.preprocessing import MinMaxScaler
 
 logging.basicConfig(level=logging.INFO)
@@ -37,7 +36,8 @@ except KeyError:
 ADS_TOKEN = os.environ['ADS_TOKEN']
 
 app.config.update(
-    PARAM_CONFIG_LOC=DATA_DIR / "config.yaml",
+    # PARAM_CONFIG_LOC=DATA_DIR / "config.yaml",
+    # PARAM_CONFIG_LOC=DATA_DIR / "config.yaml",
     VIZ_DATA_LOC=DATA_DIR / "viz_data.hdf5",
     VP=None,
     SC_LOC=DATA_DIR / f"time_series_characteristics.csv",
@@ -75,6 +75,7 @@ def get_paper_from_bibcode(bibcode):
     c = json.loads(response.content)['response']['docs'][0]
     return c
 
+
 def load_kwd_ts_df(viz_data_loc):
     with h5py.File(viz_data_loc, "r") as f0:
         keywords = f0["keywords"][:]
@@ -82,6 +83,7 @@ def load_kwd_ts_df(viz_data_loc):
     kwd_ts_df = pd.DataFrame(kwd_ts_values)
     kwd_ts_df.index = keywords
     return kwd_ts_df
+
 
 @app.before_first_request
 def init():
@@ -107,6 +109,14 @@ def init():
 def index():
     LOG.info("Serving page.")
     return render_template("index.html", version=VERSION, git_url=GIT_URL)
+
+
+@app.route("/config")
+def get_config():
+    LOG.info("Serving page.")
+    # p = app.config['PARAM_CONFIG_LOC']
+    # return render_template(p.parent, f"{p.stem}{p.suffix}")
+    return render_template("config.yaml")
 
 
 @app.route("/lda", methods=["GET"])

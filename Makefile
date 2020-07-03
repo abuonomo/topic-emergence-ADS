@@ -395,6 +395,21 @@ link-topic-data-to-app:
 	ln -f $(TOPIC_TO_YEARS_LOC) app/data/topic_years.jsonl
 	ln -f $(TOPIC_TO_BIBCODES_LOC) app/data/topic_distribs_to_bibcodes.hdf5
 
+
+download-topic-data-to-app:
+	aws s3 cp $(BUCKET)/$(YEAR_COUNT_LOC) app/data/year_counts.csv
+	aws s3 cp $(BUCKET)/$(FILT_KWDS_LOC) app/data/kwd_all_keywords_threshold.jsonl
+	aws s3 cp $(BUCKET)/$(TS_FEATURES_LOC) app/data/kwd_slope_complex.csv
+	aws s3 cp $(BUCKET)/$(TOPIC_TO_YEARS_LOC) app/data/all_keywords_threshold.jsonl
+	aws s3 cp $(BUCKET)/$(TOPIC_MANIF_POINTS_LOC) app/data/dtw_manifold_proj.jbl
+	aws s3 cp $(BUCKET)/$(TOPIC_KM_MODEL_LOC) app/data/kmeans.jbl
+	aws s3 cp $(BUCKET)/$(KM_MODEL_LOC) app/data/kwd_kmeans.jbl
+	aws s3 cp $(BUCKET)/$(TOPIC_TS_FEATURES_LOC) app/data/slope_complex.csv
+	aws s3 cp $(BUCKET)/$(TMODEL_VIZ_GEN_LOC) app/data/topic_model_viz.html
+	aws s3 cp $(BUCKET)/$(VIZ_DATA_LOC) app/data/viz_data.json
+	aws s3 cp $(BUCKET)/$(TOPIC_TO_YEARS_LOC) app/data/topic_years.jsonl
+	aws s3 cp $(BUCKET)/$(TOPIC_TO_BIBCODES_LOC) app/data/topic_distribs_to_bibcodes.hdf5
+
 ## Download service data from s3 to app/data dir
 download-topic-data-to-app:
 ifeq (default,$(PROFILE))

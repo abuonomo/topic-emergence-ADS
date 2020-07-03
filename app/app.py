@@ -247,6 +247,7 @@ def get_time_data():
     data = request.json
     df = app.config['N_DF'].loc[int(data['stem'])].reset_index()
     df.columns = ['year', 'count']
+    df['kmeans_cluster'] = app.config['SC_DF']['kmeans_cluster'].loc[int(data['stem'])]
     records = df.to_dict(orient='records')
     return jsonify(records)
 

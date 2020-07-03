@@ -164,7 +164,8 @@ class VizPrepper:
         tmp_paper_df = self.paper_df.copy()
         tmp_paper_df["topic"] = -1
         for topic in tqdm(self.embedding_df.columns):
-            tf = self.embedding_df.loc[:, topic] >= min_topic_prob_thresh
+            tf = self.embedding_df.values.argmax(axis=1) == topic
+            # tf = self.embedding_df.loc[:, topic] >= min_topic_prob_thresh
             # function to include options with argmax as well?
             # tmp_paper_df.loc[tf, 'topic'] = topic
             tmp_paper_df.loc[tmp_paper_df.index[tf], "topic"] = topic

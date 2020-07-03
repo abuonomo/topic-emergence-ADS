@@ -86,7 +86,7 @@ def load_kwd_ts_df(viz_data_loc):
 @app.before_first_request
 def init():
     with open(app.config['PYLDAVIS_DATA_LOC'], 'r') as f0:
-        app.config['PYLDAVIS_DATA'] = json.load(f0)
+        app.config['PYLDAVIS_DATA'] = json.loads(json.load(f0))
     LOG.info(f'Reading derived time series measure from {app.config["SC_LOC"]}.')
     app.config["SC_DF"] = pd.read_csv(app.config["SC_LOC"], index_col=0)
     app.config["N_DF"] = pd.read_csv(app.config["N_LOC"], index_col=0)
@@ -144,6 +144,7 @@ def topic_bibcodes():
 
 @app.route("/keyword_distribs", methods=["GET"])
 def keyword_distribs():
+    import ipdb; ipdb.set_trace()
     df = pd.DataFrame(app.config['PYLDAVIS_DATA']['token.table'])
     records = df.to_dict(orient='records')
     return jsonify(records)

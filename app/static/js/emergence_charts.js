@@ -132,8 +132,8 @@ function scatterChart() {
   var height = 300;
   var width = 500;
 
-  var xName = 'value__mean_change';
-  var yName = 'value__cid_ce__normalize_True';
+  var xName = 'mean_change';
+  var yName = 'cid_ce__normalize_True';
   var labelName = 'stem';
   var colorName = 'kmeans_cluster';
   var sizeVal = "scaled_counts";

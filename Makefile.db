@@ -31,6 +31,7 @@ N_TOPICS=500
 LIMIT=500
 BATCH_SIZE=1000
 PARAM_YAML=config/example_config.yaml
+PORT=5000
 
 BUCKET=datasquad-low/home/DataSquad/topic-emergence-ADS/
 PROFILE=default
@@ -112,8 +113,31 @@ $(records_loc): $(raw_riles)
 ## 7. Get time and characteristics
 7-get-time-chars:
 	python src/model.py get-time-chars \
-		--viz_data_loc $(lda_model_viz_data_dir)/viz_data.hdf5 \
+		--viz_data_dir $(lda_model_viz_data_dir) \
 		--config_loc $(PARAM_YAML)
+
+## Link experiment data to app directory
+link-data-to-app:
+	ln -f $(lda_model_viz_data_dir)/viz_data.hdf5 app/data
+	ln -f $(lda_model_viz_data_dir)/pyLDAvis_data.json app/data
+	ln -f $(lda_model_viz_data_dir)/time_series_characteristics.csv app/data
+	ln -f $(lda_model_viz_data_dir)/topic_years.csv app/data
+	ln -f $(PARAM_YAML) app/data/config.yaml
+
+## Run app for visualize results in development mode
+app-dev:
+	export VERSION=$$(python version.py); \
+	export FLASK_ENV=development; \
+	export APP_DATA_DIR=data; \
+	export VERSION=$$(python version.py); \
+	cd app; \
+	export PYTHONPATH=$${PYTHONPATH}:../src/; \
+	flask run
+
+## Run app for visualize results in production mode
+app-prod: | $(APP_DATA_FILES)
+	export VERSION=$$(python version.py); \
+	cd app && APP_DATA_DIR=data gunicorn app:app -b :$(PORT) --timeout 1200
 
 check_clean:
 	@echo -n "These folders will be deleted:\n$(data_dir)\n$(model_dir)\n$(viz_dir)\nProceed? [y/N] " && read ans && [ $${ans:-N} = y ]

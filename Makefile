@@ -198,7 +198,7 @@ app-dev: | $(APP_DATA_FILES)
 PORT=5000
 app-prod: | $(APP_DATA_FILES)
 	export VERSION=$$(python version.py); \
-	cd app && APP_DATA_DIR=data gunicorn app:app -b :$(PORT) --timeout 1200
+	cd app && APP_DATA_DIR=data gunicorn app:app -b 0.0.0.0:$(PORT) --timeout 1200
 
 
 clean: check_clean

@@ -10,6 +10,7 @@ import logging
 import numpy as np
 import pandas as pd
 import spacy
+import scispacy
 import sqlite3
 import yaml
 from gensim.corpora import Dictionary
@@ -515,8 +516,8 @@ class PaperOrganizer:
         return corpus, dct, corp2paper, dct2kwd
 
 
-def get_spacy_nlp():
-    nlp = spacy.load("en_core_web_sm")
+def get_spacy_nlp(model_name="en_core_web_sm"):
+    nlp = spacy.load(model_name)
 
     # modify tokenizer infix patterns to not split on hyphen
     # Need to get words like x-ray and gamma-ray
@@ -597,6 +598,7 @@ def write_ads_to_db(infile, db_loc=":memory:"):
 @click.option("--db_loc", type=Path)
 @click.option("--batch_size", type=int, default=1000)
 @click.option("--n_process", type=int, default=-1)
+@click.option("--spacy_model", type=str, default="en_core_web_sm")
 def get_keywords_from_texts(db_loc, batch_size=1000, n_process=-1):
     engine = create_engine(f"sqlite:///{db_loc}")
 
@@ -604,7 +606,7 @@ def get_keywords_from_texts(db_loc, batch_size=1000, n_process=-1):
     session = Session()
 
     try:
-        nlp = get_spacy_nlp()
+        nlp = get_spacy_nlp(model_name)
         pm = PaperKeywordExtractor(nlp)
         pm.extract_all_keywords(session, batch_size=batch_size, n_process=n_process)
         session.commit()

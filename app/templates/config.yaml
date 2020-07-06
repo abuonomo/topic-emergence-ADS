@@ -1,6 +1,7 @@
 extraction:
   no_below: 50
   no_above: 0.5
+  spacy_model_name: "en_core_sci_sm"
 paper_organizer:
   no_below: 100
   no_above: 0.25

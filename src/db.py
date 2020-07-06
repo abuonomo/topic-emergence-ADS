@@ -596,17 +596,26 @@ def write_ads_to_db(infile, db_loc=":memory:"):
 
 @cli.command()
 @click.option("--db_loc", type=Path)
+@click.option("--config_loc", type=Path)
 @click.option("--batch_size", type=int, default=1000)
 @click.option("--n_process", type=int, default=-1)
-@click.option("--spacy_model", type=str, default="en_core_web_sm")
-def get_keywords_from_texts(db_loc, batch_size=1000, n_process=-1):
+def get_keywords_from_texts(
+    db_loc, config_loc, batch_size=1000, n_process=-1
+):
+    with open(config_loc, "r") as f0:
+        config = yaml.safe_load(f0)
+    try:
+        spacy_model_name = config['extraction']['spacy_model_name']
+    except KeyError:
+        spacy_model_name = 'en_core_web_sm'
+
     engine = create_engine(f"sqlite:///{db_loc}")
 
     Session = sessionmaker(bind=engine)
     session = Session()
 
     try:
-        nlp = get_spacy_nlp(model_name)
+        nlp = get_spacy_nlp(spacy_model_name)
         pm = PaperKeywordExtractor(nlp)
         pm.extract_all_keywords(session, batch_size=batch_size, n_process=n_process)
         session.commit()

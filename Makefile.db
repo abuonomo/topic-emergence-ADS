@@ -20,6 +20,9 @@ db: 0-join-and-clean \
 lda: 4-prepare-for-lda \
 	 5-make-topic-models
 
+viz: 6-prepare-for-topic-model-viz \
+	 7-get-time-chars \
+
 .PHONY: requirements \
 		sync-raw-data-from-s3 \
 		0-join-and-clean \
@@ -37,6 +40,7 @@ EXPERIMENT_NAME=example_experiment
 
 N_TOPICS=500
 BATCH_SIZE=1000
+LIMIT=1000
 PARAM_YAML=config/example_config.yaml
 PORT=5000
 
@@ -90,6 +94,7 @@ $(records_loc): $(raw_riles)
 ## 2. Extract keywords from papers using SingleRank and insert into database
 2-get-keywords-from-texts:
 	python src/db.py get-keywords-from-texts --db_loc $(db_loc) \
+		--config_loc $(PARAM_YAML) \
 		--batch_size $(BATCH_SIZE)
 
 ## 3. Find missed keyword locations

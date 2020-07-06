@@ -266,6 +266,13 @@ def make_topic_models(prepared_data_dir, config_loc, out_models_dir, out_coh_csv
     LOG.info(f"Running with config: \n {pformat(config)}")
     tm = TopicModeler(dictionary, corpus)
     models = tm.make_all_topic_models(config["topic_range"], **config["lda"])
+
+    out_models_dir.mkdir(exist_ok=True)
+    for m in models:
+        mp = out_models_dir / f"topic_model{m.num_topics}"
+        LOG.info(f"Writing model to {mp}")
+        m.save(str(mp))
+
     coherences = tm.get_coherences(models)
     n_topics = [m.num_topics for m in models]
     df = pd.DataFrame(zip(n_topics, coherences))
@@ -274,11 +281,6 @@ def make_topic_models(prepared_data_dir, config_loc, out_models_dir, out_coh_csv
     df.columns = ["num_topics", "coherence (u_mass)"]
     df.to_csv(out_coh_csv)
 
-    out_models_dir.mkdir(exist_ok=True)
-    for m in models:
-        mp = out_models_dir / f"topic_model{m.num_topics}"
-        LOG.info(f"Writing model to {mp}")
-        m.save(str(mp))
 
 
 def get_pby(session, paper_ids: List, batch_size=990):

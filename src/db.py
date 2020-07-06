@@ -283,6 +283,7 @@ class PaperOrganizer:
         year_max=None,
         journal_blacklist=None,
         keyword_blacklist=None,
+        use_keyword_count=True,
     ):
         self.no_below = no_below
         self.no_above = no_above
@@ -291,6 +292,7 @@ class PaperOrganizer:
         self.year_max = year_max
         self.journal_blacklist = journal_blacklist
         self.keyword_blacklist = keyword_blacklist
+        self.use_keyword_count = use_keyword_count
 
     @property
     def journal_blacklist(self):
@@ -483,6 +485,8 @@ class PaperOrganizer:
 
         LOG.info("Getting paper_ids, keyword_ids, counts")
         paper_ids, keyword_ids, counts = zip(*all_records)
+        if self.use_keyword_count is False:
+            counts = [1] * len(counts)
 
         ind2sql = {
             "corp2paper": {i: b for i, b in enumerate(set(paper_ids))},

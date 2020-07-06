@@ -282,7 +282,6 @@ def make_topic_models(prepared_data_dir, config_loc, out_models_dir, out_coh_csv
     df.to_csv(out_coh_csv)
 
 
-
 def get_pby(session, paper_ids: List, batch_size=990):
     batches = range(0, len(paper_ids), batch_size)
     pbar = tqdm(batches)

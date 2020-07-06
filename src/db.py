@@ -636,6 +636,10 @@ def add_missed_locations(db_loc, config_loc):
         config = yaml.safe_load(f0)
     no_below = config["extraction"]["no_below"]
     no_above = config["extraction"]["no_above"]
+    try:
+        spacy_model_name = config['extraction']['spacy_model_name']
+    except KeyError:
+        spacy_model_name = 'en_core_web_sm'
 
     engine = create_engine(f"sqlite:///{db_loc}")
 
@@ -643,7 +647,7 @@ def add_missed_locations(db_loc, config_loc):
     session = Session()
 
     try:
-        nlp = get_spacy_nlp()
+        nlp = get_spacy_nlp(spacy_model_name)
         pm = PaperKeywordExtractor(nlp)
         records = pm.get_missed_keyword_locations(
             session, no_below=no_below, no_above=no_above

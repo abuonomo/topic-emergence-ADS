@@ -1,4 +1,4 @@
-# Topic Emergence
+# Topic Emergence ADS
 
 Creating a measure for topic emergence in the Astrophysics Data Sytem (ADS).  
 
@@ -26,9 +26,24 @@ While in the virtual environment, you can now install the python requirements wi
 If you plan to use the `docker-build-app` and `docker-run-app` commands, you will also need to install docker.
 
 ## Data Pipeline
-The commands listed after each step in the pipeline can all be found in the [Makefile](Makefile). 
+The commands listed after each step in the pipeline can all be found in the [Makefile](Makefile). You can see all of the options by simple running `make` or `make help`. You will see:
+```text
+0-join-and-clean    0. Join all years and and use rake to extract keywords. 
+1-write-ads-to-db   1. Write kwds.jsonl files to sqlite database 
+2-get-keywords-from-texts 2. Extract keywords from papers using SingleRank and insert into database 
+3-add-missed-locations 3. Find missed keyword locations 
+4-prepare-for-lda   4. Transform data into gensim corpus and dictionary for LDA training 
+5-make-topic-models 5. Train topic models 
+6-prepare-for-topic-model-viz 6. Prepare visualization data 
+7-get-time-chars    7. Get time and characteristics 
+app-dev             Run app for visualize results in development mode 
+app-prod            Run app for visualize results in production mode 
+clean-experiment    Delete all files for the given experiment 
+link-data-to-app    Link experiment data to app directory 
+requirements        Install packages to current environment with pip (venv recommended) 
+sync-raw-data-from-s3 Sync raw ADS metadata to raw data dir. 
+```
 
-You can run the commands with `MODE` set to `test` or `full` (`test` by default). See the ifeq statement in the Makefile to see how the `MODE` changes the pipeline. Essentially, test `MODE` limits to number of records so that the pipeline runs faster for testing purposes. When generating useful data, one should use `MODE=full`. For example, you might run `make join-and-clean MODE=full`. 
 
 Also, if you want to create a new experiment with its own name, you must set the `EXP_NAME` variable as well. For example you might run `make dtw-viz MODE=test EXP_NAME=my_great_test`. This will use the default `test` configuration with directory names determined by `my_great_test`.
 

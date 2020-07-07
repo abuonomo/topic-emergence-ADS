@@ -43,6 +43,7 @@ BATCH_SIZE=1000
 LIMIT=1000
 PARAM_YAML=config/example_config.yaml
 PORT=5000
+INFO="This is an example experiment."
 
 BUCKET=datasquad-low/home/DataSquad/topic-emergence-ADS/
 PROFILE=default
@@ -73,7 +74,7 @@ requirements:
 sync-raw-data-from-s3:
 	aws s3 sync s3://datasquad-low/data/ADS/2020_03_15 $(raw_dir)
 
-## Join all years and and use rake to extract keywords.
+## 0. Join all years and and use rake to extract keywords.
 0-join-and-clean: $(records_loc)
 $(records_loc): $(raw_riles)
 	mkdir -p $(data_dir); \
@@ -159,6 +160,28 @@ check_clean:
 ## Delete all files for the given experiment
 clean-experiment: check_clean
 	@echo "Manually remove the files."
+
+## Get short description of this experiment
+info:
+	@echo $(INFO);
+
+## Get descriptions for all experiments
+all-info:
+	@for CONFIG_FILE in $(wildcard config/*.mk); \
+	do \
+		source $${CONFIG_FILE}; \
+		echo "$${EXPERIMENT_NAME}: $${INFO}"; \
+		export EXPERIMENT_NAME=; \
+		export INFO=; \
+	done;
+
+#unset $${EXPERIMENT_NAME} $${INFO}; \
+#CONFIG_FILES=$(wildcard config/*.mk)
+#
+#$(CONFIG_FILES):
+#	@echo $@
+#
+#all-info: $(CONFIG_FILES)
 
 #################################################################################
 # Self Documenting Commands                                                     #

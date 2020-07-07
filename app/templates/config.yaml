@@ -1,3 +1,7 @@
+join_and_clean:
+  limit: 500 # Use this for testing. Only takes this many papers from each year.
+  min_abstract_length: 100
+  database_whitelist: ["astronomy"]
 keyword_extraction:
   no_below: 50
   no_above: 0.5
@@ -6,8 +10,6 @@ paper_organizer:
   no_below: 100
   no_above: 0.25
   min_mean_score: 0.015
-  year_min: 1997
-  year_max: 2010
   journal_blacklist: ["arXiv"]
   keyword_blacklist: "config/drop_features.txt"
 topic_model:
@@ -22,4 +24,3 @@ topic_model:
 time_series:
   year_min: 1997
   year_max: 2010
-  min_topic_prob_thresh: 0.1

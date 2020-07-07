@@ -23,7 +23,6 @@ EXPERIMENT_NAME=example_experiment
 
 N_TOPICS=500
 BATCH_SIZE=1000
-LIMIT=1000
 PARAM_YAML=config/example_config.yaml
 PORT=5000
 INFO="This is an example experiment."
@@ -95,7 +94,7 @@ $(records_loc): $(raw_files)
 	python src/join_and_clean.py \
 		$(raw_dir) \
 		$(records_loc) \
-		--limit $(LIMIT)
+		--config_loc $(PARAM_YAML)
 
 ## 1. Write kwds.jsonl files to sqlite database
 1-write-ads-to-db:

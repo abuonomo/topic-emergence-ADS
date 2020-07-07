@@ -279,8 +279,6 @@ class PaperOrganizer:
         no_below=5,
         no_above=0.5,
         min_mean_score=0,
-        year_min=None,
-        year_max=None,
         journal_blacklist=None,
         keyword_blacklist=None,
         use_keyword_count=True,
@@ -288,8 +286,6 @@ class PaperOrganizer:
         self.no_below = no_below
         self.no_above = no_above
         self.min_mean_score = min_mean_score
-        self.year_min = year_min
-        self.year_max = year_max
         self.journal_blacklist = journal_blacklist
         self.keyword_blacklist = keyword_blacklist
         self.use_keyword_count = use_keyword_count

@@ -140,7 +140,7 @@ class VizPrepper:
             period = max(ys) - min(ys)
             return (x[-1] / x[0]) ** (1 / period) - 1
 
-    def get_time_characteristics(self, min_topic_prob_thresh, year_min, year_max):
+    def get_time_characteristics(self, year_min, year_max):
         all_time_series = []
         tmp_paper_df = self.paper_df.copy()
         tmp_paper_df["topic"] = -1
@@ -359,7 +359,6 @@ def prepare_for_topic_model_viz(db_loc, prepared_data_dir, tmodel_loc, viz_data_
         f0.create_dataset("keyword_ids", dtype=np.int, data=keyword_ids)
         f0.create_dataset("keyword_ts_values", dtype=np.int, data=kwd_ts_df.values)
         f0.create_dataset("keywords", dtype=dt, data=kwd_ts_df.index)
-    # pby.to_hdf(viz_data_loc, key="paper2bibcode2year")
     LOG.info(viz_data_loc)
 
     with open(pyldavis_data_loc, "w") as f0:

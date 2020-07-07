@@ -339,54 +339,6 @@ class PaperOrganizer:
             q = q.filter(~Paper.bibcode.contains(j))
         return q
 
-    def get_year_counts(self, session):
-        q = session.query(Paper.year, func.count(Paper.year))
-        return q.group_by(Paper.year).all()
-
-    def get_all_kwd_years(self, session):
-        kwd_query = self._get_filtered_keywords(session)
-        kwd_ids = (k.id for k, v, c in kwd_query)
-        years_query = (
-            session.query(Paper.year, PaperKeywords.keyword_id, func.count(Paper.year))
-            .join(PaperKeywords)
-            .join(Keyword)
-            .filter(Keyword.id.in_(kwd_ids))
-            .group_by(Keyword.id)
-            .group_by(Paper.year)
-        )
-        years_query = self.add_journal_blacklist_to_query(years_query)
-        if self.year_min is not None:
-            years_query = years_query.filter(Paper.year >= self.year_min)
-        if self.year_max is not None:
-            years_query = years_query.filter(Paper.year <= self.year_max)
-        years = years_query.all()
-        records = [{"year": y[0], "keyword_id": y[1], "count": y[2]} for y in years]
-        df = pd.DataFrame(records)
-        ydf = df.pivot(index="keyword_id", columns="year", values="count").fillna(0)
-        ydf = ydf.loc[:, sorted(ydf.columns)]
-        return ydf
-
-    def get_kwd_years(self, session, kwd):
-        years_query = (
-            session.query(Paper.year, func.count(Paper.year))
-            .join(PaperKeywords)
-            .join(Keyword)
-            .filter(Keyword.keyword == kwd)
-            .group_by(Paper.year)
-        )
-        for j in self.journal_blacklist:
-            years_query = years_query.filter(~Paper.bibcode.contains(j))
-        years = years_query.all()
-        yd = dict(years)
-        fy = {}
-        for y in range(self.year_min, self.year_max):
-            if y in yd:
-                c = yd[y]
-            else:
-                c = 0
-            fy[y] = c
-        return fy
-
     def get_filtered_keywords(self, session, *args):
         kwd_query = self._get_filtered_keywords(session, *args)
         return kwd_query.all()
@@ -411,25 +363,6 @@ class PaperOrganizer:
         )
         kwd_query = self.add_journal_blacklist_to_query(kwd_query)
         return kwd_query
-
-    def get_tokens(self, session) -> Generator:
-        kwds = self.get_filtered_keywords(session)
-        q = session.query(Paper)
-        for j in self.journal_blacklist:
-            q = q.filter(~Paper.bibcode.contains(j))
-        kwd_ids = [k.id for k, _, _ in kwds]
-        tokens = (self.get_doc_tokens(p, kwd_ids) for p in tqdm(q, total=q.count()))
-        return tokens
-
-    @staticmethod
-    def get_doc_tokens(p, kwd_ids):
-        tokens0 = [
-            [pk.keyword.keyword] * pk.count
-            for pk in p.keywords
-            if pk.keyword_id in kwd_ids
-        ]
-        paper_tokens = [t for ts in tokens0 for t in ts]
-        return paper_tokens
 
     def get_keyword_batch_records(self, session, kwds_batch, pbar=None):
         q = (

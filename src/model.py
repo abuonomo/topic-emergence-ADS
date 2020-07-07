@@ -1,12 +1,13 @@
 import json
+import logging
 from collections import defaultdict
+from pathlib import Path
 from pprint import pformat
+from typing import List
 
 import click
 import dask
-from typing import List
 import h5py
-import logging
 import numpy as np
 import pandas as pd
 import pyLDAvis
@@ -15,17 +16,13 @@ import yaml
 from gensim.corpora import MmCorpus, Dictionary
 from gensim.models import LdaModel, CoherenceModel
 from matplotlib import pyplot as plt
-from pathlib import Path
-from sklearn.cluster import KMeans
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from tqdm import tqdm
 from tsfresh import extract_features
-from yellowbrick.cluster import KElbowVisualizer
-from yellowbrick.features import Manifold
-from dtw_time_analysis import dtw_kwds
 
 from db import Paper, Keyword, PaperKeywords
+from dtw_time_analysis import dtw_kwds, dtw_to_manifold, dtw_to_tboard, yellow_plot_kmd
 
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
@@ -215,37 +212,6 @@ class VizPrepper:
         kmeans = dtw_to_tboard(ts_df, dtw_df, c=n_clusters)
         dtw_man = dtw_to_manifold(dtw_df)
         return kmeans, dtw_man
-
-
-def dtw_to_manifold(dtw_df, out_plot=None):
-    LOG.info("Computing tsne manifold.")
-    viz = Manifold(manifold="tsne")
-    dtw_man = viz.fit_transform(dtw_df)  # Fit the data to the visualizer
-    if out_plot is not None:
-        LOG.info(f"Writing tsne manifold plot to {out_plot}.")
-        viz.show(out_plot)  # Finalize and render the figure
-    return dtw_man
-
-
-def dtw_to_tboard(normed_kwd_years, dtw_df, c=6, lim=1000):
-    """Use pre-computed dynamic time warp values and calculate kmeans."""
-    # TODO: Used elbow to determine, but not being placed programmatically
-    LOG.info(f"Performing kmeans with {c} clusters.")
-    m = KMeans(n_clusters=c)
-    m.fit(dtw_df.values)
-    return m
-
-
-def yellow_plot_kmd(X, out_plot=None, c_min=2, c_max=20):
-    LOG.info(f"Trying kmeans n_clusters from {c_min} to {c_max}")
-    model = KMeans()
-    visualizer = KElbowVisualizer(model, k=(c_min, c_max))
-    visualizer.fit(X)  # Fit the data to the visualizer
-    LOG.info(f"Writing elbow to {out_plot}.")
-    if out_plot is None:
-        return visualizer
-    else:
-        visualizer.show(out_plot)
 
 
 @click.group()

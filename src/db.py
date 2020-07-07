@@ -8,7 +8,6 @@ import click
 import dask
 import logging
 import numpy as np
-import pandas as pd
 import spacy
 import scispacy
 import sqlite3

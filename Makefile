@@ -50,16 +50,6 @@ lda_model_viz_data_dir=$(model_dir)/topic_model$(N_TOPICS)
 raw_files=$(shell find $(raw_dir) -type f -name '*')
 
 # Commands
-## Runs 0 through 7
-all: 0-join-and-clean \
-	 1-write-ads-to-db \
-	 2-get-keywords-from-texts \
-	 3-add-missed-locations \
-	 4-prepare-for-lda \
-	 5-make-topic-models \
-	 6-prepare-for-topic-model-viz \
-	 7-get-time-chars
-
 ## Runs 0 through 3
 db: 0-join-and-clean \
 	1-write-ads-to-db \

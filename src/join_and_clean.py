@@ -88,16 +88,18 @@ def main(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Say hello")
+    parser = argparse.ArgumentParser(
+        description="Get each year of ADS metadata, apply filters, and make into one jsonlines file."
+    )
     parser.add_argument("i", help="input raw records dir", type=Path)
     parser.add_argument("o", help="output jsonslines collected keywords", type=Path)
     parser.add_argument("--config_loc", type=Path)
     args = parser.parse_args()
 
-    with open(args.config_loc, 'r') as f0:
+    with open(args.config_loc, "r") as f0:
         config = yaml.safe_load(f0)
     try:
-        limit = config['join_and_clean']['limit']
+        limit = config["join_and_clean"]["limit"]
     except KeyError:
         limit = None
     if limit == 0:
@@ -108,8 +110,8 @@ if __name__ == "__main__":
         args.i,
         args.o,
         limit,
-        min_text_len=config['join_and_clean']['min_abstract_length'],
+        min_text_len=config["join_and_clean"]["min_abstract_length"],
         only_nature_and_sci=False,
         first_year=None,
-        database_whitelist=config['join_and_clean']['database_whitelist'],
+        database_whitelist=config["join_and_clean"]["database_whitelist"],
     )

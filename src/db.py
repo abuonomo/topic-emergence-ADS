@@ -483,13 +483,19 @@ def copy_database(source_connection, dest_dbname=":memory:", uri=False):
 
 @click.group()
 def cli():
-    pass
+    """Tool for filling database with ADS metadata and keywords.
+    """
 
 
-@cli.command()
-@click.option("--infile", type=Path)
-@click.option("--db_loc", type=Path, default=":memory:")
+@cli.command(short_help="Write JSONlines metadata to database.")
+@click.option("--infile", type=Path, help="JSONlines with ADS metadata")
+@click.option(
+    "--db_loc", type=Path, default=":memory:", help="Location of output SQLite database"
+)
 def write_ads_to_db(infile, db_loc=":memory:"):
+    """
+    Write JSONlines metadata to database.
+    """
     engine = create_engine(f"sqlite:///{db_loc}")
     BASE.metadata.create_all(engine)
 
@@ -523,11 +529,18 @@ def write_ads_to_db(infile, db_loc=":memory:"):
 
 
 @cli.command()
-@click.option("--db_loc", type=Path)
-@click.option("--config_loc", type=Path)
-@click.option("--batch_size", type=int, default=1000)
-@click.option("--n_process", type=int, default=-1)
+@click.option("--db_loc", type=Path, help="Path to SQlite database")
+@click.option("--config_loc", type=Path, help="Path to YAML configuration")
+@click.option(
+    "--batch_size", type=int, default=1000, help="Batch size for spacy pipeline"
+)
+@click.option(
+    "--n_process", type=int, default=-1, help="Number of process for spacy pipeline"
+)
 def get_keywords_from_texts(db_loc, config_loc, batch_size=1000, n_process=-1):
+    """
+    Use SingleRank to extract keywords from titles and abstracts in database.
+    """
     with open(config_loc, "r") as f0:
         config = yaml.safe_load(f0)
     try:
@@ -555,9 +568,12 @@ def get_keywords_from_texts(db_loc, config_loc, batch_size=1000, n_process=-1):
 
 
 @cli.command()
-@click.option("--db_loc", type=Path)
-@click.option("--config_loc", type=Path)
+@click.option("--db_loc", type=Path, help="Path to SQlite database")
+@click.option("--config_loc", type=Path, help="Path to YAML configuration")
 def add_missed_locations(db_loc, config_loc):
+    """
+    Go back through the texts to find missed keyword locations.
+    """
     with open(config_loc, "r") as f0:
         config = yaml.safe_load(f0)
     no_below = config["keyword_extraction"]["no_below"]
@@ -594,14 +610,29 @@ def add_missed_locations(db_loc, config_loc):
 
 
 @cli.command()
-@click.option("--db_loc", type=Path)
-@click.option("--config_loc", type=Path)
-@click.option("--prepared_data_dir", type=Path)
-@click.option("--db_in_memory/--no_db_in_memory", default=False)
-@click.option("--in_memory/--no_in_memory", default=False)
+@click.option("--db_loc", type=Path, help="Path to SQlite database")
+@click.option("--config_loc", type=Path, help="Path to YAML configuration")
+@click.option(
+    "--prepared_data_dir",
+    type=Path,
+    help="Output directory in which to place files needed for topic modeling.",
+)
+@click.option(
+    "--db_in_memory/--no_db_in_memory",
+    default=False,
+    help="dump the whole database into memory",
+)
+@click.option(
+    "--in_memory/--no_in_memory",
+    default=False,
+    help="Load all keywords into memory before filtering",
+)
 def prepare_for_lda(
     db_loc, config_loc, prepared_data_dir, db_in_memory=False, in_memory=False
 ):
+    """
+    Create files necessary for running LDA topic modeling.
+    """
     with open(config_loc, "r") as f0:
         config = yaml.safe_load(f0)
     LOG.info(f"Using config: \n {pformat(config)}")

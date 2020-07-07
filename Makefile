@@ -3,6 +3,7 @@
 #TIMESTAMP=$$(date +%Y-%m-%d_%H:%M:%S)
 #include $(CONFIG_FILE) # This file may overwrite some defaults variables above
 
+## Runs 0 through 7
 all: 0-join-and-clean \
 	 1-write-ads-to-db \
 	 2-get-keywords-from-texts \
@@ -12,14 +13,17 @@ all: 0-join-and-clean \
 	 6-prepare-for-topic-model-viz \
 	 7-get-time-chars
 
+## Runs 0 through 3
 db: 0-join-and-clean \
 	1-write-ads-to-db \
 	2-get-keywords-from-texts \
 	3-add-missed-locations
 
+## Runs 4 and 5
 lda: 4-prepare-for-lda \
 	 5-make-topic-models
 
+## Runs 6 and 7
 viz: 6-prepare-for-topic-model-viz \
 	 7-get-time-chars \
 
@@ -115,7 +119,7 @@ $(records_loc): $(raw_riles)
 		--prepared_data_dir $(lda_prep_data_dir) \
 		--config_loc $(PARAM_YAML) \
 		--out_models_dir $(lda_models_dir) \
-		--out_coh_csv $(reports_dir)/coherence.csv
+		--reports_dir $(reports_dir)
 
 ## 6. Prepare visualization data
 6-prepare-for-topic-model-viz:

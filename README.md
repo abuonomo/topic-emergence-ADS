@@ -5,7 +5,7 @@ Creating a measure for topic emergence in the Astrophysics Data Sytem (ADS).
 See all options by going to root of this repository and running `make`.
 
 - [Installation](#installation)
-- [Data Pipeline](#data-pipeline)
+- [Running](#running)
 - [App](#app)
 
 
@@ -25,76 +25,32 @@ While in the virtual environment, you can now install the python requirements wi
 
 If you plan to use the `docker-build-app` and `docker-run-app` commands, you will also need to install docker.
 
-## Data Pipeline
-The commands listed after each step in the pipeline can all be found in the [Makefile](Makefile). You can see all of the options by simple running `make` or `make help`. You will see:
-```text
-0-join-and-clean    0. Join all years and and use rake to extract keywords. 
-1-write-ads-to-db   1. Write kwds.jsonl files to sqlite database 
-2-get-keywords-from-texts 2. Extract keywords from papers using SingleRank and insert into database 
-3-add-missed-locations 3. Find missed keyword locations 
-4-prepare-for-lda   4. Transform data into gensim corpus and dictionary for LDA training 
-5-make-topic-models 5. Train topic models 
-6-prepare-for-topic-model-viz 6. Prepare visualization data 
-7-get-time-chars    7. Get time and characteristics 
-app-dev             Run app for visualize results in development mode 
-app-prod            Run app for visualize results in production mode 
-clean-experiment    Delete all files for the given experiment 
-link-data-to-app    Link experiment data to app directory 
-requirements        Install packages to current environment with pip (venv recommended) 
-sync-raw-data-from-s3 Sync raw ADS metadata to raw data dir. 
-```
+## Running
+The commands listed after each step in the pipeline can all be found in the [Makefile](Makefile). You can see all of the options by simple running `make` or `make help`.
 
+Here is how to simply run an example experiment:
+1) Run `make db lda CONFIG_FILE=config/example_config.mk`
+2) Decide which topic model to use for the TEV. See `reports/example_experiment/` for coherence plot and data. For this example let's say you choose the topic model with 10 topics.
+3) Run `make viz CONFIG_FILE=config/example_config.mk N_TOPICS=30`.
+4) First you will need to make an [ADS account](https://ui.adsabs.harvard.edu/user/account/register) and obtain an API token [here](https://ui.adsabs.harvard.edu/user/settings/token). Then, run:
+    ```bash
+    make link-data-to-app app-dev \ 
+        CONFIG_FILE=config/example_config.mk \
+        N_TOPICS=30 \
+        ADS_TOKEN=YOUR-ADS-TOKEN
+     ```
+5) Visit `localhost:5000` to see the Topic Emergence Visualizer for your experiment.
 
-Also, if you want to create a new experiment with its own name, you must set the `EXP_NAME` variable as well. For example you might run `make dtw-viz MODE=test EXP_NAME=my_great_test`. This will use the default `test` configuration with directory names determined by `my_great_test`.
+## Configuration
 
-The pipeline process is as follows:
+In order to tailor the experiment to your use case, you need to understand the configuration files.
 
-1. The pipeline takes the input corpus, extracts potential keywords from the abstracts and titles, and counts frequencies for those keywords for each year (`join-and-clean`, `docs-to-keywords-df`, `get-filtered-keywords`).  
-  
-2. It then normalizes these frequency counts by the total count of papers for each year. The ratio of each year's frequency as compared to the first non-zero keyword count is also computed for each keyword (`normalize-keyword-freqs`).
- 
-3. From these keyword frequencies time series, a number of features are extracted and saved (`slope-complexity`).
- 
-4. Also from the normalized keyword frequencies, dynamic time warps are calculated pairwise between all keywords. Then kmeans clustering is performed on this matrix of dynamic time warps (`dtw`, `cluster-tests`, `dtw-viz`).
- 
-5. Finally, a flask app can run which displays a scatter plot with each keyword time series as a point. The axes are each one of the extracted time series features. The bubbles are sized by the log of their counts and colored by their dynamic time warp kmeans cluster (`link-data-to-app`, `app`).
+There are three configuration files:
+1) *Main makefile config* -- Make configuration for naming experiment, parameters which change performance of pipeline, and references to other configuration files. Example [here](config/example_experiment.mk).
+2) *parameter config* -- YAML configuration that changes how the experiment is conducted. Example [here](config/example_config.yaml).
+3) *drop features* -- a txt file with one keyword per line. It is a blacklist of keywords which should be ignored. Example [here](config/drop_features.txt).
 
-See list of all options with descriptions by running `make`.
-
-### With Docker
-
-You can run the data pipeline with docker, by either building or pulling the image. For example, pulling the image:
-```bash
-docker pull storage.analytics.nasa.gov/datasquad/keyword-emergence-pipeline:latest
-```
-You could alias the docker run command like so:
-```bash
-alias emerge='docker run -it --rm \
-    -v $(pwd)/config:/home/config \
-    -v $(pwd)/data:/home/data \
-    -v $(pwd)/models:/home/models \
-    -v $(pwd)/reports:/home/reports \
-    storage.analytics.nasa.gov/datasquad/keyword-emergence-pipeline:latest'
-```
-Then, just run `emerge` to see all the Makefile options.
-
-You might have to assure that the docker container's user has the right permissions on the attached volumes. You could do this by changing the owner of these directories, using the uid of the container's user (999):
-```bash
-chown -R 999:999 config/ data/ models/ reports/
-```
-## App
-To just run the app from a docker image, first pull or build the keyword-emergence-visualizer docker image (Dockerfile [here](app/Dockerfile)). You can see available image tags [here](https://storage.analytics.nasa.gov/repository/datasquad/keyword-emergence-visualizer). For example, you can pull the `latest` image with:
- ```
- docker pull storage.analytics.nasa.gov/datasquad/keyword-emergence-visualizer:latest
-```
-Once you have the image on your machine, you can run it, being sure to correctly configure your ports and docker volume mappings. For example:
-```bash
-cd app
-export IMAGE=storage.analytics.nasa.gov/datasquad/keyword-emergence-visualizer:latest
-docker run -it -p 5002:5000 -v $(pwd)/data:/home/data $IMAGE
-```
-
-For development purposes, you can run the app with the make commands `app` or `docker-run-app`. The first command will depend upon having the local environment properly configured with all requirements installed. The second requires only the docker container and some information from git about commits, remotes, and tags. The `docker-build-app` and `docker-run-app` commands service to automatically supply the image with some information about the git repo. 
+More details about these options are contained within the example configuration files.
 
 ## Index
 

@@ -257,8 +257,8 @@ def cli():
 @click.option("--prepared_data_dir", type=Path)
 @click.option("--config_loc", type=Path)
 @click.option("--out_models_dir", type=Path)
-@click.option("--out_coh_csv", type=Path)
-def make_topic_models(prepared_data_dir, config_loc, out_models_dir, out_coh_csv):
+@click.option("--reports_dir", type=Path)
+def make_topic_models(prepared_data_dir, config_loc, out_models_dir, reports_dir):
     corpus, dictionary, _, _ = read_from_prepared_data(prepared_data_dir)
     with open(config_loc, "r") as f0:
         config = yaml.safe_load(f0)
@@ -278,10 +278,14 @@ def make_topic_models(prepared_data_dir, config_loc, out_models_dir, out_coh_csv
     coherences = tm.get_coherences(models)
     n_topics = [m.num_topics for m in models]
     df = pd.DataFrame(zip(n_topics, coherences))
-
-    LOG.info(f"Writing coherence scores to {out_coh_csv}.")
     df.columns = ["num_topics", "coherence (u_mass)"]
+    coh_fig = get_coherence_plot(df)
+
+    out_coh_csv = reports_dir / "coherences.csv"
+    out_coh_plt = reports_dir / "coherences.png"
+    LOG.info(f"Writing coherence scores and plot to {reports_dir}.")
     df.to_csv(out_coh_csv)
+    coh_fig.savefig(out_coh_plt)
 
 
 def get_pby(session, paper_ids: List, batch_size=990):

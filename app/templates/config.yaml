@@ -1,4 +1,4 @@
-extraction:
+keyword_extraction:
   no_below: 50
   no_above: 0.5
   spacy_model_name: "en_core_sci_sm"
@@ -10,15 +10,16 @@ paper_organizer:
   year_max: 2010
   journal_blacklist: ["arXiv"]
   keyword_blacklist: "config/drop_features.txt"
-topic_range: [20, 30, 50]
-lda:
-  alpha: "auto"
-  eta: "auto"
-  iterations: 200
-  passes: 10
-  chunksize: 5000
-  eval_every: 1
-app:
+topic_model:
+  topic_range: [20, 30, 50]
+  lda_params: # More info: https://radimrehurek.com/gensim/models/ldamodel.html
+    alpha: "auto"
+    eta: "auto"
+    iterations: 200
+    passes: 10
+    chunksize: 5000
+    eval_every: 1
+time_series:
   year_min: 1997
   year_max: 2010
   min_topic_prob_thresh: 0.1

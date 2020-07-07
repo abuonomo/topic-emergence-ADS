@@ -599,15 +599,13 @@ def write_ads_to_db(infile, db_loc=":memory:"):
 @click.option("--config_loc", type=Path)
 @click.option("--batch_size", type=int, default=1000)
 @click.option("--n_process", type=int, default=-1)
-def get_keywords_from_texts(
-    db_loc, config_loc, batch_size=1000, n_process=-1
-):
+def get_keywords_from_texts(db_loc, config_loc, batch_size=1000, n_process=-1):
     with open(config_loc, "r") as f0:
         config = yaml.safe_load(f0)
     try:
-        spacy_model_name = config['extraction']['spacy_model_name']
+        spacy_model_name = config["keyword_extraction"]["spacy_model_name"]
     except KeyError:
-        spacy_model_name = 'en_core_web_sm'
+        spacy_model_name = "en_core_web_sm"
 
     engine = create_engine(f"sqlite:///{db_loc}")
 
@@ -634,12 +632,12 @@ def get_keywords_from_texts(
 def add_missed_locations(db_loc, config_loc):
     with open(config_loc, "r") as f0:
         config = yaml.safe_load(f0)
-    no_below = config["extraction"]["no_below"]
-    no_above = config["extraction"]["no_above"]
+    no_below = config["keyword_extraction"]["no_below"]
+    no_above = config["keyword_extraction"]["no_above"]
     try:
-        spacy_model_name = config['extraction']['spacy_model_name']
+        spacy_model_name = config["keyword_extraction"]["spacy_model_name"]
     except KeyError:
-        spacy_model_name = 'en_core_web_sm'
+        spacy_model_name = "en_core_web_sm"
 
     engine = create_engine(f"sqlite:///{db_loc}")
 

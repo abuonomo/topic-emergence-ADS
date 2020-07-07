@@ -199,11 +199,11 @@ class VizPrepper:
         features_df = extract_features(
             ts_df_long, column_id="topic", column_sort="year"
         )
-        cols = [c.split('count__')[1] for c in features_df.columns]
+        cols = [c.split("count__")[1] for c in features_df.columns]
         features_df.columns = cols
         features_df["coherence_score"] = self.topic_coherences
         features_df["CAGR"] = ts_df.apply(cagr, axis=1)
-        features_df['nasa_affiliation'] = ratio_nasa_affiliation
+        features_df["nasa_affiliation"] = ratio_nasa_affiliation
 
         return ts_df, features_df
 
@@ -265,7 +265,9 @@ def make_topic_models(prepared_data_dir, config_loc, out_models_dir, out_coh_csv
 
     LOG.info(f"Running with config: \n {pformat(config)}")
     tm = TopicModeler(dictionary, corpus)
-    models = tm.make_all_topic_models(config["topic_range"], **config["lda"])
+    models = tm.make_all_topic_models(
+        config["topic_model"]["topic_range"], **config["topic_model"]["lda_params"]
+    )
 
     out_models_dir.mkdir(exist_ok=True)
     for m in models:
@@ -394,7 +396,7 @@ def get_time_chars(viz_data_dir, config_loc):
     vp = VizPrepper()
     vp.read_hdf(viz_data_loc)
 
-    ts_df, chars_df = vp.get_time_characteristics(**config["app"])
+    ts_df, chars_df = vp.get_time_characteristics(**config["time_series"])
     kmeans, dtw_man = vp.get_dynamic_time_warp_clusters(ts_df)
     chars_df["kmeans_cluster"] = kmeans.labels_
     chars_df["manifold_x"] = dtw_man[:, 0]

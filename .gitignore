@@ -9,6 +9,8 @@ dask-worker-space/
 config/*
 !config/example.mk
 !config/example_config.yaml
+!config/drop_features.txt
+!config/example_experiment.mk
 !config/example_small.mk
 my_env/*
 *.jsonl

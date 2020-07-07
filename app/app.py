@@ -230,6 +230,7 @@ def get_time_data():
     df = app.config['N_DF'].loc[int(data['stem'])].reset_index()
     df.columns = ['year', 'count']
     df['kmeans_cluster'] = app.config['SC_DF']['kmeans_cluster'].loc[int(data['stem'])]
+    df['stem'] = data['stem']
     records = df.to_dict(orient='records')
     return jsonify(records)
 
@@ -239,6 +240,7 @@ def get_kwd_time_data():
     data = request.json
     df = app.config['KWD_N_DF'].loc[data['stem']].reset_index()
     df.columns = ['year', 'count']
+    df['stem'] = data['stem']
     records = df.to_dict(orient='records')
     return jsonify(records)
 

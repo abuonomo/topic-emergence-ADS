@@ -67,8 +67,9 @@ viz: 6-prepare-for-topic-model-viz \
 ## Install packages to current environment with pip (venv recommended)
 requirements:
 	pip install -r requirements.txt; \
+	pip install git+https://github.com/abuonomo/pyLDAvis.git; \
 	python -m spacy download en_core_web_sm; \
-	pip install git+https://github.com/abuonomo/pyLDAvis.git
+	pip install https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.2.4/en_core_sci_sm-0.2.4.tar.gz; \
 
 ## Sync raw ADS metadata to raw data dir.
 sync-raw-data-from-s3:

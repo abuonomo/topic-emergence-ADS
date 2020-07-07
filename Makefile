@@ -1,8 +1,56 @@
-# Set parameters depending on whether running test or full data
-#CONFIG_FILE=config/config.yaml
-#TIMESTAMP=$$(date +%Y-%m-%d_%H:%M:%S)
-#include $(CONFIG_FILE) # This file may overwrite some defaults variables above
+# Topic Emergence ADS
+# Create topic models for Astrophysics Data System and visualize trends over time.
+# author: Anthony Buonomo
+# email: arb246@georgetown.edu
 
+TIMESTAMP=$$(date +%Y-%m-%d_%H:%M:%S)
+
+.PHONY: requirements \
+		sync-raw-data-from-s3 \
+		0-join-and-clean \
+		1-write-ads-to-db \
+		2-get-keywords-from-texts \
+		3-add-missed-locations \
+		4-prepare-for-lda \
+		5-make-topic-models \
+		6-prepare-for-topic-model-viz \
+		7-get-time-chars \
+		clean-experiment \
+		check_clean
+
+# Default Config Variables
+EXPERIMENT_NAME=example_experiment
+
+N_TOPICS=500
+BATCH_SIZE=1000
+LIMIT=1000
+PARAM_YAML=config/example_config.yaml
+PORT=5000
+INFO="This is an example experiment."
+
+BUCKET=datasquad-low/home/DataSquad/topic-emergence-ADS/
+PROFILE=default
+
+# Experiment specific variables contained in CONFIG_FILE
+# Values in CONFIG_FILE will overwrite the variables above
+include $(CONFIG_FILE)
+
+# Internal variables, not to be altered by CONFIG_FILE.
+raw_dir=data/raw
+data_dir=data/$(EXPERIMENT_NAME)
+model_dir=models/$(EXPERIMENT_NAME)
+reports_dir=reports/$(EXPERIMENT_NAME)
+viz_dir=reports/viz/$(EXPERIMENT_NAME)
+
+records_loc=$(data_dir)/kwds.jsonl
+db_loc=$(data_dir)/ads_metadata.sqlite
+lda_prep_data_dir=$(data_dir)/lda_prep_data
+lda_models_dir=$(model_dir)/topic_models
+lda_model_viz_data_dir=$(model_dir)/topic_model$(N_TOPICS)
+
+raw_files=$(shell find $(raw_dir) -type f -name '*')
+
+# Commands
 ## Runs 0 through 7
 all: 0-join-and-clean \
 	 1-write-ads-to-db \
@@ -27,47 +75,6 @@ lda: 4-prepare-for-lda \
 viz: 6-prepare-for-topic-model-viz \
 	 7-get-time-chars \
 
-.PHONY: requirements \
-		sync-raw-data-from-s3 \
-		0-join-and-clean \
-		1-write-ads-to-db \
-		2-get-keywords-from-texts \
-		3-add-missed-locations \
-		4-prepare-for-lda \
-		5-make-topic-models \
-		6-prepare-for-topic-model-viz \
-		7-get-time-chars \
-		clean-experiment \
-		check_clean
-
-EXPERIMENT_NAME=example_experiment
-
-N_TOPICS=500
-BATCH_SIZE=1000
-LIMIT=1000
-PARAM_YAML=config/example_config.yaml
-PORT=5000
-INFO="This is an example experiment."
-
-BUCKET=datasquad-low/home/DataSquad/topic-emergence-ADS/
-PROFILE=default
-
-include $(CONFIG_FILE) # This file may overwrite some defaults variables above
-
-raw_dir=data/raw
-data_dir=data/$(EXPERIMENT_NAME)
-model_dir=models/$(EXPERIMENT_NAME)
-reports_dir=reports/$(EXPERIMENT_NAME)
-viz_dir=reports/viz/$(EXPERIMENT_NAME)
-
-records_loc=$(data_dir)/kwds.jsonl
-db_loc=$(data_dir)/ads_metadata.sqlite
-lda_prep_data_dir=$(data_dir)/lda_prep_data
-lda_models_dir=$(model_dir)/topic_models
-lda_model_viz_data_dir=$(model_dir)/topic_model$(N_TOPICS)
-
-raw_riles=$(shell find $(raw_dir) -type f -name '*')
-
 ## Install packages to current environment with pip (venv recommended)
 requirements:
 	pip install -r requirements.txt; \
@@ -80,7 +87,7 @@ sync-raw-data-from-s3:
 
 ## 0. Join all years and and use rake to extract keywords.
 0-join-and-clean: $(records_loc)
-$(records_loc): $(raw_riles)
+$(records_loc): $(raw_files)
 	mkdir -p $(data_dir); \
 	mkdir -p $(model_dir); \
 	mkdir -p $(viz_dir); \
@@ -178,14 +185,6 @@ all-info:
 		export EXPERIMENT_NAME=; \
 		export INFO=; \
 	done;
-
-#unset $${EXPERIMENT_NAME} $${INFO}; \
-#CONFIG_FILES=$(wildcard config/*.mk)
-#
-#$(CONFIG_FILES):
-#	@echo $@
-#
-#all-info: $(CONFIG_FILES)
 
 #################################################################################
 # Self Documenting Commands                                                     #

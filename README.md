@@ -5,8 +5,9 @@ Creating a measure for topic emergence in the Astrophysics Data Sytem (ADS).
 See all options by going to root of this repository and running `make`.
 
 - [Installation](#installation)
+- [Getting the data](#getting-the-data)
 - [Running](#running)
-- [App](#app)
+- [Configuration](#configuration)
 
 
 ## Installation
@@ -24,8 +25,17 @@ While in the virtual environment, you can now install the python requirements wi
 
 If you plan to use the `docker-build-app` and `docker-run-app` commands, you will also need to install docker.
 
+## Getting the data
+
+You can find the raw data at this s3 bucket location: `s3://datasquad-low/data/ADS/2020_03_15`.
+
+If you have your awscli credentials properly configured, you should be able to download this folder to the right place with:
+```bash
+make sync-raw-data-from-s3
+```
+
 ## Running
-The commands listed after each step in the pipeline can all be found in the [Makefile](Makefile). You can see all of the options by simple running `make` or `make help`.
+The commands listed after each step in the pipeline can all be found in the [Makefile](Makefile). You can see all of the options by simple running `make help`.
 
 Here is how to simply run an example experiment:
 1) Run `make db lda CONFIG_FILE=config/example_config.mk`

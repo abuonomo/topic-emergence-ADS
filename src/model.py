@@ -75,41 +75,6 @@ class TopicModeler:
         return embedding
 
 
-def read_from_prepared_data(prepared_data_dir):
-    in_corp = prepared_data_dir / "corpus.mm"
-    in_dct = prepared_data_dir / "dct.mm"
-    in_corp2paper = prepared_data_dir / "corp2paper.json"
-    in_dct2kwd = prepared_data_dir / "dct2kwd.json"
-
-    corpus = MmCorpus(str(in_corp))
-    dictionary = Dictionary.load(str(in_dct))
-    with open(in_corp2paper, "r") as f0:
-        corp2paper = json.load(f0)
-    with open(in_dct2kwd, "r") as f0:
-        dct2kwd = json.load(f0)
-
-    return corpus, dictionary, corp2paper, dct2kwd
-
-
-def cagr(x_row):
-    x = x_row.values
-    nz_inds = np.nonzero(x)[0]
-    if len(nz_inds) == 0:  # If all are 0, set CAGR to 0
-        return 0
-    else:
-        first_nonzero_index = nz_inds[0]
-        x = x[first_nonzero_index:]  # Not valid if starts with 0. Becomes inf
-        x = x[
-            ~np.isnan(x)
-        ]  # For normalized time series, NaNs before any occurrence of kwd
-    if len(x) < 2:  # If no periods, set CAGR to 0
-        return 0
-    else:
-        ys = x_row.index
-        period = max(ys) - min(ys)
-        return (x[-1] / x[0]) ** (1 / period) - 1
-
-
 class VizPrepper:
     def __init__(self):
         self.pyLDAvis_data = None
@@ -156,6 +121,25 @@ class VizPrepper:
         with open(pyLDAvis_data_loc, "r") as f0:
             self.pyLDAvis_data = json.load(f0)
 
+    @staticmethod
+    def cagr(x_row):
+        x = x_row.values
+        nz_inds = np.nonzero(x)[0]
+        if len(nz_inds) == 0:  # If all are 0, set CAGR to 0
+            return 0
+        else:
+            first_nonzero_index = nz_inds[0]
+            x = x[first_nonzero_index:]  # Not valid if starts with 0. Becomes inf
+            x = x[
+                ~np.isnan(x)
+            ]  # For normalized time series, NaNs before any occurrence of kwd
+        if len(x) < 2:  # If no periods, set CAGR to 0
+            return 0
+        else:
+            ys = x_row.index
+            period = max(ys) - min(ys)
+            return (x[-1] / x[0]) ** (1 / period) - 1
+
     def get_time_characteristics(self, min_topic_prob_thresh, year_min, year_max):
         all_time_series = []
         tmp_paper_df = self.paper_df.copy()
@@ -199,7 +183,7 @@ class VizPrepper:
         cols = [c.split("count__")[1] for c in features_df.columns]
         features_df.columns = cols
         features_df["coherence_score"] = self.topic_coherences
-        features_df["CAGR"] = ts_df.apply(cagr, axis=1)
+        features_df["CAGR"] = ts_df.apply(self.cagr, axis=1)
         features_df["nasa_affiliation"] = ratio_nasa_affiliation
 
         return ts_df, features_df
@@ -212,6 +196,70 @@ class VizPrepper:
         kmeans = dtw_to_tboard(ts_df, dtw_df, c=n_clusters)
         dtw_man = dtw_to_manifold(dtw_df)
         return kmeans, dtw_man
+
+
+def get_coherence_plot(df):
+    xlab = "num_topics"
+    ylab = "coherence (u_mass)"
+
+    plt.plot(df[xlab], df[ylab], "-o")
+    plt.xlabel(xlab)
+    plt.ylabel(ylab)
+    plt.title("Topic Model Coherence versus Number of Topics")
+    fig = plt.gcf()
+    return fig
+
+
+def read_from_prepared_data(prepared_data_dir):
+    in_corp = prepared_data_dir / "corpus.mm"
+    in_dct = prepared_data_dir / "dct.mm"
+    in_corp2paper = prepared_data_dir / "corp2paper.json"
+    in_dct2kwd = prepared_data_dir / "dct2kwd.json"
+
+    corpus = MmCorpus(str(in_corp))
+    dictionary = Dictionary.load(str(in_dct))
+    with open(in_corp2paper, "r") as f0:
+        corp2paper = json.load(f0)
+    with open(in_dct2kwd, "r") as f0:
+        dct2kwd = json.load(f0)
+
+    return corpus, dictionary, corp2paper, dct2kwd
+
+
+def get_pby(session, paper_ids: List, batch_size=990):
+    batches = range(0, len(paper_ids), batch_size)
+    pbar = tqdm(batches)
+    all_records = []
+    for i in pbar:
+        paper_id_batch = paper_ids[i : i + batch_size]
+        q = session.query(
+            Paper.id, Paper.bibcode, Paper.year, Paper.nasa_affiliation
+        ).filter(Paper.id.in_(paper_id_batch))
+        all_records = all_records + q.all()
+    df = pd.DataFrame(all_records)
+    df.columns = ["id", "bibcode", "year", "nasa_affiliation"]
+    return df
+
+
+def get_kwd_ts_df(session, keyword_ids: List, batch_size=990):
+    batches = range(0, len(keyword_ids), batch_size)
+    pbar = tqdm(batches)
+    all_records = []
+    for i in pbar:
+        kwd_id_batch = keyword_ids[i : i + batch_size]
+        q = (
+            session.query(PaperKeywords)
+                .join(Keyword)
+                .filter(Keyword.id.in_(kwd_id_batch))
+        )
+        records = [{"keyword": pk.keyword.keyword, "year": pk.paper.year} for pk in q]
+        all_records = all_records + records
+    df = pd.DataFrame(all_records)
+    df.columns = ["keyword", "year"]
+    df["count"] = 1
+    cdf = df.groupby(["keyword", "year"]).count().reset_index()
+    kwd_ts_df = cdf.pivot(index="keyword", columns="year", values="count").fillna(0)
+    return kwd_ts_df
 
 
 @click.group()
@@ -252,42 +300,6 @@ def make_topic_models(prepared_data_dir, config_loc, out_models_dir, reports_dir
     LOG.info(f"Writing coherence scores and plot to {reports_dir}.")
     df.to_csv(out_coh_csv)
     coh_fig.savefig(out_coh_plt)
-
-
-def get_pby(session, paper_ids: List, batch_size=990):
-    batches = range(0, len(paper_ids), batch_size)
-    pbar = tqdm(batches)
-    all_records = []
-    for i in pbar:
-        paper_id_batch = paper_ids[i : i + batch_size]
-        q = session.query(
-            Paper.id, Paper.bibcode, Paper.year, Paper.nasa_affiliation
-        ).filter(Paper.id.in_(paper_id_batch))
-        all_records = all_records + q.all()
-    df = pd.DataFrame(all_records)
-    df.columns = ["id", "bibcode", "year", "nasa_affiliation"]
-    return df
-
-
-def get_kwd_ts_df(session, keyword_ids: List, batch_size=990):
-    batches = range(0, len(keyword_ids), batch_size)
-    pbar = tqdm(batches)
-    all_records = []
-    for i in pbar:
-        kwd_id_batch = keyword_ids[i : i + batch_size]
-        q = (
-            session.query(PaperKeywords)
-            .join(Keyword)
-            .filter(Keyword.id.in_(kwd_id_batch))
-        )
-        records = [{"keyword": pk.keyword.keyword, "year": pk.paper.year} for pk in q]
-        all_records = all_records + records
-    df = pd.DataFrame(all_records)
-    df.columns = ["keyword", "year"]
-    df["count"] = 1
-    cdf = df.groupby(["keyword", "year"]).count().reset_index()
-    kwd_ts_df = cdf.pivot(index="keyword", columns="year", values="count").fillna(0)
-    return kwd_ts_df
 
 
 @cli.command()
@@ -380,19 +392,6 @@ def get_time_chars(viz_data_dir, config_loc):
 
     out_ts_loc = viz_data_dir / "topic_years.csv"
     ts_df.to_csv(out_ts_loc)
-
-
-def get_coherence_plot(df):
-    # df = pd.read_csv(infile, index_col=0)
-    xlab = "num_topics"
-    ylab = "coherence (u_mass)"
-
-    plt.plot(df[xlab], df[ylab], "-o")
-    plt.xlabel(xlab)
-    plt.ylabel(ylab)
-    plt.title("Topic Model Coherence versus Number of Topics")
-    fig = plt.gcf()
-    return fig
 
 
 if __name__ == "__main__":

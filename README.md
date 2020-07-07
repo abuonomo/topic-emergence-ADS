@@ -34,7 +34,7 @@ Here is how to simply run an example experiment:
 4) First you will need to make an [ADS account](https://ui.adsabs.harvard.edu/user/account/register) and obtain an API token [here](https://ui.adsabs.harvard.edu/user/settings/token). Then, run:
     ```bash
     make link-data-to-app app-dev \ 
-        CONFIG_FILE=config/example_config.mk \
+        CONFIG_FILE=config/example_experiment.mk \
         N_TOPICS=30 \
         ADS_TOKEN=YOUR-ADS-TOKEN
      ```

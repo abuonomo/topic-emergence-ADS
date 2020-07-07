@@ -8,6 +8,7 @@ dask-worker-space/
 *.tar.gz
 config/*
 !config/example.mk
+!config/example_config.yaml
 !config/example_small.mk
 my_env/*
 *.jsonl

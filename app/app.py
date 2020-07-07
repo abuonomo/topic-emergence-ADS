@@ -1,14 +1,13 @@
 import json
-import h5py
 import logging
 import os
 from pathlib import Path
 
-import joblib
+import h5py
 import numpy as np
 import pandas as pd
 import requests
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, send_from_directory
 from sklearn.preprocessing import MinMaxScaler
 
 logging.basicConfig(level=logging.INFO)
@@ -37,28 +36,21 @@ except KeyError:
 ADS_TOKEN = os.environ['ADS_TOKEN']
 
 app.config.update(
-    SC_LOC=DATA_DIR / f"slope_complex.csv",
-    N_LOC=DATA_DIR / f"all_keywords_threshold.jsonl",
-    KWD_SC_LOC=DATA_DIR / f"kwd_slope_complex.csv",
-    KWD_N_LOC=DATA_DIR / f"kwd_all_keywords_threshold.jsonl",
+    # PARAM_CONFIG_LOC=DATA_DIR / "config.yaml",
+    # PARAM_CONFIG_LOC=DATA_DIR / "config.yaml",
+    VIZ_DATA_LOC=DATA_DIR / "viz_data.hdf5",
+    VP=None,
+    SC_LOC=DATA_DIR / f"time_series_characteristics.csv",
+    N_LOC=DATA_DIR / f"topic_years.csv",
     YC_LOC=DATA_DIR / "year_counts.csv",
-    KMEANS_LOC=DATA_DIR / "kmeans.jbl",
-    KWD_KMEANS_LOC=DATA_DIR / "kwd_kmeans.jbl",
-    MAN_LOC=DATA_DIR / "dtw_manifold_proj.jbl",
-    TOPIC_DISTRIB_LOC=DATA_DIR / "topic_distribs_to_bibcodes.hdf5",
     TOPIC_YEARS_LOC=DATA_DIR / "topic_years.csv",
-    VIZ_DATA_LOC=DATA_DIR / "viz_data.json",
+    PYLDAVIS_DATA_LOC=DATA_DIR / "pyLDAvis_data.json",
+    PYLDAVIS_DATA=None,
     SC_DF=None,
     N_DF=None,
-    KWD_SC_DF=None,
     KWD_N_DF=None,
     YEAR_COUNTS=None,
-    KMEANS=None,
-    KWD_KMEANS=None,
-    TOPIC_DISTRIB_DF=None,
     TOPIC_YEARS_DF=None,
-    VIZ_DATA=None,
-    YEAR_MIN=None,
     LOAD_COLS=[
         "stem",
         "count",
@@ -84,49 +76,32 @@ def get_paper_from_bibcode(bibcode):
     return c
 
 
+def load_kwd_ts_df(viz_data_loc):
+    with h5py.File(viz_data_loc, "r") as f0:
+        keywords = f0["keywords"][:]
+        kwd_ts_values = f0["keyword_ts_values"][:]
+    kwd_ts_df = pd.DataFrame(kwd_ts_values)
+    kwd_ts_df.index = keywords
+    return kwd_ts_df
+
+
 @app.before_first_request
 def init():
+    with open(app.config['PYLDAVIS_DATA_LOC'], 'r') as f0:
+        app.config['PYLDAVIS_DATA'] = json.loads(json.load(f0))
     LOG.info(f'Reading derived time series measure from {app.config["SC_LOC"]}.')
     app.config["SC_DF"] = pd.read_csv(app.config["SC_LOC"], index_col=0)
-
-    LOG.info(f'Reading full stem time series from {app.config["N_LOC"]}.')
-    app.config["N_DF"] = pd.read_json(app.config["N_LOC"], orient="records", lines=True)
-
-    LOG.info(f'Reading derived time series measure from {app.config["KWD_SC_LOC"]}.')
-    app.config["KWD_SC_DF"] = pd.read_csv(app.config["KWD_SC_LOC"], index_col=0)
-
-    LOG.info(f'Reading full stem time series from {app.config["KWD_N_LOC"]}.')
-    app.config["KWD_N_DF"] = pd.read_json(app.config["KWD_N_LOC"], orient="records", lines=True)
-
-    LOG.info(f"Reading kmeans model from {app.config['KMEANS_LOC']}")
-    app.config["KMEANS"] = joblib.load(app.config["KMEANS_LOC"])
-
-    LOG.info(f"Reading kmeans model from {app.config['KWD_KMEANS_LOC']}")
-    app.config["KWD_KMEANS"] = joblib.load(app.config["KWD_KMEANS_LOC"])
-
-    manifold_data = joblib.load(app.config["MAN_LOC"])
+    app.config["N_DF"] = pd.read_csv(app.config["N_LOC"], index_col=0)
+    app.config['KWD_N_DF'] = load_kwd_ts_df(app.config['VIZ_DATA_LOC'])
     app.config["YEAR_COUNTS"] = pd.read_csv(app.config["YC_LOC"], index_col=0)
 
-    app.config['YEAR_MIN'] = min([int(c.split('_')[0]) for c in app.config["N_DF"].columns if "_sum" in c])
-
-    app.config["SC_DF"]["kmeans_cluster"] = app.config["KMEANS"].labels_
     log_count = np.log(app.config["SC_DF"]["count"])
-
-    try:
-        app.config["KWD_SC_DF"]["kmeans_cluster"] = app.config["KWD_KMEANS"].labels_
-    except ValueError:
-        app.config["KWD_SC_DF"]["kmeans_cluster"] = 0
+    log_count = log_count.replace([np.inf, -np.inf], 0)
 
     scaler = MinMaxScaler(feature_range=(3, 10))
     app.config["SC_DF"]["scaled_counts"] = scaler.fit_transform(
         log_count.values.reshape(-1, 1)
     )
-    app.config["SC_DF"]["manifold_x"] = manifold_data[:, 0]
-    app.config["SC_DF"]["manifold_y"] = manifold_data[:, 1]
-
-    with open(app.config['VIZ_DATA_LOC'], 'r') as f0:
-        app.config['VIZ_DATA'] = json.loads(json.load(f0))
-
     LOG.info(f"Ready")
 
 
@@ -136,16 +111,24 @@ def index():
     return render_template("index.html", version=VERSION, git_url=GIT_URL)
 
 
+@app.route("/config")
+def get_config():
+    LOG.info("Serving page.")
+    # p = app.config['PARAM_CONFIG_LOC']
+    # return render_template(p.parent, f"{p.stem}{p.suffix}")
+    return render_template("config.yaml")
+
+
 @app.route("/lda", methods=["GET"])
 def lda():
     LOG.info("Serving LDA viz.")
-    return jsonify(app.config['VIZ_DATA'])
+    return jsonify(app.config['PYLDAVIS_DATA'])
 
 
 def load_topic_distributions(loc: os.PathLike, t: int):
     with h5py.File(loc, 'r') as f0:
         mask = f0['topic_maxes'][:] == t
-        v = f0['topic_distribution'][mask, :]
+        v = f0['embedding'][mask, :]
         b = f0['bibcodes'][mask]
 
     tmp_df = pd.DataFrame(v)
@@ -153,9 +136,6 @@ def load_topic_distributions(loc: os.PathLike, t: int):
     tmps = tmp_df.iloc[:, t]
     df = tmps.reset_index()
     df.columns = ['bibcode', 'prob']
-    year = df['bibcode'].apply(lambda x: int(x[0:4]))
-    df = df.drop(df.index[year < app.config["YEAR_MIN"]])
-    df = df.sort_values('prob', ascending=False)
     return df
 
 
@@ -164,7 +144,7 @@ def topic_bibcodes():
     in_data = request.json
     topic = int(in_data['topic'])  # Frontend index starts at 1, here starts at 0
     limit = int(in_data['limit'])
-    topic_df = load_topic_distributions(app.config["TOPIC_DISTRIB_LOC"], topic)
+    topic_df = load_topic_distributions(app.config["VIZ_DATA_LOC"], topic)
     if limit == 0:
         records = topic_df.to_dict(orient='records')
     else:
@@ -174,7 +154,7 @@ def topic_bibcodes():
 
 @app.route("/keyword_distribs", methods=["GET"])
 def keyword_distribs():
-    df = pd.DataFrame(app.config['VIZ_DATA']['token.table'])
+    df = pd.DataFrame(app.config['PYLDAVIS_DATA']['token.table'])
     records = df.to_dict(orient='records')
     return jsonify(records)
 
@@ -184,10 +164,14 @@ def get_scatter_data():
     in_data = request.json
     LOG.info(f"Getting scatter data for {in_data}.")
     cols = list(set(app.config["LOAD_COLS"] + [in_data["x"], in_data["y"]]))
+    not_in_cols = [c for c in cols if c not in app.config['SC_DF'].columns]
+    if len(not_in_cols) > 0:
+        raise ValueError("All LOAD_COLS must be in SC_DF")
     chart_data = (
         app.config["SC_DF"]
+        .query(f"count > 0")
         .query(f"count >= {in_data['min_count']}")
-        .query(f"score_mean >= {in_data['minRake']}")
+        .query(f"coherence_score >= {in_data['minRake']}")
         .loc[:, cols]
         .to_dict(orient="records")
     )
@@ -220,18 +204,6 @@ def _trans_time(ts, kwd, clus):
     return ts_recs
 
 
-def get_time_data_inner(data, n_df, sc_df):
-    LOG.info(f"Getting time data for {data}.")
-    cols = [f"{y}_sum" for y in app.config['YEAR_COUNTS']['year'].sort_values()]
-    lcols = [c for c in cols if c in n_df.columns]
-    ts = n_df.query(f'stem == "{data["stem"]}"').loc[:, lcols]
-    s = data['stem']
-    kmc = sc_df.query(f'stem == "{s}"')['kmeans_cluster'].iloc[0]
-    ts = ts.T
-    ts_recs = _trans_time(ts, s, kmc)
-    return ts_recs
-
-
 @app.route("/get-count-range", methods=['GET'])
 def get_count_range():
     d = {
@@ -255,28 +227,31 @@ def get_score_range():
 @app.route("/get-time-data", methods=["GET", "POST"])
 def get_time_data():
     data = request.json
-    ts_recs = get_time_data_inner(data, app.config["N_DF"], app.config["SC_DF"])
-    return jsonify(ts_recs)
+    df = app.config['N_DF'].loc[int(data['stem'])].reset_index()
+    df.columns = ['year', 'count']
+    df['kmeans_cluster'] = app.config['SC_DF']['kmeans_cluster'].loc[int(data['stem'])]
+    df['stem'] = data['stem']
+    records = df.to_dict(orient='records')
+    return jsonify(records)
 
 
 @app.route("/get-kwd-time-data", methods=["GET", "POST"])
 def get_kwd_time_data():
     data = request.json
-    ts_recs = get_time_data_inner(data, app.config["KWD_N_DF"], app.config["KWD_SC_DF"])
-    return jsonify(ts_recs)
+    df = app.config['KWD_N_DF'].loc[data['stem']].reset_index()
+    df.columns = ['year', 'count']
+    df['stem'] = data['stem']
+    records = df.to_dict(orient='records')
+    return jsonify(records)
 
 
 @app.route("/get-all-time-data", methods=["GET", "POST"])
 def get_all_time_data():
     LOG.info(f"Getting total frequencies for each year.")
-    ts = pd.DataFrame(app.config["N_DF"].iloc[:, 5:].sum())
-    tmp_df = app.config["YEAR_COUNTS"].copy().sort_values("year")
-    tmp_df = tmp_df.drop(tmp_df.index[tmp_df['year'] < app.config['YEAR_MIN']])
-    ind = tmp_df["year"].apply(lambda x: f"{x}_sum")
-    tmp_df["index"] = ind
-    tmp_df = tmp_df.set_index("index").drop(columns=["year"])
-    ts_recs = _trans_time(tmp_df, "all", 0)
-    return jsonify(ts_recs)
+    df = app.config["N_DF"].sum().reset_index()
+    df.columns = ['year', 'count']
+    records = df.to_dict(orient='records')
+    return jsonify(records)
 
 
 @app.route("/get-all-options")

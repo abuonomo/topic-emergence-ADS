@@ -157,8 +157,8 @@
       var chart0 = scatterChart()
       .height(height)
       .width(width)
-      .xName('nasa_afil')
-      .yName('cagr')
+      .xName('nasa_affiliation')
+      .yName('CAGR')
       .timeSvg(timeSvg)
       .timeChart(timeChart)
       .color(color);
@@ -173,7 +173,7 @@
       .timeChart(timeChart)
       .color(color);
 
-      var min_count = -999;
+      var min_count = 1;
       var minRake= -999;
 
       var sliderSimple;
@@ -234,7 +234,7 @@
       d3.json(window.location.pathname + "get-scatter-data", {
             method:"POST",
             body: JSON.stringify({
-              x: 'nasa_afil', y: 'cagr', min_count: min_count, minRake: minRake
+              x: 'nasa_affiliation', y: 'CAGR', min_count: min_count, minRake: minRake
             }),
             headers: {
               "Content-type": "application/json; charset=UTF-8"
@@ -257,7 +257,7 @@
             .text(function (d) { return d; }) // text showed in the menu
             .attr("value", function (d) { return d; }); // corresponding value returned by the button
 
-            d3.select('#selectButtonX').property('value', 'nasa_afil');
+            d3.select('#selectButtonX').property('value', 'nasa_affiliation');
 
             d3.select("#selectButtonY")
             .selectAll('myOptions')
@@ -267,7 +267,7 @@
             .text(function (d) { return d; }) // text showed in the menu
             .attr("value", function (d) { return d; }); // corresponding value returned by the button
 
-            d3.select('#selectButtonY').property('value', 'cagr');
+            d3.select('#selectButtonY').property('value', 'CAGR');
 
             d3.select("#selectButtonXScale")
             .selectAll('myOptions')
@@ -332,8 +332,8 @@
 
       // Saved views
       d3.select("#cagrNasaafil").on("click", function (d) {
-                let x = 'nasa_afil';
-                let y = 'cagr';
+                let x = 'nasa_affiliation';
+                let y = 'CAGR';
                 return scatterRequestPlot(d, x, y);
               }
       );
@@ -346,15 +346,15 @@
       );
 
       d3.select("#maxSkew").on("click", function (d) {
-                let x = 'value__skewness';
-                let y = 'value__first_location_of_maximum';
+                let x = 'skewness';
+                let y = 'first_location_of_maximum';
                 return scatterRequestPlot(d, x, y);
               }
       );
 
       d3.select("#changeComplex").on("click", function (d) {
-                let x = 'value__mean_change';
-                let y = 'value__cid_ce__normalize_False';
+                let x = 'mean_change';
+                let y = 'cid_ce__normalize_False';
                 return scatterRequestPlot(d, x, y);
               }
       );
@@ -421,7 +421,7 @@ d3.json(page_url + "lda").then(function(data){
 });
 </script>
   <footer id="footerInfo">
-    <p style="font-size: 16px">For questions, contact <a href = "mailto: anthony.r.buonomo@nasa.gov">anthony.r.buonomo@nasa.gov</a> or <a href = "mailto: brian.a.thomas@nasa.gov">brian.a.thomas@nasa.gov</a>.</p>
+    <p style="font-size: 16px">For questions, contact <a href = "mailto: brian.a.thomas@nasa.gov">brian.a.thomas@nasa.gov</a>.</p>
   </footer>
   </body>
 </html>

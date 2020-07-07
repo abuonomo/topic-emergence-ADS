@@ -1,602 +1,180 @@
-BUCKET=datasquad-low/home/DataSquad/topic-emergence-ADS/
-PROFILE=moderate
-RECIPES=python recipes.py
-IN_ADS_TOKEN=
-export LOGLEVEL=INFO
-export ADS_TOKEN=$(IN_ADS_TOKEN)
+# Topic Emergence ADS
+# Create topic models for Astrophysics Data System and visualize trends over time.
+# author: Anthony Buonomo
+# email: arb246@georgetown.edu
 
-# Set parameters depending on whether running test or full data
-BATCH_SIZE=1000
-N_PROCESS=1
-MIN_THRESH=100
-MAX_THRESH=1
-NO_BELOW=300
-NO_ABOVE=0.25
-RAW_DIR=data/raw
-JOURNAL_LIMIT=--no_only_nature_and_sci
-TOPIC_RANGE_FILE=config/topic_range.json
-CONFIG_FILE=config/example_small.mk
-YEAR_MIN=0
 TIMESTAMP=$$(date +%Y-%m-%d_%H:%M:%S)
-include $(CONFIG_FILE) # This file may overwrite some defaults variables above
 
-DATA_DIR=data/$(EXP_NAME)
-VIZ_DIR=reports/viz/$(EXP_NAME)
-MODEL_DIR=models/$(EXP_NAME)
+.PHONY: requirements \
+		sync-raw-data-from-s3 \
+		0-join-and-clean \
+		1-write-ads-to-db \
+		2-get-keywords-from-texts \
+		3-add-missed-locations \
+		4-prepare-for-lda \
+		5-make-topic-models \
+		6-prepare-for-topic-model-viz \
+		7-get-time-chars \
+		clean-experiment \
+		check_clean
 
+# Default Config Variables
+EXPERIMENT_NAME=example_experiment
 
-.PHONY: join-and-clean docs-to-keywords-df get-filtered-kwds normalize-keyword-freqs \
-		slope-complexity dtw cluster-tests dtw-viz \
-		make-topic-models visualize-topic-models app clean check_clean
-#all: join-and-clean docs-to-keywords-df get-filtered-kwds normalize-keyword-freqs \
-#	 slope-complexity dtw cluster-tests dtw-viz \
-#	 make-topic-models visualize-topic-models
+N_TOPICS=500
+BATCH_SIZE=1000
+PARAM_YAML=config/example_config.yaml
+PORT=5000
+INFO="This is an example experiment."
 
-all: topics-time-series-measures topic-dtw-viz slope-complexity dtw-viz
+BUCKET=datasquad-low/home/DataSquad/topic-emergence-ADS/
+PROFILE=default
 
+# Experiment specific variables contained in CONFIG_FILE
+# Values in CONFIG_FILE will overwrite the variables above
+include $(CONFIG_FILE)
 
-$(DATA_DIR) $(MODEL_DIR) $(VIZ_DIR):
-	mkdir -p $(DATA_DIR) $(MODEL_DIR) $(VIZ_DIR)
+# Internal variables, not to be altered by CONFIG_FILE.
+raw_dir=data/raw
+data_dir=data/$(EXPERIMENT_NAME)
+model_dir=models/$(EXPERIMENT_NAME)
+reports_dir=reports/$(EXPERIMENT_NAME)
+viz_dir=reports/viz/$(EXPERIMENT_NAME)
 
+records_loc=$(data_dir)/kwds.jsonl
+db_loc=$(data_dir)/ads_metadata.sqlite
+lda_prep_data_dir=$(data_dir)/lda_prep_data
+lda_models_dir=$(model_dir)/topic_models
+lda_model_viz_data_dir=$(model_dir)/topic_model$(N_TOPICS)
+
+raw_files=$(shell find $(raw_dir) -type f -name '*')
+
+# Commands
+## Runs 0 through 3
+db: 0-join-and-clean \
+	1-write-ads-to-db \
+	2-get-keywords-from-texts \
+	3-add-missed-locations
+
+## Runs 4 and 5
+lda: 4-prepare-for-lda \
+	 5-make-topic-models
+
+## Runs 6 and 7
+viz: 6-prepare-for-topic-model-viz \
+	 7-get-time-chars \
 
 ## Install packages to current environment with pip (venv recommended)
 requirements:
-	pip install -r requirements.txt && python -m spacy download en_core_web_sm
-	@echo "You need to install the rust compiler on your system to use contextualized embedding topic modeling."
-	@echo "If you are on a mac see here: https://sourabhbajaj.com/mac-setup/Rust/"
+	pip install -r requirements.txt; \
+	pip install git+https://github.com/abuonomo/pyLDAvis.git; \
+	python -m spacy download en_core_web_sm; \
+	pip install https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.2.4/en_core_sci_sm-0.2.4.tar.gz; \
 
+## Sync raw ADS metadata to raw data dir.
+sync-raw-data-from-s3:
+	aws s3 sync s3://datasquad-low/data/ADS/2020_03_15 $(raw_dir)
 
-## Install the requirements for the app
-requirements-app:
-	pip install -r app/requirements.txt
-
-
-RAW_FILES=$(shell find $(RAW_DIR) -type f -name '*')
-RECORDS_LOC=$(DATA_DIR)/kwds.jsonl
-## Join all years and and use rake to extract keywords.
-join-and-clean: $(RECORDS_LOC)
-$(RECORDS_LOC): $(RAW_FILES)
-	mkdir -p $(DATA_DIR); \
-	mkdir -p $(MODEL_DIR); \
-	mkdir -p $(VIZ_DIR); \
+## 0. Join all years and and use rake to extract keywords.
+0-join-and-clean: $(records_loc)
+$(records_loc): $(raw_files)
+	mkdir -p $(data_dir); \
+	mkdir -p $(model_dir); \
+	mkdir -p $(viz_dir); \
+	mkdir -p $(reports_dir); \
 	python src/join_and_clean.py \
-		$(RAW_DIR) \
-		$(RECORDS_LOC) \
-		--limit $(LIMIT) \
-		$(JOURNAL_LIMIT) \
-		$(YEAR_LIMIT)
+		$(raw_dir) \
+		$(records_loc) \
+		--config_loc $(PARAM_YAML)
 
+## 1. Write kwds.jsonl files to sqlite database
+1-write-ads-to-db:
+	python src/db.py write-ads-to-db \
+		--infile $(records_loc) \
+		--db_loc $(db_loc)
 
-YEAR_COUNT_LOC=$(DATA_DIR)/year_counts.csv
-KWD_TOKENS_LOC=$(DATA_DIR)/kwd_tokens.jsonl
-## Extract all keywords and their scores from abstracts and titles
-docs-to-keywords-df: $(ALL_KWDS_LOC) $(YEAR_COUNT_LOC) $(KWD_TOKENS_LOC)
-$(ALL_KWDS_LOC) $(YEAR_COUNT_LOC) $(KWD_TOKENS_LOC): $(RECORDS_LOC)
-	python src/extract_keywords.py main \
-		--infile $(RECORDS_LOC) \
-		--out_years $(YEAR_COUNT_LOC) \
-		--out_tokens $(KWD_TOKENS_LOC) \
-		--strategy $(STRATEGY) \
-		--n_process $(N_PROCESS) \
+## 2. Extract keywords from papers using SingleRank and insert into database
+2-get-keywords-from-texts:
+	python src/db.py get-keywords-from-texts --db_loc $(db_loc) \
+		--config_loc $(PARAM_YAML) \
 		--batch_size $(BATCH_SIZE)
 
+## 3. Find missed keyword locations
+3-add-missed-locations:
+	python src/db.py add-missed-locations --db_loc $(db_loc) --config_loc $(PARAM_YAML)
 
-ALL_KWDS_LOC=$(DATA_DIR)/all_keywords.jsonl
-## Get dataframe of keyword frequencies over the years
-aggregate-kwds: $(ALL_KWDS_LOC)
-$(ALL_KWDS_LOC): $(KWD_TOKENS_LOC)
-	python src/extract_keywords.py aggregate-kwds \
-		--infile $(RECORDS_LOC) \
-		--in_kwd_lists $(KWD_TOKENS_LOC) \
-		--outfile $(ALL_KWDS_LOC) \
-		--min_thresh $(MIN_THRESH) \
-		--max_thresh $(MAX_THRESH) \
+## 4. Transform data into gensim corpus and dictionary for LDA training
+4-prepare-for-lda:
+	python src/db.py prepare-for-lda \
+		--db_loc $(db_loc) \
+		--config_loc $(PARAM_YAML) \
+		--prepared_data_dir $(lda_prep_data_dir)
 
+## 5. Train topic models
+5-make-topic-models:
+	python src/model.py make-topic-models \
+		--prepared_data_dir $(lda_prep_data_dir) \
+		--config_loc $(PARAM_YAML) \
+		--out_models_dir $(lda_models_dir) \
+		--reports_dir $(reports_dir)
 
-OUT_AFFIL=$(DATA_DIR)/nasa_affiliation.csv
-## Get overall nasa affiliation
-affil: $(OUT_AFFIL)
-$(OUT_AFFIL): $(RECORDS_LOC) src/get_overall_nasa_affil.py
-	python src/get_overall_nasa_affil.py \
-		$(RECORDS_LOC) \
-		$(OUT_AFFIL) \
-		--year_min $(YEAR_MIN)
+## 6. Prepare visualization data
+6-prepare-for-topic-model-viz:
+	python src/model.py prepare-for-topic-model-viz \
+		--db_loc $(db_loc) \
+		--prepared_data_dir  $(lda_prep_data_dir) \
+		--tmodel_loc $(lda_models_dir)/topic_model$(N_TOPICS) \
+		--viz_data_dir $(lda_model_viz_data_dir)
 
+## 7. Get time and characteristics
+7-get-time-chars:
+	python src/model.py get-time-chars \
+		--viz_data_dir $(lda_model_viz_data_dir) \
+		--config_loc $(PARAM_YAML)
 
-bootstrap: $(RECORDS_LOC)
-	python src/bootstrapping.py $(RECORDS_LOC)
-
-
-FILT_KWDS_LOC=$(DATA_DIR)/all_keywords_threshold_$(FREQ)_$(SCORE)_$(HARD).jsonl
-DROP_FEATURE_LOC=config/drop_features.json
-## Filter keywords by total frequency and rake score. Also provide hard limit.
-get-filtered-kwds: $(FILT_KWDS_LOC)
-$(FILT_KWDS_LOC): $(ALL_KWDS_LOC)
-	@echo "See notebook/arb-10-look-at-textacy-kwds.ipynb to see code for selecting filter params."
-	python src/extract_keywords.py filter-kwds \
-		--infile $(ALL_KWDS_LOC) \
-		--out_loc $(FILT_KWDS_LOC) \
-		--threshold $(FREQ) --score_thresh=$(SCORE) --hard_limit $(HARD) \
-		--year_count_loc $(YEAR_COUNT_LOC) --year_min $(YEAR_MIN) \
-		--drop_feature_loc $(DROP_FEATURE_LOC)
-
-
-NORM_KWDS_LOC=$(DATA_DIR)/all_keywords_norm_threshold_$(FREQ)_$(SCORE)_$(HARD).jsonl
-## Normalize keyword frequencies by year totals and percent of baselines.
-normalize-keyword-freqs: $(NORM_KWDS_LOC)
-$(NORM_KWDS_LOC): $(FILT_KWDS_LOC) $(YEAR_COUNT_LOC)
-	$(RECIPES) normalize-keyword-freqs \
-		--kwds_loc $(FILT_KWDS_LOC) \
-		--in_years $(YEAR_COUNT_LOC) \
-		--out_norm $(NORM_KWDS_LOC) \
-		--year_min $(YEAR_MIN)
-
-
-TS_FEATURES_LOC=$(DATA_DIR)/slope_complex.csv
-## Get various measures for keyword time series
-slope-complexity: $(TS_FEATURES_LOC)
-$(TS_FEATURES_LOC): $(NORM_KWDS_LOC) $(OUT_AFFIL)
-	$(RECIPES) slope-complexity \
-		--norm_loc $(NORM_KWDS_LOC) \
-		--year_count_loc $(YEAR_COUNT_LOC) \
-		--affil_loc $(OUT_AFFIL) \
-		--out_df $(TS_FEATURES_LOC) \
-		--year_min $(YEAR_MIN)
-
-
-DTW_DISTS_LOC=$(DATA_DIR)/dynamic_time_warp_distances.csv
-## Compute pairwise dynamic time warp between keywords
-dtw: $(DTW_DISTS_LOC)
-$(DTW_DISTS_LOC): $(NORM_KWDS_LOC)
-	$(RECIPES) dtw \
-		--norm_loc $(NORM_KWDS_LOC) \
-		--year_count_loc $(YEAR_COUNT_LOC) \
-		--dtw_loc $(DTW_DISTS_LOC) \
-		--year_min $(YEAR_MIN)
-
-ELBOW_PLT_LOC=$(VIZ_DIR)/elbow.png
-## Try various numbers of clusters for kmeans, produce plots
-cluster-tests: $(ELBOW_PLT_LOC)
-$(ELBOW_PLT_LOC): $(DTW_DISTS_LOC)
-	$(RECIPES) cluster-tests \
-		--dtw_loc $(DTW_DISTS_LOC) \
-		--out_elbow_plot $(ELBOW_PLT_LOC)
-
-KM_MODEL_LOC=$(MODEL_DIR)/kmeans.jbl
-MANIF_PLT_LOC=$(VIZ_DIR)/manifold.png
-MANIF_POINTS_LOC=$(MODEL_DIR)/dtw_manifold_proj.jbl
-## Cluster keywords by dynamic time warp values and plot in tensorboard.
-dtw-viz: $(MANIF_PLT_LOC) $(MANIF_POINTS_LOC) $(KM_MODEL_LOC)
-$(MANIF_PLT_LOC) $(MANIF_POINTS_LOC) $(KM_MODEL_LOC): $(NORM_KWDS_LOC) $(DTW_DISTS_LOC)
-	$(RECIPES) dtw-viz \
-		--norm_loc $(NORM_KWDS_LOC) \
-		--dtw_loc $(DTW_DISTS_LOC) \
-		--kmeans_loc $(KM_MODEL_LOC) \
-		--out_man_plot $(MANIF_PLT_LOC) \
-		--out_man_points $(MANIF_POINTS_LOC)
-
-APP_DATA_DIR=$$(pwd)/app/data
-APP_DATA_FILES=$(shell find $(APP_DATA_DIR) -type f -name '*')
-## link data files to app's data dir
+## Link experiment data to app directory
 link-data-to-app:
-	ln -f $(YEAR_COUNT_LOC) app/data
-	ln -f $(FILT_KWDS_LOC) app/data/all_keywords_threshold.jsonl
-	ln -f $(MANIF_POINTS_LOC) app/data
-	ln -f $(KM_MODEL_LOC) app/data
-	ln -f $(TS_FEATURES_LOC) app/data
-	ln -f $(TMODEL_VIZ_GEN_LOC) app/static/html/topic_model_viz.html
-	ln -f $(TOPIC_TO_BIBCODES_LOC) app/data/topic_distribs_to_bibcodes.csv
-	ln -f $(TOPIC_TO_YEARS_LOC) app/data/topic_years.csv
-
+	ln -f $(lda_model_viz_data_dir)/viz_data.hdf5 app/data
+	ln -f $(lda_model_viz_data_dir)/pyLDAvis_data.json app/data
+	ln -f $(lda_model_viz_data_dir)/time_series_characteristics.csv app/data
+	ln -f $(lda_model_viz_data_dir)/topic_years.csv app/data
+	ln -f $(PARAM_YAML) app/templates/config.yaml
 
 ## Run app for visualize results in development mode
-app-dev: | $(APP_DATA_FILES)
+app-dev:
 	export VERSION=$$(python version.py); \
-	export FLASK_ENV=development APP_DATA_DIR=data export VERSION=$$(python version.py) && cd app && flask run
+	export FLASK_ENV=development; \
+	export APP_DATA_DIR=data; \
+	export VERSION=$$(python version.py); \
+	cd app; \
+	export PYTHONPATH=$${PYTHONPATH}:../src/; \
+	flask run
 
 ## Run app for visualize results in production mode
-PORT=5000
 app-prod: | $(APP_DATA_FILES)
 	export VERSION=$$(python version.py); \
-	cd app && APP_DATA_DIR=data gunicorn app:app -b 0.0.0.0:$(PORT) --timeout 1200
-
-
-clean: check_clean
-	rm -r $(DATA_DIR)
-	rm -r $(VIZ_DIR)
-	rm -r $(MODEL_DIR)
-
+	cd app && APP_DATA_DIR=data gunicorn app:app -b :$(PORT) --timeout 1200
 
 check_clean:
-	echo -n "Are you sure you want to delete \'$(DATA_DIR)\', \'$(VIZ_DIR)\' and \'$(MODEL_DIR)\'? [y/N] " \&& read ans && [ $${ans:-N} = y ]
+	@echo -n "These folders will be deleted:\n$(data_dir)\n$(model_dir)\n$(viz_dir)\nProceed? [y/N] " && read ans && [ $${ans:-N} = y ]
 
+## Delete all files for the given experiment
+clean-experiment: check_clean
+	@echo "Manually remove the files."
 
-#========= Topic Modeling =========#
+## Get short description of this experiment
+info:
+	@echo $(INFO);
 
-DOC_FEAT_MAT_LOC=$(DATA_DIR)/doc_feature_matrix.mtx
-MULT_LAB_BIN_LOC=$(MODEL_DIR)/mlb.jbl
-MAP_LOC=$(MODEL_DIR)/mat_doc_mapping.csv
-DCT_LOC=$(MODEL_DIR)/gensim_dct.mm
-CORP_LOC=$(MODEL_DIR)/gensim_corpus.mm
-## Create document term matrix
-prepare-features: $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC) $(DCT_LOC) $(CORP_LOC)
-$(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC) $(DCT_LOC) $(CORP_LOC): $(NORM_KWDS_LOC)
-	python src/topic_modeling.py prepare-features \
-		--norm_loc $(NORM_KWDS_LOC) \
-		--mat_loc $(DOC_FEAT_MAT_LOC) \
-		--mlb_loc $(MULT_LAB_BIN_LOC) \
-		--map_loc $(MAP_LOC) \
-		--dct_loc $(DCT_LOC) \
-		--corp_loc $(CORP_LOC)
-
-
-TOKENS_LOC=$(MODEL_DIR)/gensim_tokens.jsonl
-COH_PLT_LOC=$(VIZ_DIR)/coherence.png
-TMODEL_DIR=$(MODEL_DIR)/topic_models
-ALG='lda'
-## Create test topic models of varying sizes
-run-topic-models: $(COH_PLT_LOC)
-$(COH_PLT_LOC): $(DOC_FEAT_MAT_LOC) $(MULT_LAB_BIN_LOC) $(MAP_LOC)
-	mkdir -p $(TMODEL_DIR); \
-	python src/topic_modeling.py run-topic-models \
-		--plot_loc $(COH_PLT_LOC) \
-		--mat_loc $(DOC_FEAT_MAT_LOC) \
-		--mlb_loc $(MULT_LAB_BIN_LOC) \
-		--map_loc $(MAP_LOC) \
-		--tmodels_dir $(TMODEL_DIR) \
-		--alg $(ALG)
-
-
-COHERENCE_LOC=$(VIZ_DIR)/coherence$(TIMESTAMP).csv
-DCT_TOK_LOC=$(MODEL_DIR)/gensim_tok_dct.mm
-CORP_TOK_LOC=$(MODEL_DIR)/gensim_tok_corpus.mm
-TMODEL0 = $(TMODEL_DIR)/gensim_topic_model$(N_TOPICS)
-TMODELS_LOG = $(TMODEL_DIR)/model_convergence.log
-## Make topic models using gensim's LdaMulticore
-run-gensim-lda-mult: $(COH_PLT_LOC) $(TMODEL0)
-$(COH_PLT_LOC) $(TMODEL0): $(DCT_LOC) $(CORP_LOC) $(MAP_LOC)
-	mkdir -p $(TMODEL_DIR); \
-	python src/topic_modeling.py --loglevel DEBUG --logfile $(TMODELS_LOG) run-gensim-lda-mult \
-		--plot_loc $(COH_PLT_LOC) \
-		--topic_range_loc $(TOPIC_RANGE_FILE) \
-		--tmodels_dir $(TMODEL_DIR) \
-		--coherence_loc $(COHERENCE_LOC) \
-		--dct_loc $(DCT_LOC) \
-		--corp_loc $(CORP_LOC)
-
-
-## Get coherences for gensim topic models
-get-gensim-coherences: $(COH_PLT_LOC)
-	python src/topic_modeling.py get-gensim-coherences \
-		--plot_loc $(COH_PLT_LOC) \
-		--corp_loc $(CORP_LOC) \
-		--tmodels_dir $(TMODEL_DIR)
-
-
-TMODELS=$(shell find $(TMODEL_DIR) -type f -name '*')
-N_TOPICS=50
-TMODEL_VIZ_LOC=$(VIZ_DIR)/topic_model_viz$(N_TOPICS).html
-TOPIC_COHS_LOC=$(VIZ_DIR)/topic_coherences$(N_TOPICS).csv
-# Above line collects all files in dir for command prerequisite
-## Visualize topic models with pyLDAviz
-visualize-topic-models: $(TMODEL_VIZ_LOC)
-$(TMODEL_VIZ_LOC): $(TMODELS)
-	python src/topic_modeling.py visualize-topic-models \
-		--infile $(RECORDS_LOC) \
-		--tmodel_dir $(TMODEL_DIR) \
-		--n $(N_TOPICS) \
-		--mlb_loc $(MULT_LAB_BIN_LOC) \
-		--map_loc $(MAP_LOC) \
-		--tmodel_viz_loc $(TMODEL_VIZ_LOC) \
-		--topic_cohs_loc $(TOPIC_COHS_LOC)
-
-
-TMODEL_VIZ_GEN_LOC=$(VIZ_DIR)/gensim_topic_model_viz$(N_TOPICS).html
-VIZ_DATA_LOC=$(VIZ_DIR)/viz_data$(N_TOPICS).json
-TOPIC_TO_BIBCODES_LOC=$(VIZ_DIR)/topic_distribs_to_bibcodes$(N_TOPICS).hdf5
-## Visualize gensim topic models with pyLDAvis
-visualize-gensim-topic-models: $(TMODEL_VIZ_GEN_LOC) $(TOPIC_TO_BIBCODES_LOC)
-$(TMODEL_VIZ_GEN_LOC) $(TOPIC_TO_BIBCODES_LOC): $(TMODELS) $(MAP_LOC) $(TMODEL0)
-	python src/topic_modeling.py visualize-gensim-topic-models \
-		--infile $(RECORDS_LOC) \
-		--tmodel_dir $(TMODEL_DIR) \
-		--n $(N_TOPICS) \
-		--in_corpus $(CORP_LOC) \
-		--dct_loc $(DCT_LOC) \
-		--map_loc $(MAP_LOC) \
-		--tmodel_viz_loc $(TMODEL_VIZ_GEN_LOC) \
-		--viz_data_loc $(VIZ_DATA_LOC) \
-		--topic_to_bibcodes_loc $(TOPIC_TO_BIBCODES_LOC) \
-		--topic_cohs_loc $(TOPIC_COHS_LOC)
-
-
-TOPIC_TO_YEARS_LOC=$(VIZ_DIR)/topic_years$(N_TOPICS).jsonl
-## Get year time series for topics
-get-topic-years: $(TOPIC_TO_YEARS_LOC)
-$(TOPIC_TO_YEARS_LOC): $(TOPIC_TO_BIBCODES_LOC) $(RECORDS_LOC)
-	python src/topic_modeling.py get-topic-years \
-		--records_loc $(RECORDS_LOC) \
-		--in_bib $(TOPIC_TO_BIBCODES_LOC) \
-		--topic_cohs_loc $(TOPIC_COHS_LOC) \
-		--map_loc $(MAP_LOC) \
-		--out_years $(TOPIC_TO_YEARS_LOC) \
-		--year_min $(YEAR_MIN)
-
-
-NORM_TOPICS_LOC=$(VIZ_DIR)/topic_years_norm$(N_TOPICS).jsonl
-## Normalize topic frequencies by year totals and percent of baselines.
-normalize-topic-freqs: $(TOPIC_TO_YEARS_LOC)
-$(NORM_TOPICS_LOC): $(TOPIC_TO_YEARS_LOC) $(YEAR_COUNT_LOC)
-	$(RECIPES) normalize-keyword-freqs \
-		--kwds_loc $(TOPIC_TO_YEARS_LOC) \
-		--in_years $(YEAR_COUNT_LOC) \
-		--out_norm $(NORM_TOPICS_LOC) \
-		--year_min $(YEAR_MIN)
-
-
-
-TOPIC_TS_FEATURES_LOC=$(DATA_DIR)/topic_time_series_measures$(N_TOPICS).csv
-## Get various measures for topics time series
-topics-time-series-measures: $(TOPIC_TS_FEATURES_LOC)
-$(TOPIC_TS_FEATURES_LOC): $(TOPIC_TO_YEARS_LOC) $(OUT_AFFIL)
-	$(RECIPES) slope-complexity \
-		--norm_loc $(TOPIC_TO_YEARS_LOC) \
-		--year_count_loc $(YEAR_COUNT_LOC) \
-		--affil_loc $(OUT_AFFIL) \
-		--out_df $(TOPIC_TS_FEATURES_LOC) \
-		--year_min $(YEAR_MIN)
-
-
-TOPIC_DTW_DISTS_LOC=$(DATA_DIR)/topic_dynamic_time_warp_distances.csv
-## Compute pairwise dynamic time warp between topics
-topic-dtw: $(TOPIC_DTW_DISTS_LOC)
-$(TOPIC_DTW_DISTS_LOC): $(NORM_TOPICS_LOC)
-	$(RECIPES) dtw \
-		--norm_loc $(NORM_TOPICS_LOC) \
-		--year_count_loc $(YEAR_COUNT_LOC) \
-		--dtw_loc $(TOPIC_DTW_DISTS_LOC) \
-		--year_min $(YEAR_MIN)
-
-
-ELBOW_PLT_LOC=$(VIZ_DIR)/topic_elbow.png
-## Try various numbers of clusters for kmeans topic time series clustering
-topic-cluster-tests: $(ELBOW_PLT_LOC)
-$(ELBOW_PLT_LOC): $(TOPIC_DTW_DISTS_LOC)
-	$(RECIPES) cluster-tests \
-		--dtw_loc $(TOPIC_DTW_DISTS_LOC) \
-		--out_elbow_plot $(ELBOW_PLT_LOC)
-
-
-TOPIC_KM_MODEL_LOC=$(MODEL_DIR)/topic_kmeans.jbl
-TOPIC_MANIF_PLT_LOC=$(VIZ_DIR)/topic_manifold.png
-TOPIC_MANIF_POINTS_LOC=$(MODEL_DIR)/topic_dtw_manifold_proj.jbl
-## Cluster topics by dynamic time warp values and plot in tensorboard.
-topic-dtw-viz: $(TOPIC_MANIF_PLT_LOC) $(TOPIC_MANIF_POINTS_LOC) $(TOPIC_KM_MODEL_LOC)
-$(TOPIC_MANIF_PLT_LOC) $(TOPIC_MANIF_POINTS_LOC) $(TOPIC_KM_MODEL_LOC): $(NORM_TOPICS_LOC) $(TOPIC_DTW_DISTS_LOC)
-	$(RECIPES) dtw-viz \
-		--norm_loc $(NORM_TOPICS_LOC) \
-		--dtw_loc $(TOPIC_DTW_DISTS_LOC) \
-		--kmeans_loc $(TOPIC_KM_MODEL_LOC) \
-		--out_man_plot $(TOPIC_MANIF_PLT_LOC) \
-		--out_man_points $(TOPIC_MANIF_POINTS_LOC)
-
-
-link-topic-data-to-app:
-	ln -f $(YEAR_COUNT_LOC) app/data/year_counts.csv
-	ln -f $(FILT_KWDS_LOC) app/data/kwd_all_keywords_threshold.jsonl
-	ln -f $(TS_FEATURES_LOC) app/data/kwd_slope_complex.csv
-	ln -f $(TOPIC_TO_YEARS_LOC) app/data/all_keywords_threshold.jsonl
-	ln -f $(TOPIC_MANIF_POINTS_LOC) app/data/dtw_manifold_proj.jbl
-	ln -f $(TOPIC_KM_MODEL_LOC) app/data/kmeans.jbl
-	ln -f $(KM_MODEL_LOC) app/data/kwd_kmeans.jbl
-	ln -f $(TOPIC_TS_FEATURES_LOC) app/data/slope_complex.csv
-	ln -f $(TMODEL_VIZ_GEN_LOC) app/data/topic_model_viz.html
-	ln -f $(VIZ_DATA_LOC) app/data/viz_data.json
-	ln -f $(TOPIC_TO_YEARS_LOC) app/data/topic_years.jsonl
-	ln -f $(TOPIC_TO_BIBCODES_LOC) app/data/topic_distribs_to_bibcodes.hdf5
-
-
-download-topic-data-to-app:
-	aws s3 cp $(BUCKET)/$(YEAR_COUNT_LOC) app/data/year_counts.csv
-	aws s3 cp $(BUCKET)/$(FILT_KWDS_LOC) app/data/kwd_all_keywords_threshold.jsonl
-	aws s3 cp $(BUCKET)/$(TS_FEATURES_LOC) app/data/kwd_slope_complex.csv
-	aws s3 cp $(BUCKET)/$(TOPIC_TO_YEARS_LOC) app/data/all_keywords_threshold.jsonl
-	aws s3 cp $(BUCKET)/$(TOPIC_MANIF_POINTS_LOC) app/data/dtw_manifold_proj.jbl
-	aws s3 cp $(BUCKET)/$(TOPIC_KM_MODEL_LOC) app/data/kmeans.jbl
-	aws s3 cp $(BUCKET)/$(KM_MODEL_LOC) app/data/kwd_kmeans.jbl
-	aws s3 cp $(BUCKET)/$(TOPIC_TS_FEATURES_LOC) app/data/slope_complex.csv
-	aws s3 cp $(BUCKET)/$(TMODEL_VIZ_GEN_LOC) app/data/topic_model_viz.html
-	aws s3 cp $(BUCKET)/$(VIZ_DATA_LOC) app/data/viz_data.json
-	aws s3 cp $(BUCKET)/$(TOPIC_TO_YEARS_LOC) app/data/topic_years.jsonl
-	aws s3 cp $(BUCKET)/$(TOPIC_TO_BIBCODES_LOC) app/data/topic_distribs_to_bibcodes.hdf5
-
-## Download service data from s3 to app/data dir
-download-topic-data-to-app:
-ifeq (default,$(PROFILE))
-	aws s3 cp s3://$(BUCKET)$(YEAR_COUNT_LOC) app/data/year_counts.csv
-	aws s3 cp s3://$(BUCKET)$(FILT_KWDS_LOC) app/data/kwd_all_keywords_threshold.jsonl
-	aws s3 cp s3://$(BUCKET)$(TS_FEATURES_LOC) app/data/kwd_slope_complex.csv
-	aws s3 cp s3://$(BUCKET)$(TOPIC_TO_YEARS_LOC) app/data/all_keywords_threshold.jsonl
-	aws s3 cp s3://$(BUCKET)$(TOPIC_MANIF_POINTS_LOC) app/data/dtw_manifold_proj.jbl
-	aws s3 cp s3://$(BUCKET)$(TOPIC_KM_MODEL_LOC) app/data/kmeans.jbl
-	aws s3 cp s3://$(BUCKET)$(KM_MODEL_LOC) app/data/kwd_kmeans.jbl
-	aws s3 cp s3://$(BUCKET)$(TOPIC_TS_FEATURES_LOC) app/data/slope_complex.csv
-	aws s3 cp s3://$(BUCKET)$(TMODEL_VIZ_GEN_LOC) app/data/topic_model_viz.html
-	aws s3 cp s3://$(BUCKET)$(VIZ_DATA_LOC) app/data/viz_data.json
-	aws s3 cp s3://$(BUCKET)$(TOPIC_TO_YEARS_LOC) app/data/topic_years.jsonl
-	aws s3 cp s3://$(BUCKET)$(TOPIC_TO_BIBCODES_LOC) app/data/topic_distribs_to_bibcodes.hdf5
-else
-	aws s3 cp s3://$(BUCKET)$(YEAR_COUNT_LOC) app/data/year_counts.csv --profile $(PROFILE)
-	aws s3 cp s3://$(BUCKET)$(FILT_KWDS_LOC) app/data/kwd_all_keywords_threshold.jsonl --profile $(PROFILE)
-	aws s3 cp s3://$(BUCKET)$(TS_FEATURES_LOC) app/data/kwd_slope_complex.csv --profile $(PROFILE)
-	aws s3 cp s3://$(BUCKET)$(TOPIC_TO_YEARS_LOC) app/data/all_keywords_threshold.jsonl --profile $(PROFILE)
-	aws s3 cp s3://$(BUCKET)$(TOPIC_MANIF_POINTS_LOC) app/data/dtw_manifold_proj.jbl --profile $(PROFILE)
-	aws s3 cp s3://$(BUCKET)$(TOPIC_KM_MODEL_LOC) app/data/kmeans.jbl --profile $(PROFILE)
-	aws s3 cp s3://$(BUCKET)$(KM_MODEL_LOC) app/data/kwd_kmeans.jbl --profile $(PROFILE)
-	aws s3 cp s3://$(BUCKET)$(TOPIC_TS_FEATURES_LOC) app/data/slope_complex.csv --profile $(PROFILE)
-	aws s3 cp s3://$(BUCKET)$(TMODEL_VIZ_GEN_LOC) app/data/topic_model_viz.html --profile $(PROFILE)
-	aws s3 cp s3://$(BUCKET)$(VIZ_DATA_LOC) app/data/viz_data.json --profile $(PROFILE)
-	aws s3 cp s3://$(BUCKET)$(TOPIC_TO_YEARS_LOC) app/data/topic_years.jsonl --profile $(PROFILE)
-	aws s3 cp s3://$(BUCKET)$(TOPIC_TO_BIBCODES_LOC) app/data/topic_distribs_to_bibcodes.hdf5 --profile $(PROFILE)
-endif
-
-
-DOC_TXTS=$(DATA_DIR)/documents.txt
-## Prepare data for neural LDA
-prepare-for-neural-lda: $(DOC_TXTS)
-$(DOC_TXTS): $(RECORDS_LOC)
-	python src/topic_modeling.py prepare-for-neural-lda \
-		--infile $(RECORDS_LOC) \
-		--outfile $(DOC_TXTS)
-
-NEURAL_LDA_MODEL_DIR=$(MODEL_DIR)/neural_lda
-N_EPOCHS=10
-## Run contextual neural lda with bert embeddings
-run-neural-lda: $(NEURAL_LDA_MODEL_LOC)
-	python src/topic_modeling.py run-neural-lda \
-		--in_docs $(DOC_TXTS) \
-		--dct_loc $(DCT_LOC) \
-		--corp_loc $(CORP_LOC) \
-		--lda_model_dir $(NEURAL_LDA_MODEL_DIR) \
-		--n_topics $(N_TOPICS) \
-		--num_epochs $(N_EPOCHS)
-
-#$(NEURAL_LDA_MODEL_LOC): $(DOC_TXTS)
-
-#========= Docker =========#
-
-PIPELINE_IMAGE_NAME=keyword-emergence-pipeline
-## Build docker image for service, automatically labeling image with link to most recent commit
-build:
-	export COMMIT=$$(git log -1 --format=%H); \
-	export REPO_URL=$$(git remote get-url $(GIT_REMOTE)); \
-	export REPO_DIR=$$(dirname $$REPO_URL); \
-	export BASE_NAME=$$(basename $$REPO_URL .git); \
-	export GIT_LOC=$$REPO_DIR/$$BASE_NAME/tree/$$COMMIT; \
-	export VERSION=$$(python version.py); \
-	echo $$GIT_LOC; \
-	docker build -t $(PIPELINE_IMAGE_NAME):$$VERSION \
-		--build-arg GIT_URL=$$GIT_LOC \
-		--build-arg VERSION=$$VERSION .; \
-	docker tag $(PIPELINE_IMAGE_NAME):$$VERSION $(PIPELINE_IMAGE_NAME):latest; \
-	docker tag $(PIPELINE_IMAGE_NAME):$$VERSION storage.analytics.nasa.gov/datasquad/$(PIPELINE_IMAGE_NAME):$$VERSION; \
-	docker tag $(PIPELINE_IMAGE_NAME):$$VERSION storage.analytics.nasa.gov/datasquad/$(PIPELINE_IMAGE_NAME):latest; \
-
-## Push the docker image to storage.analytics.nasa.gov
-push:
-	export VERSION=$$(python version.py); \
-	docker push storage.analytics.nasa.gov/datasquad/$(PIPELINE_IMAGE_NAME):$$VERSION; \
-	docker push storage.analytics.nasa.gov/datasquad/$(PIPELINE_IMAGE_NAME):latest
-
-## Push docker image to storage.analytics.nasa.gov as stable version
-push-stable:
-	export VERSION=$$(python version.py); \
-	docker tag $(PIPELINE_IMAGE_NAME):$$VERSION storage.analytics.nasa.gov/datasquad/$(PIPELINE_IMAGE_NAME):stable; \
-	docker push storage.analytics.nasa.gov/datasquad/$(PIPELINE_IMAGE_NAME):latest
-
-## Save the docker image locally
-save:
-	docker save $(PIPELINE_IMAGE_NAME):latest | gzip > $(PIPELINE_IMAGE_NAME)_latest.tar.gz
-
-# Server name here references an entry in the ~/.ssh/config file
-SERVER_NAME=compute-ml
-## Upload docker image to server
-upload:
-	scp $(PIPELINE_IMAGE_NAME)_latest.tar.gz \
-		compute-ml:/home/ubuntu/projects/keyword-emergence/$(PIPELINE_IMAGE_NAME)_latest.tar.gz
-
-## Load docker image on remote server from local file which was uploaded
-load:
-	ssh compute-ml "cd /home/ubuntu/projects/keyword-emergence/ && docker load < $(PIPELINE_IMAGE_NAME)_latest.tar.gz"
-
-## Run docker image remotely
-run-remote:
-	ssh compute-ml << HERE
-		cd /home/ubuntu/projects/keyword-emergence/
-		docker run -d --shm-size 4g \
-			--env NB_WORKERS=12 \
-			-v $(pwd)/config:/home/config \
-			-v $(pwd)/data:/home/data \
-			-v $(pwd)/models:/home/models \
-			-v $(pwd)/reports:/home/reports \
-			keyword-emergence-pipeline:latest \
-			dtw-viz CONFIG_FILE=config/full_new_data.mk"
-	HERE
-
-IMAGE_NAME=keyword-emergence-visualizer
-GIT_REMOTE=origin
-## Build flask app docker container
-docker-build-app:
-	export COMMIT=$$(git log -1 --format=%H); \
-	export REPO_URL=$$(git remote get-url $(GIT_REMOTE)); \
-	export REPO_DIR=$$(dirname $$REPO_URL); \
-	export BASE_NAME=$$(basename $$REPO_URL .git); \
-	export GIT_LOC=$$REPO_DIR/$$BASE_NAME/tree/$$COMMIT; \
-	export VERSION=$$(python version.py); \
-	echo $$GIT_LOC; \
-	cd app; \
-	docker build -t $(IMAGE_NAME):$$VERSION \
-		--build-arg GIT_URL=$$GIT_LOC \
-		--build-arg VERSION=$$VERSION .
-
-## Run flask app using gunicorn through docker container
-docker-run-app: | $(APP_DATA_FILES)
-	export VERSION=$$(python version.py); \
-	cd app; \
-	docker run -it \
-		-p 5001:5000 \
-		-v $$(pwd)/static/html:/home/static/html/ \
-		-v $$(pwd)/data:/home/data/ \
-		$(IMAGE_NAME):$$VERSION
-
-
-#===== Data Exports ==========#
-
-KWD_EXPORT=scratch/kwd_export_$(EXP_NAME).csv
-export-keywords:
-	python src/exports.py keywords \
-		--in_slope_complex $(TS_FEATURES_LOC) \
-		--viz_data_loc $(VIZ_DATA_LOC) \
-		--filt_kwds_loc $(FILT_KWDS_LOC) \
-		--kwd_export_loc $(KWD_EXPORT)
-
-
-
-#===== S3 Bucket Syncing =====#
-
-## sync data from s3 bucket
-sync-from-s3:
-ifeq (default,$(PROFILE))
-	aws s3 sync s3://$(BUCKET)models/$(EXP_NAME) models/$(EXP_NAME)
-	aws s3 sync s3://$(BUCKET)data/$(EXP_NAME) data/$(EXP_NAME)
-	aws s3 sync s3://$(BUCKET)reports/viz/$(EXP_NAME) reports/viz/$(EXP_NAME)
-else
-	aws s3 sync s3://$(BUCKET)models/$(EXP_NAME) models/$(EXP_NAME) --profile $(PROFILE)
-	aws s3 sync s3://$(BUCKET)data/$(EXP_NAME) data/$(EXP_NAME) --profile $(PROFILE)
-	aws s3 sync s3://$(BUCKET)reports/viz/$(EXP_NAME) reports/viz/$(EXP_NAME) --profile $(PROFILE)
-endif
-
-## sync data and models to s3 bucket
-sync-to-s3:
-ifeq (default,$(PROFILE))
-	aws s3 sync models/$(EXP_NAME) s3://$(BUCKET)models/$(EXP_NAME)
-	aws s3 sync data/$(EXP_NAME) s3://$(BUCKET)data/$(EXP_NAME)
-	aws s3 sync reports/viz/$(EXP_NAME) s3://$(BUCKET)reports/viz/$(EXP_NAME)
-else
-	aws s3 sync models/$(EXP_NAME) s3://$(BUCKET)models/$(EXP_NAME) --profile $(PROFILE)
-	aws s3 sync data/$(EXP_NAME) s3://$(BUCKET)data/$(EXP_NAME) --profile $(PROFILE)
-	aws s3 sync reports/viz/$(EXP_NAME) s3://$(BUCKET)reports/viz/$(EXP_NAME) --profile $(PROFILE)
-endif
-
-## sync app data and models from s3 bucket. WARNING: This will overwrite existing files for current experiment.
-sync-app-data-from-s3:
-	for file in $(YEAR_COUNT_LOC) $(FILT_KWDS_LOC) $(MANIF_POINTS_LOC) $(KM_MODEL_LOC) $(TS_FEATURES_LOC); do \
-		aws s3 cp s3://$(BUCKET)$$file $$file --profile $(PROFILE); \
-	done
-
-## sync raw ADS files from s3 bucket
-sync-raw-data-from-s3:
-	aws s3 sync s3://datasquad-low/data/ADS/2020_03_15 data/raw
+## Get descriptions for all experiments
+all-info:
+	@for CONFIG_FILE in $(wildcard config/*.mk); \
+	do \
+		source $${CONFIG_FILE}; \
+		echo "$${EXPERIMENT_NAME}: $${INFO}"; \
+		export EXPERIMENT_NAME=; \
+		export INFO=; \
+	done;
 
 #################################################################################
 # Self Documenting Commands                                                     #

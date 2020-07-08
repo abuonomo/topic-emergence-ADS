@@ -1,22 +1,23 @@
 import json
+import logging
+import sqlite3
 from contextlib import closing
 from html import unescape
 from html.parser import HTMLParser
+from math import ceil
+from pathlib import Path
 from pprint import pformat
+from typing import Dict, Union
 
 import click
 import dask
-import logging
 import numpy as np
 import spacy
 import scispacy
-import sqlite3
 import yaml
 from gensim.corpora import Dictionary
 from gensim.corpora import MmCorpus
 from gensim.matutils import Sparse2Corpus
-from math import ceil
-from pathlib import Path
 from scipy.sparse import coo_matrix
 from spacy.lang.char_classes import ALPHA, ALPHA_LOWER, ALPHA_UPPER
 from spacy.lang.char_classes import CONCAT_QUOTES, LIST_ELLIPSES, LIST_ICONS
@@ -28,7 +29,6 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.orm import sessionmaker
 from textacy.ke import textrank
 from tqdm import tqdm
-from typing import Dict, Union, Generator
 
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
@@ -141,6 +141,9 @@ class Keyword(BASE):
 
 
 def is_nu_like(s):
+    """
+    Check if the given string looks like a number
+    """
     try:
         float(s)
         return True
@@ -150,11 +153,26 @@ def is_nu_like(s):
 
 class PaperKeywordExtractor:
     def __init__(self, nlp):
+        """
+        Object for extracting keywords from papers.
+
+        Args:
+            nlp: spacy model to use for keyword extraction
+        """
         self.nlp = nlp
 
     def extract_all_keywords(
         self, session, batch_size=100, n_process=-1,
     ):
+        """
+        Extract keywords from all papers using SingleRank. Then insert these keywords
+            into the database.
+
+        Args:
+            session: sqlalchemy session connected to database
+            batch_size: batch_size for spacy model pipe
+            n_process: number of processes for spacy model pipe
+        """
         papers = session.query(Paper).all()
         LOG.info(f"Extracting keywords from {len(papers)} documents.")
         texts = (p.get_feature_text() for p in papers)
@@ -179,6 +197,16 @@ class PaperKeywordExtractor:
 
     @staticmethod
     def extract_keyword_from_doc(doc):
+        """
+        Extract keywords from a single spacy doc using SingleRank
+
+        Args:
+            doc: Spacy doc from which to extract keywords
+
+        Returns:
+            text: The lemmatized and lowercase text for the doc
+            kwd_counts: The SingleRank keywords with their scores and counts.
+        """
         # SingleRank parameters
         kwds = textrank(
             doc,
@@ -195,6 +223,17 @@ class PaperKeywordExtractor:
         return text, kwd_counts
 
     def get_new_paper_records(self, paper_dict, paper_kwds, pbar):
+        """
+        Create records for a given paper's new keywords
+
+        Args:
+            paper_dict: A dict representation of a paper
+            paper_kwds: dict representations of keywords to potentially add to the paper
+            pbar: a tqdm progress bar to update
+
+        Returns:
+            records: dicts for PaperKeywords to be added for the given Paper dict form
+        """
         records = []
         for k in paper_kwds:
             if (
@@ -251,7 +290,7 @@ class PaperKeywordExtractor:
         pbar = tqdm(papers)
         batch_size = ceil(len(papers) / npartitions)
         for i in range(0, len(papers), batch_size):
-            sub_papers = papers[i : i + batch_size]
+            sub_papers = papers[i: i + batch_size]
             result_batch = dask.delayed(make_batch)(sub_papers, pks, pbar)
             batches.append(result_batch)
 
@@ -263,6 +302,16 @@ class PaperKeywordExtractor:
 
     @staticmethod
     def get_pk_dict(paper_dict: Dict, paper_kwd: Dict) -> Dict[str, Union[str, int]]:
+        """
+        Get dictionary record of a new PaperKeyword to be added to the database
+
+        Args:
+            paper_dict: Dict representation of Paper
+            paper_kwd: Dict representation of a PaperKeyword
+
+        Returns:
+            record: dict for PaperKeyword to be added
+        """
         count = paper_dict["lemma_text"].count(paper_kwd["raw_keyword"].lower())
         record = {
             "raw_keyword": paper_kwd["raw_keyword"],
@@ -283,6 +332,23 @@ class PaperOrganizer:
         keyword_blacklist=None,
         use_keyword_count=True,
     ):
+        """
+        Object to get prepared gensim corpus and dictionary from provided database
+        after applying a variety of filters.
+
+        Args:
+            no_below: Keep keywords which are contained in at least no_below documents
+            no_above: Keep keywords which are contained in no more than no_above documents
+                (fraction of total corpus size, not an absolute number).
+            min_mean_score: Keep keywords which have mean scores greater than or equal
+                to min_mean_score
+            journal_blacklist: Remove papers which are in journal_blacklist
+            keyword_blacklist: Remove keywords which are in keyword_blacklist
+            use_keyword_count: If use_keyword_count is True, the corpus includes the
+                counts of the keywords in each document. If use_keyword_count is False,
+                the corpus has a count of 1 if the keyword occurs in a given document,
+                and a 0 otherwise.
+        """
         self.no_below = no_below
         self.no_above = no_above
         self.min_mean_score = min_mean_score
@@ -292,6 +358,12 @@ class PaperOrganizer:
 
     @property
     def journal_blacklist(self):
+        """
+        Journals which should not be included in gensim corpus.
+
+        Getter: Gets a list of these journals
+        Setter: Sets these journals. Sets as an empty list if None is provided.
+        """
         return self.__journal_blacklist
 
     @journal_blacklist.setter
@@ -303,6 +375,15 @@ class PaperOrganizer:
 
     @property
     def keyword_blacklist(self):
+        """
+        Keywords which should not be included in gensim dictionary.
+
+        Getter: Get a list of these keywords
+        Setter: If provided a list, sets these keywords as provided list. If provided
+            None, sets these keywords to an empty list. If provided a pathlike object,
+            assumes the file has one keyword per line, loads these keywords as a list,
+            and sets the keywords to that list.
+        """
         return self.__keyword_blacklist
 
     @keyword_blacklist.setter
@@ -330,15 +411,47 @@ class PaperOrganizer:
                 )
 
     def add_journal_blacklist_to_query(self, q):
+        """
+        Add journal blacklisting to the given query
+
+        Args:
+            q: an sqlalchemy query
+
+        Returns:
+            q: new query with journal blacklisting included
+        """
         for j in self.journal_blacklist:
             q = q.filter(~Paper.bibcode.contains(j))
         return q
 
     def get_filtered_keywords(self, session, *args):
+        """
+        From database, get tuple of keywords which pass filters
+
+        Args:
+            session: sqlalchemy session connected to database
+            *args: what objects to return from query, must contain Keyword or one of its
+                attributes (ex. Keyword.id, Keyword.keyword).
+
+        Returns:
+            Tuple of keywords which pass filters
+        """
         kwd_query = self._get_filtered_keywords(session, *args)
         return kwd_query.all()
 
     def _get_filtered_keywords(self, session, *args):
+        """
+        From database, get query result for keywords which pass filters
+        (but don't execute the query)
+
+        Args:
+            session: sqlalchemy session connected to database
+            *args: what objects to return from query, must contain Keyword or one of its
+                attributes (ex. Keyword.id, Keyword.keyword).
+
+        Returns:
+            Query for keywords which pass filters.
+        """
         if len(args) == 0:
             args = [Keyword, func.count(Keyword.id), func.avg(PaperKeywords.score)]
         corpus_size = session.query(Paper.id).count()
@@ -360,6 +473,18 @@ class PaperOrganizer:
         return kwd_query
 
     def get_keyword_batch_records(self, session, kwds_batch, pbar=None):
+        """
+        Get counts of keywords for each paper in batches of keywords.
+
+        Args:
+            session: an sqlalchemy session with connection to the database
+            kwds_batch: Batch of keywords for which to papers keyword
+                counts or occurences
+            pbar: a tqdm loading bar to update
+
+        Returns:
+            Tuple of all the papers to keyword to count mappings.
+        """
         q = (
             session.query(
                 PaperKeywords.paper_id, PaperKeywords.keyword_id, PaperKeywords.count,
@@ -375,6 +500,21 @@ class PaperOrganizer:
     def get_paper_keyword_records(
         self, session, all_kwd_ids, batch_size, in_memory=False
     ):
+        """
+        Get counts of keywords for each paper
+
+        Args:
+            session: an sqlalchemy session with connection to the database
+            all_kwd_ids: all keywords to get paper counts for
+            batch_size: Number of keywords to query at once. Limited by maximum
+                number of variables of your database
+            in_memory: If True, load all PaperKeywords into memory and then
+                apply filtering. If False, apply filtering as the keywords are queried.
+
+        Returns:
+            all_records: papers and their keyword occurence counts as a list of tuples
+                each tuple ~ (paper id, keyword id, count of keyword in given paper).
+        """
         if in_memory is True:
             LOG.info("Loading all paper_keywords into memory, then filtering.")
             all_paper_keywords = session.query(
@@ -392,12 +532,29 @@ class PaperOrganizer:
             kwd_batches = range(0, num_kwds, batch_size)
             pbar = tqdm(kwd_batches)
             for i in pbar:
-                kwds_batch = all_kwd_ids[i : i + batch_size]
+                kwds_batch = all_kwd_ids[i: i + batch_size]
                 records = self.get_keyword_batch_records(session, kwds_batch)
                 all_records = all_records + records
         return all_records
 
     def get_corpus_and_dictionary(self, session, batch_size=990, in_memory=False):
+        """
+        Get gensim corpus and keyword dictionary from the database, applying the
+        specified filters.
+
+        Args:
+            session: an sqlalchemy session with connection to database
+            batch_size: Number of keywods to query at once. Limited by maximum number
+                of variables for the database.
+            in_memory: If True, load all PaperKeywords into memory and then
+                apply filtering. If False, apply filtering as the keywords are queried.
+
+        Returns:
+            corpus: a bag of words gensim corpus of documents and their keywords
+            dct: a gensim dictionary of the keywords
+            corp2paper: a mapping from corpus index to paper ids in the database
+            dct2kwd: a mapping from dictionary index to keywords ids in the database
+        """
         max_batch_size = 999 - len(self.journal_blacklist)
         if batch_size > max_batch_size:
             raise ValueError(
@@ -445,6 +602,16 @@ class PaperOrganizer:
 
 
 def get_spacy_nlp(model_name="en_core_web_sm"):
+    """
+    Get a spacy model with a modified tokenizer which keeps words with hyphens together.
+        For example, x-ray will not be split into "x" and "ray".
+
+    Args:
+        model_name: Name of spacy model to modify tokenizer for
+
+    Returns:
+        nlp: modified spacy model which does not split tokens on hyphens
+    """
     nlp = spacy.load(model_name)
 
     # modify tokenizer infix patterns to not split on hyphen

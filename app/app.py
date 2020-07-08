@@ -42,14 +42,12 @@ app.config.update(
     VP=None,
     SC_LOC=DATA_DIR / f"time_series_characteristics.csv",
     N_LOC=DATA_DIR / f"topic_years.csv",
-    YC_LOC=DATA_DIR / "year_counts.csv",
     TOPIC_YEARS_LOC=DATA_DIR / "topic_years.csv",
     PYLDAVIS_DATA_LOC=DATA_DIR / "pyLDAvis_data.json",
     PYLDAVIS_DATA=None,
     SC_DF=None,
     N_DF=None,
     KWD_N_DF=None,
-    YEAR_COUNTS=None,
     TOPIC_YEARS_DF=None,
     LOAD_COLS=[
         "stem",
@@ -93,7 +91,6 @@ def init():
     app.config["SC_DF"] = pd.read_csv(app.config["SC_LOC"], index_col=0)
     app.config["N_DF"] = pd.read_csv(app.config["N_LOC"], index_col=0)
     app.config['KWD_N_DF'] = load_kwd_ts_df(app.config['VIZ_DATA_LOC'])
-    app.config["YEAR_COUNTS"] = pd.read_csv(app.config["YC_LOC"], index_col=0)
 
     log_count = np.log(app.config["SC_DF"]["count"])
     log_count = log_count.replace([np.inf, -np.inf], 0)
@@ -184,24 +181,6 @@ def get_doc_preview():
     b = data['bibcode']
     d = get_paper_from_bibcode(b)
     return jsonify(d)
-
-
-def _trans_time(ts, kwd, clus):
-    ts["year"] = [int(v[0:4]) for v in ts.index]
-    ts.columns = ["count", "year"]
-    ts = ts.reset_index(drop=True)
-    ts["stem"] = kwd
-    ts["kmeans_cluster"] = clus
-
-    def f(x):
-        total = app.config["YEAR_COUNTS"].query(f'year == {x["year"]}').iloc[0]["count"]
-        norm_val = x["count"] / total
-        return norm_val
-
-    ts["norm_count"] = ts.apply(f, axis=1)
-    ts = ts.loc[:, ["stem", "kmeans_cluster", "year", "count", "norm_count"]]
-    ts_recs = ts.to_dict(orient="records")
-    return ts_recs
 
 
 @app.route("/get-count-range", methods=['GET'])

@@ -289,7 +289,7 @@ class VizPrepper:
         dtw_df = dtw_kwds(ts_df)
         visualizer = yellow_plot_kmd(dtw_df)
         n_clusters = visualizer.elbow_value_
-        kmeans = dtw_to_tboard(ts_df, dtw_df, c=n_clusters)
+        kmeans = dtw_to_tboard(dtw_df, c=n_clusters)
         dtw_man = dtw_to_manifold(dtw_df)
         return kmeans, dtw_man
 

@@ -249,8 +249,8 @@ def get_kwd_ts_df(session, keyword_ids: List, batch_size=990):
         kwd_id_batch = keyword_ids[i : i + batch_size]
         q = (
             session.query(PaperKeywords)
-                .join(Keyword)
-                .filter(Keyword.id.in_(kwd_id_batch))
+            .join(Keyword)
+            .filter(Keyword.id.in_(kwd_id_batch))
         )
         records = [{"keyword": pk.keyword.keyword, "year": pk.paper.year} for pk in q]
         all_records = all_records + records
@@ -264,15 +264,29 @@ def get_kwd_ts_df(session, keyword_ids: List, batch_size=990):
 
 @click.group()
 def cli():
-    pass
+    """Tool for making topic models and calculating their time series characteristics.
+    """
 
 
 @cli.command()
-@click.option("--prepared_data_dir", type=Path)
-@click.option("--config_loc", type=Path)
-@click.option("--out_models_dir", type=Path)
-@click.option("--reports_dir", type=Path)
+@click.option(
+    "--prepared_data_dir",
+    type=Path,
+    help="Output directory in which to place files needed for topic modeling.",
+)
+@click.option("--config_loc", type=Path, help="Path to YAML configuration")
+@click.option(
+    "--out_models_dir", type=Path, help="Directory in which to save topic models"
+)
+@click.option(
+    "--reports_dir",
+    type=Path,
+    help="Directory in which to save topic model coherence data and plots.",
+)
 def make_topic_models(prepared_data_dir, config_loc, out_models_dir, reports_dir):
+    """
+    Create several topic models with differing numbers of topics.
+    """
     corpus, dictionary, _, _ = read_from_prepared_data(prepared_data_dir)
     with open(config_loc, "r") as f0:
         config = yaml.safe_load(f0)
@@ -303,11 +317,23 @@ def make_topic_models(prepared_data_dir, config_loc, out_models_dir, reports_dir
 
 
 @cli.command()
-@click.option("--db_loc", type=Path)
-@click.option("--prepared_data_dir", type=Path)
-@click.option("--tmodel_loc", type=Path)
-@click.option("--viz_data_dir", type=Path)
+@click.option("--db_loc", type=Path, help="Location of output SQLite database")
+@click.option(
+    "--prepared_data_dir",
+    type=Path,
+    help="Output directory in which to place files needed for topic modeling.",
+)
+@click.option("--tmodel_loc", type=Path, help="Path to a topic model")
+@click.option(
+    "--viz_data_dir",
+    type=Path,
+    help="Directory in which to save data used for visualization.",
+)
 def prepare_for_topic_model_viz(db_loc, prepared_data_dir, tmodel_loc, viz_data_dir):
+    """
+    Calculate topic embeddings for all docs, topic coherences for each topic,
+     and keyword time series.
+    """
     LOG.info(f"Loading from {prepared_data_dir} and {tmodel_loc}")
     corpus, dictionary, corp2paper, dct2kwd = read_from_prepared_data(prepared_data_dir)
 
@@ -367,9 +393,16 @@ def prepare_for_topic_model_viz(db_loc, prepared_data_dir, tmodel_loc, viz_data_
 
 
 @cli.command()
-@click.option("--viz_data_dir", type=Path)
-@click.option("--config_loc", type=Path)
+@click.option(
+    "--viz_data_dir",
+    type=Path,
+    help="Directory in which to save data used for visualization.",
+)
+@click.option("--config_loc", type=Path, help="Path to YAML configuration")
 def get_time_chars(viz_data_dir, config_loc):
+    """
+    Calcuate time series characteristics (ex. CAGR)
+    """
     with open(config_loc, "r") as f0:
         config = yaml.safe_load(f0)
     viz_data_loc = viz_data_dir / "viz_data.hdf5"

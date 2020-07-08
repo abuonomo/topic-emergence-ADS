@@ -37,7 +37,7 @@ def main(
     for doc in pbar:
         lemma_text = " ".join([t.lemma_.lower() for t in doc])
         tokens = []
-        for k in model.id2word:
+        for _, k in model.id2word.items():
             if k.lower() in lemma_text:
                 count = lemma_text.count(k.lower())
                 tokens = tokens + ([k] * count)

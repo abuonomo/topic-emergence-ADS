@@ -140,6 +140,22 @@ link-data-to-app:
 	ln -f $(lda_model_viz_data_dir)/topic_years.csv app/data
 	ln -f $(PARAM_YAML) app/templates/config.yaml
 
+## sync experiment viz data to s3
+sync-viz-to-s3:
+ifeq (default,$(PROFILE))
+	aws s3 sync $(lda_model_viz_data_dir) $(BUCKET)/$(lda_model_viz_data_dir)
+else
+	aws s3 sync $(lda_model_viz_data_dir) $(BUCKET)/$(lda_model_viz_data_dir) --profile $(PROFILE)
+endif
+
+## sync experiment viz from s3
+sync-viz-to-s3:
+ifeq (default,$(PROFILE))
+	aws s3 sync $(BUCKET)/$(lda_model_viz_data_dir) $(lda_model_viz_data_dir)
+else
+	aws s3 sync $(BUCKET)/$(lda_model_viz_data_dir) $(lda_model_viz_data_dir) --profile $(PROFILE)
+endif
+
 ## Run app for visualize results in development mode
 app-dev:
 	export VERSION=$$(python version.py); \

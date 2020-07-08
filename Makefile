@@ -176,6 +176,15 @@ all-info:
 		export INFO=; \
 	done;
 
+sync-astro2010-whitepapers-from-s3:
+	aws s3 sync "s3://datasquad-low/home/DataSquad/topic-emergence-ADS/Astro 2010 Whitepapers/" data/astro2010_whitepapers
+
+get-inference-from-dir:
+	python src/get_paper_topic_distribs.py \
+		--lda_model $(lda_models_dir)/topic_model$(N_TOPICS) \
+		--dir_of_txts data/astro2010_whitepapers \
+		--output_embedding_csv $(data_dir)/astro2010_topic_distributions.csv
+
 #################################################################################
 # Self Documenting Commands                                                     #
 #################################################################################

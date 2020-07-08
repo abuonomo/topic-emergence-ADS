@@ -151,6 +151,33 @@ def is_nu_like(s):
         return False
 
 
+def extract_keyword_from_doc(doc):
+    """
+    Extract keywords from a single spacy doc using SingleRank
+
+    Args:
+        doc: Spacy doc from which to extract keywords
+
+    Returns:
+        text: The lemmatized and lowercase text for the doc
+        kwd_counts: The SingleRank keywords with their scores and counts.
+    """
+    # SingleRank parameters
+    kwds = textrank(
+        doc,
+        normalize="lemma",
+        topn=999_999,  # This could cause issues with a huge abstract
+        window_size=10,
+        edge_weighting="count",
+        position_bias=False,
+    )
+    # Remove keywords which are 1 character long or are numbers
+    kwds = [(k.lower(), v) for k, v in kwds if (not is_nu_like(k)) and (len(k) > 1)]
+    text = " ".join([t.lemma_.lower() for t in doc])
+    kwd_counts = [(k, v, text.count(k)) for k, v in kwds]
+    return text, kwd_counts
+
+
 class PaperKeywordExtractor:
     def __init__(self, nlp):
         """
@@ -194,33 +221,6 @@ class PaperKeywordExtractor:
                     assoc = PaperKeywords(raw_keyword=kwd, score=score, count=count)
                     assoc.keyword = db_kwd
                     p.keywords.append(assoc)
-
-    @staticmethod
-    def extract_keyword_from_doc(doc):
-        """
-        Extract keywords from a single spacy doc using SingleRank
-
-        Args:
-            doc: Spacy doc from which to extract keywords
-
-        Returns:
-            text: The lemmatized and lowercase text for the doc
-            kwd_counts: The SingleRank keywords with their scores and counts.
-        """
-        # SingleRank parameters
-        kwds = textrank(
-            doc,
-            normalize="lemma",
-            topn=999_999,  # This could cause issues with a huge abstract
-            window_size=10,
-            edge_weighting="count",
-            position_bias=False,
-        )
-        # Remove keywords which are 1 character long or are numbers
-        kwds = [(k.lower(), v) for k, v in kwds if (not is_nu_like(k)) and (len(k) > 1)]
-        text = " ".join([t.lemma_.lower() for t in doc])
-        kwd_counts = [(k, v, text.count(k)) for k, v in kwds]
-        return text, kwd_counts
 
     def get_new_paper_records(self, paper_dict, paper_kwds, pbar):
         """

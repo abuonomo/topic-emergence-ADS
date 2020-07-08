@@ -41,7 +41,7 @@ def dtw_to_manifold(dtw_df, out_plot=None):
     return dtw_man
 
 
-def dtw_to_tboard(normed_kwd_years, dtw_df, c=6, lim=1000):
+def dtw_to_tboard(normed_kwd_years, dtw_df, c=6, lim=1000) -> KMeans:
     """Use pre-computed dynamic time warp values and calculate kmeans."""
     # TODO: Used elbow to determine, but not being placed programmatically
     LOG.info(f"Performing kmeans with {c} clusters.")

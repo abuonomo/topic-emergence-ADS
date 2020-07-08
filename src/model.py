@@ -1,4 +1,5 @@
 import json
+import os
 import logging
 from collections import defaultdict
 from pathlib import Path
@@ -77,6 +78,10 @@ class TopicModeler:
 
 class VizPrepper:
     def __init__(self):
+        """
+        Object for reading derived topic model data and calculating topic time series
+        and time series characteristics.
+        """
         self.pyLDAvis_data = None
         self.embedding_df = None
         self.paper_df = None
@@ -87,7 +92,13 @@ class VizPrepper:
         self.manifold = None
         self.kwd_ts_df = None
 
-    def read_hdf(self, viz_data_loc):
+    def read_hdf(self, viz_data_loc: os.PathLike):
+        """
+        Load object parameters from an hdf database.
+
+        Args:
+            viz_data_loc: path to opinionated hdf file
+        """
 
         with h5py.File(viz_data_loc, "r") as f0:
             embedding = f0["embedding"][:]
@@ -118,11 +129,27 @@ class VizPrepper:
         self.topic_coherences = topic_coherences
 
     def read_pyldavis_data(self, pyLDAvis_data_loc):
+        """
+        Load pyLDAvis data from json file
+
+        Args:
+            pyLDAvis_data_loc: Path to pyLDAvis json file
+        """
         with open(pyLDAvis_data_loc, "r") as f0:
             self.pyLDAvis_data = json.load(f0)
 
     @staticmethod
-    def cagr(x_row):
+    def cagr(x_row: pd.Series) -> float:
+        """
+        Calculate Compound Annualized Interest Rate (CAGR). In cases of invalid CAGR
+        calulations, CAGR is set to 0 instead of nan or inf.
+
+        Args:
+            x_row: a pandas series
+
+        Returns:
+            the CAGR score
+        """
         x = x_row.values
         nz_inds = np.nonzero(x)[0]
         if len(nz_inds) == 0:  # If all are 0, set CAGR to 0
@@ -141,6 +168,17 @@ class VizPrepper:
             return (x[-1] / x[0]) ** (1 / period) - 1
 
     def get_time_characteristics(self, year_min, year_max):
+        """
+        Calculate topics' time series and their characteristics within the given years.
+
+        Args:
+            year_min: the minimum year to include in the calculations
+            year_max: the maximum year to include in the calculations
+
+        Returns:
+            ts_df: The time series for all of the topics
+            features_df: The time series characteristics for all of the topics
+        """
         all_time_series = []
         tmp_paper_df = self.paper_df.copy()
         tmp_paper_df["topic"] = -1
@@ -189,7 +227,18 @@ class VizPrepper:
         return ts_df, features_df
 
     @staticmethod
-    def get_dynamic_time_warp_clusters(ts_df):
+    def get_dynamic_time_warp_clusters(ts_df: pd.DataFrame):
+        """
+        Calculate the pairwise dynamic time warp values between topics' time series.
+
+        Args:
+            ts_df: The time series for all of the topics
+
+        Returns:
+            kmeans: kmeans model fit to the pairwise dynamic time warp values
+            dtw_man: 2-D TSNE manifold projection of the
+                pairwise dynamic time warp space
+        """
         dtw_df = dtw_kwds(ts_df)
         visualizer = yellow_plot_kmd(dtw_df)
         n_clusters = visualizer.elbow_value_
@@ -246,7 +295,7 @@ def get_kwd_ts_df(session, keyword_ids: List, batch_size=990):
     pbar = tqdm(batches)
     all_records = []
     for i in pbar:
-        kwd_id_batch = keyword_ids[i : i + batch_size]
+        kwd_id_batch = keyword_ids[i: i + batch_size]
         q = (
             session.query(PaperKeywords)
             .join(Keyword)
@@ -345,6 +394,7 @@ def prepare_for_topic_model_viz(db_loc, prepared_data_dir, tmodel_loc, viz_data_
     coh_per_topic = tm.get_coherence_model(lda_model).get_coherence_per_topic()
     topic_maxes = embedding.argmax(axis=1)
 
+    LOG.info("Preparing pyLDAvis data.")
     viz_data = pyLDAvis.gensim.prepare(
         lda_model,
         tm.corpus,
@@ -363,6 +413,7 @@ def prepare_for_topic_model_viz(db_loc, prepared_data_dir, tmodel_loc, viz_data_
 
     LOG.info(f"Reading paper info from database at {db_loc}")
     pby = get_pby(session, paper_ids)
+    LOG.info(f"Getting keyword time series from database at {db_loc}")
     kwd_ts_df = get_kwd_ts_df(session, keyword_ids)
 
     LOG.info(f"Writing data to {viz_data_dir}")

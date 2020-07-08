@@ -4,7 +4,7 @@ import logging
 from collections import defaultdict
 from pathlib import Path
 from pprint import pformat
-from typing import List
+from typing import List, Tuple, Dict
 
 import click
 import dask
@@ -31,11 +31,30 @@ LOG.setLevel(logging.INFO)
 
 
 class TopicModeler:
-    def __init__(self, dictionary, corpus):
+    def __init__(self, dictionary: Dictionary, corpus: MmCorpus):
+        """
+        Object for making topic models, measuring their coherences,
+        and performing inference
+
+        Args:
+            corpus: Gensim bag of words corpus
+            dictionary: Gensim dictionary mapping keywords to index
+        """
         self.dictionary = dictionary
         self.corpus = corpus
 
-    def make_all_topic_models(self, topic_range, **kwargs):
+    def make_all_topic_models(self, topic_range, **kwargs) -> List[LdaModel]:
+        """
+        Create topic models for various numbers of topics
+
+        Args:
+            topic_range: The number of topics for which to create models
+            **kwargs: arguments to pass to gensim's LdaModel.
+                More here: https://radimrehurek.com/gensim/models/ldamodel.html
+
+        Returns:
+            ldas: list of all of the LDA topic models
+        """
         gensim_logger = logging.getLogger("gensim")
         gensim_logger.setLevel(logging.DEBUG)
         LOG.setLevel(logging.DEBUG)
@@ -53,13 +72,31 @@ class TopicModeler:
         ldas = dask.compute(jobs)[0]
         return ldas
 
-    def get_coherence_model(self, model):
+    def get_coherence_model(self, model: LdaModel) -> CoherenceModel:
+        """
+        Get the u_mass coherence for the given topic model
+
+        Args:
+            model: an topic model
+
+        Returns:
+            cm: a coherence model
+        """
         cm = CoherenceModel(
             model, corpus=self.corpus, coherence="u_mass", dictionary=self.dictionary
         )  # only u_mass because tokens out of order and overlapping
         return cm
 
-    def get_coherences(self, lda_models):
+    def get_coherences(self, lda_models: List[LdaModel]) -> List[float]:
+        """
+        Get the coherence values for all the topic models
+
+        Args:
+            lda_models: A list of topic models for which to calculate coherence
+
+        Returns:
+            coherences: The coherence values for each topic model
+        """
         coherences = []
         coh_pbar = tqdm(lda_models)
         for lda_model in coh_pbar:
@@ -71,6 +108,16 @@ class TopicModeler:
         return coherences
 
     def get_inference(self, model):
+        """
+        Get topic distribution inferences for all the documents in the corpus
+        using the given model
+
+        Args:
+            model: the topic model to use
+
+        Returns:
+            embedding: The topic distributions for each document in the corpus
+        """
         tc = model.get_document_topics(self.corpus, minimum_probability=0)
         embedding = np.vstack([[v for t, v in r] for r in tqdm(tc)])
         return embedding
@@ -247,7 +294,17 @@ class VizPrepper:
         return kmeans, dtw_man
 
 
-def get_coherence_plot(df):
+def get_coherence_plot(df: pd.DataFrame) -> plt.figure:
+    """
+    Get plot of coherences by number of topics
+
+    Args:
+        df: A dataframe with columns "num_topics" and "coherence (u_mass)"
+            with these values for each topic model
+
+    Returns:
+        fig: A plot of coherences versus number of topics
+    """
     xlab = "num_topics"
     ylab = "coherence (u_mass)"
 
@@ -259,7 +316,21 @@ def get_coherence_plot(df):
     return fig
 
 
-def read_from_prepared_data(prepared_data_dir):
+def read_from_prepared_data(prepared_data_dir: Path):
+    """
+    Read the data necessary to perform topic modeling
+
+    Args:
+        prepared_data_dir: Directory with these data
+
+    Returns:
+        corpus: Gensim bag of words corpus
+        dictionary: Gensim dictionary mapping keywords to index
+        corp2paper: a dict mapping corpus indices to their corresponding ids
+            in the database
+        dct2kwd: a dict mapping gensim dictionary's keyword ids to their ids
+            in the database
+    """
     in_corp = prepared_data_dir / "corpus.mm"
     in_dct = prepared_data_dir / "dct.mm"
     in_corp2paper = prepared_data_dir / "corp2paper.json"
@@ -276,6 +347,21 @@ def read_from_prepared_data(prepared_data_dir):
 
 
 def get_pby(session, paper_ids: List, batch_size=990):
+    """
+    Query database to create pandas dataframe of paper ids, bibcodes, years, and
+    nasa affiliation statuses.
+
+    Args:
+        session: sqlalchemy session connected to database
+        paper_ids: the paper ids for which to get these data
+        batch_size: the number of papers for which to query these data an once.
+            This value is limited by the maximum number of variables allowed
+            by your database.
+
+    Returns:
+        df: Pandas dataframe of paper ids, bibcodes, years,
+            and nasa affiliation statuses.
+    """
     batches = range(0, len(paper_ids), batch_size)
     pbar = tqdm(batches)
     all_records = []
@@ -291,6 +377,20 @@ def get_pby(session, paper_ids: List, batch_size=990):
 
 
 def get_kwd_ts_df(session, keyword_ids: List, batch_size=990):
+    """
+    Get time series for all desired keywords.
+
+    Args:
+        session: sqlalchemy session connected to database
+        keyword_ids: ids for keywords for which to get time series
+        batch_size: the number of keywords for which to query these data an once.
+            This value is limited by the maximum number of variables allowed
+            by your database.
+
+    Returns:
+        kwd_ts_df: pandas DataFrame with keywords as indices, years as columns, and
+            year frequencies as values.
+    """
     batches = range(0, len(keyword_ids), batch_size)
     pbar = tqdm(batches)
     all_records = []

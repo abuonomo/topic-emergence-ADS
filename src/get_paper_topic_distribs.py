@@ -35,11 +35,18 @@ def main(
     pbar = tqdm(pipe, total=len(texts))
     corpus = []
     for doc in pbar:
-        _, kwds = extract_keyword_from_doc(doc)
-        tokens_exp = [[k[0]] * k[2] for k in kwds]
-        tokens = [k for ks in tokens_exp for k in ks]
+        lemma_text = " ".join([t.lemma_.lower() for t in doc])
+        tokens = []
+        for k in model.id2word:
+            if k.lower() in lemma_text:
+                count = lemma_text.count(k.lower())
+                tokens = tokens + ([k] * count)
+            else:
+                continue
         bow = model.id2word.doc2bow(tokens)
         corpus.append(bow)
+    # Just check for occurrence of the dictionary terms in the lemma_text instead of
+    # using the whole text extraction
 
     LOG.info("Running inference to get topic distributions.")
     tc = model.get_document_topics(corpus, minimum_probability=0)

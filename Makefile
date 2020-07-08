@@ -149,7 +149,7 @@ else
 endif
 
 ## sync experiment viz from s3
-sync-viz-to-s3:
+sync-viz-from-s3:
 ifeq (default,$(PROFILE))
 	aws s3 sync $(BUCKET)/$(lda_model_viz_data_dir) $(lda_model_viz_data_dir)
 else

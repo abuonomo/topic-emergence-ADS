@@ -44,7 +44,9 @@ def keywords(
         LOG.info(f"Writing keywords to {kwd_export_loc}")
         df.to_csv(kwd_export_loc)
     except:
+        LOG.warning(f"Aborted getting keywords from database.")
         session.rollback()
+        raise
     finally:
         session.close()
 

@@ -205,6 +205,12 @@ get-inference-from-dir:
 		--dir_of_txts data/astro2010_whitepapers \
 		--output_embedding_csv $(data_dir)/astro2010_topic_distributions.csv
 
+export-keywords:
+	python src/exports.py keywords \
+		--db_loc $(db_loc) \
+		--config_loc $(PARAM_YAML) \
+		--kwd_export_loc $(reports_dir)/keywords.csv
+
 #################################################################################
 # Self Documenting Commands                                                     #
 #################################################################################

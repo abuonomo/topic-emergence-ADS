@@ -323,6 +323,7 @@ class PaperKeywordExtractor:
 
 
 class PaperOrganizer:
+
     def __init__(
         self,
         no_below=5,
@@ -462,7 +463,7 @@ class PaperOrganizer:
             session.query(*args)
             .join(PaperKeywords)
             .join(Paper)
-            .filter(~Keyword.keyword.in_(self.keyword_blacklist))
+            .filter(~Keyword.keyword.in_(self.keyword_blacklist)) # May require batching if more than 999 vars
             .group_by(Keyword.id)
             .order_by(func.avg(PaperKeywords.score).desc())
             .having(func.count() >= self.no_below)

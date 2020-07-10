@@ -1,8 +1,13 @@
 import logging
+from pathlib import Path
+
 import click
 import pandas as pd
-import json
-from pathlib import Path
+import yaml
+from sqlalchemy import create_engine, func
+from sqlalchemy.orm import sessionmaker
+
+import db
 
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
@@ -15,37 +20,33 @@ def cli():
 
 
 @cli.command()
-@click.option("--in_slope_complex", type=Path)
-@click.option("--viz_data_loc", type=Path)
-@click.option("--filt_kwds_loc", type=Path)
+@click.option("--db_loc", type=Path)
+@click.option("--config_loc", type=Path)
 @click.option("--kwd_export_loc", type=Path)
 def keywords(
-    in_slope_complex,
-    viz_data_loc,
-    filt_kwds_loc,
+    db_loc,
+    config_loc,
     kwd_export_loc,
-    include_viz_data=False,
 ):
-    LOG.info("Reading data")
-    sc = pd.read_csv(in_slope_complex).loc[:, ["stem", "count"]]
+    with open(config_loc, 'r') as f0:
+        config = yaml.safe_load(f0)
 
-    with open(viz_data_loc, "r") as f0:
-        vd = json.loads(json.load(f0))
-    t_df = pd.DataFrame(vd["token.table"])
-
-    rdf = pd.read_json(filt_kwds_loc, orient="records", lines=True)
-    skdf = rdf.loc[:, ["stem", "keyword_list"]]
-
-    LOG.info("Joining data")
-    if include_viz_data is True:
-        tsc = t_df.set_index("Term").join(sc.set_index("stem"))
-    else:
-        tsc = sc.set_index("stem")
-    kwd_df = tsc.join(skdf.set_index("stem")).reset_index()
-    kwd_df = kwd_df.rename(columns={"index": "term"})
-    kwd_df = kwd_df.sort_values('count', ascending=False)
-    LOG.info(f"Writing keywords to {kwd_export_loc}")
-    kwd_df.to_csv(kwd_export_loc)
+    engine = create_engine(f"sqlite:///{db_loc}")
+    Session = sessionmaker(bind=engine)
+    session = Session()
+    try:
+        po = db.PaperOrganizer(**config['paper_organizer'])
+        q = po._get_filtered_keywords(session, db.Keyword.id, db.Keyword.keyword,
+                                      func.count(db.Keyword.id))
+        LOG.info("Reading keyword counts from database.")
+        df = pd.read_sql(q.statement, con=engine)
+        df = df.sort_values('count_1', ascending=False)
+        LOG.info(f"Writing keywords to {kwd_export_loc}")
+        df.to_csv(kwd_export_loc)
+    except:
+        session.rollback()
+    finally:
+        session.close()
 
 
 if __name__ == "__main__":

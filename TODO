@@ -3,3 +3,4 @@
 - Small example data built in to the repo
 \ more document important functions and classes
 | api request for model inference
+| add double slider for min and max for counts and coherences

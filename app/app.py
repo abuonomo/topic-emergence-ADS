@@ -7,7 +7,7 @@ import h5py
 import numpy as np
 import pandas as pd
 import requests
-from flask import Flask, render_template, jsonify, request, send_from_directory
+from flask import Flask, render_template, jsonify, request
 from sklearn.preprocessing import MinMaxScaler
 
 logging.basicConfig(level=logging.INFO)

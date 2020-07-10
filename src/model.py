@@ -124,6 +124,7 @@ class TopicModeler:
 
 
 class VizPrepper:
+
     def __init__(self):
         """
         Object for reading derived topic model data and calculating topic time series

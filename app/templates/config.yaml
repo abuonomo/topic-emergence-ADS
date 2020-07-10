@@ -13,6 +13,7 @@ paper_organizer:
   min_mean_score: 0.015 # keywords with mean singlerank score less than this not included in topic modeling
   journal_blacklist: ["arXiv"] # These journals not included in topic modeling
   keyword_blacklist: "config/drop_features.txt" # Path assuming working dir is root of project
+  use_keyword_count: True
 topic_model:
   topic_range: [20, 30, 50]
   lda_params: # More info: https://radimrehurek.com/gensim/models/ldamodel.html

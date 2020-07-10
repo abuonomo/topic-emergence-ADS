@@ -143,8 +143,12 @@ link-data-to-app:
 ## sync experiment viz data to s3
 sync-viz-to-s3:
 ifeq (default,$(PROFILE))
+	aws s3 cp $(CONFIG_FILE) $(BUCKET)/$(CONFIG_FILE)
+	aws s3 cp $(PARAM_YAML) $(BUCKET)/$(PARAM_YAML)
 	aws s3 sync $(lda_model_viz_data_dir) $(BUCKET)/$(lda_model_viz_data_dir)
 else
+	aws s3 cp $(CONFIG_FILE) $(BUCKET)/$(CONFIG_FILE) --profile $(PROFILE)
+	aws s3 cp $(PARAM_YAML) $(BUCKET)/$(PARAM_YAML) --profile $(PROFILE)
 	aws s3 sync $(lda_model_viz_data_dir) $(BUCKET)/$(lda_model_viz_data_dir) --profile $(PROFILE)
 endif
 

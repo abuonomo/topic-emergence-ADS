@@ -7,7 +7,7 @@ import h5py
 import numpy as np
 import pandas as pd
 import requests
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, Response
 from sklearn.preprocessing import MinMaxScaler
 
 logging.basicConfig(level=logging.INFO)
@@ -111,9 +111,9 @@ def index():
 @app.route("/config")
 def get_config():
     LOG.info("Serving page.")
-    # p = app.config['PARAM_CONFIG_LOC']
-    # return render_template(p.parent, f"{p.stem}{p.suffix}")
-    return render_template("config.yaml")
+    with open('templates/config.yaml', 'r') as f0:
+        config_txt = f0.read()
+    return Response(config_txt, mimetype='text/yaml')
 
 
 @app.route("/lda", methods=["GET"])

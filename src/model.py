@@ -251,7 +251,7 @@ class VizPrepper:
             ycd = defaultdict(int, {y: c for _, y, c in year_counts})
             topic_time_series = [
                 {"topic": topic, "year": y, "count": ycd[y]}
-                for y in range(year_min, year_max)
+                for y in range(year_min, year_max + 1)
             ]
             all_time_series = all_time_series + topic_time_series
 

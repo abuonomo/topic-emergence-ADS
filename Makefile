@@ -134,10 +134,11 @@ $(records_loc): $(raw_files)
 
 ## Link experiment data to app directory
 link-data-to-app:
-	ln -f $(lda_model_viz_data_dir)/viz_data.hdf5 app/data
-	ln -f $(lda_model_viz_data_dir)/pyLDAvis_data.json app/data
-	ln -f $(lda_model_viz_data_dir)/time_series_characteristics.csv app/data
-	ln -f $(lda_model_viz_data_dir)/topic_years.csv app/data
+	ln -f $(lda_model_viz_data_dir)/* app/data
+#	ln -f $(lda_model_viz_data_dir)/viz_data.hdf5 app/data
+#	ln -f $(lda_model_viz_data_dir)/pyLDAvis_data.json app/data
+#	ln -f $(lda_model_viz_data_dir)/time_series_characteristics.csv app/data
+#	ln -f $(lda_model_viz_data_dir)/topic_years.csv app/data
 	ln -f $(PARAM_YAML) app/templates/config.yaml
 
 ## sync experiment viz data to s3

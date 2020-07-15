@@ -42,6 +42,7 @@ app.config.update(
     VP=None,
     SC_LOC=DATA_DIR / f"time_series_characteristics.csv",
     N_LOC=DATA_DIR / f"topic_years.csv",
+    KWD_N_DF_LOC=DATA_DIR / "kwd_years.csv",
     TOPIC_YEARS_LOC=DATA_DIR / "topic_years.csv",
     PYLDAVIS_DATA_LOC=DATA_DIR / "pyLDAvis_data.json",
     PYLDAVIS_DATA=None,
@@ -78,6 +79,7 @@ def load_kwd_ts_df(viz_data_loc):
     with h5py.File(viz_data_loc, "r") as f0:
         keywords = f0["keywords"][:]
         kwd_ts_values = f0["keyword_ts_values"][:]
+        year_cols = f0["keywords"][:]
     kwd_ts_df = pd.DataFrame(kwd_ts_values)
     kwd_ts_df.index = keywords
     return kwd_ts_df
@@ -90,7 +92,7 @@ def init():
     LOG.info(f'Reading derived time series measure from {app.config["SC_LOC"]}.')
     app.config["SC_DF"] = pd.read_csv(app.config["SC_LOC"], index_col=0)
     app.config["N_DF"] = pd.read_csv(app.config["N_LOC"], index_col=0)
-    app.config['KWD_N_DF'] = load_kwd_ts_df(app.config['VIZ_DATA_LOC'])
+    app.config['KWD_N_DF'] = pd.read_csv(app.config['KWD_N_DF_LOC'], index_col=0)
 
     log_count = np.log(app.config["SC_DF"]["count"])
     log_count = log_count.replace([np.inf, -np.inf], 0)

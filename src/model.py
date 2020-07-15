@@ -124,7 +124,6 @@ class TopicModeler:
 
 
 class VizPrepper:
-
     def __init__(self):
         """
         Object for reading derived topic model data and calculating topic time series
@@ -156,7 +155,9 @@ class VizPrepper:
             nasa_affiliation = f0["nasa_affiliation"][:]
             years = f0["years"][:]
             keyword_ids = f0["keyword_ids"][:]
+            keywords = f0["keywords"][:]
             kwd_ts_values = f0["keyword_ts_values"][:]
+            kwd_ts_cols = f0["keyword_cols"][:]
 
         self.paper_df = pd.DataFrame(
             {
@@ -171,7 +172,8 @@ class VizPrepper:
         self.embedding_df = embedding_df
 
         kwd_ts_df = pd.DataFrame(kwd_ts_values)
-        kwd_ts_df.index = keyword_ids
+        kwd_ts_df.index = keywords
+        kwd_ts_df.columns = kwd_ts_cols
         self.kwd_ts_df = kwd_ts_df
 
         self.topic_coherences = topic_coherences
@@ -396,7 +398,7 @@ def get_kwd_ts_df(session, keyword_ids: List, batch_size=990):
     pbar = tqdm(batches)
     all_records = []
     for i in pbar:
-        kwd_id_batch = keyword_ids[i: i + batch_size]
+        kwd_id_batch = keyword_ids[i : i + batch_size]
         q = (
             session.query(PaperKeywords)
             .join(Keyword)
@@ -537,11 +539,18 @@ def prepare_for_topic_model_viz(db_loc, prepared_data_dir, tmodel_loc, viz_data_
         f0.create_dataset("keyword_ids", dtype=np.int, data=keyword_ids)
         f0.create_dataset("keyword_ts_values", dtype=np.int, data=kwd_ts_df.values)
         f0.create_dataset("keywords", dtype=dt, data=kwd_ts_df.index)
+        f0.create_dataset("keyword_cols", dtype=np.int, data=kwd_ts_df.columns)
     LOG.info(viz_data_loc)
 
     with open(pyldavis_data_loc, "w") as f0:
         json.dump(viz_data.to_json(), f0)
     LOG.info(pyldavis_data_loc)
+
+
+def limit_kwd_ts_df(kwd_ts_df, year_min, year_max):
+    keep_years = list(range(year_min, year_max + 1))
+    kwd_ts_df = kwd_ts_df.filter(keep_years)
+    return kwd_ts_df
 
 
 @cli.command()
@@ -563,6 +572,12 @@ def get_time_chars(viz_data_dir, config_loc):
     vp.read_hdf(viz_data_loc)
 
     ts_df, chars_df = vp.get_time_characteristics(**config["time_series"])
+    kwd_ts_df = limit_kwd_ts_df(
+        vp.kwd_ts_df,
+        config["time_series"]["year_min"],
+        config["time_series"]["year_max"],
+    )
+
     kmeans, dtw_man = vp.get_dynamic_time_warp_clusters(ts_df)
     chars_df["kmeans_cluster"] = kmeans.labels_
     chars_df["manifold_x"] = dtw_man[:, 0]
@@ -576,6 +591,9 @@ def get_time_chars(viz_data_dir, config_loc):
 
     out_ts_loc = viz_data_dir / "topic_years.csv"
     ts_df.to_csv(out_ts_loc)
+
+    out_kwd_ts_loc = viz_data_dir / "kwd_years.csv"
+    kwd_ts_df.to_csv(out_kwd_ts_loc)
 
 
 if __name__ == "__main__":

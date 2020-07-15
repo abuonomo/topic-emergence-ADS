@@ -31,9 +31,9 @@ LOG.info(f"Deploying Version: {VERSION}")
 try:
     DATA_DIR = Path(os.environ["APP_DATA_DIR"])
 except KeyError:
-    DATA_DIR = Path('data')
+    DATA_DIR = Path("data")
 
-ADS_TOKEN = os.environ['ADS_TOKEN']
+ADS_TOKEN = os.environ["ADS_TOKEN"]
 
 app.config.update(
     # PARAM_CONFIG_LOC=DATA_DIR / "config.yaml",
@@ -63,15 +63,16 @@ app.config.update(
 
 def get_paper_from_bibcode(bibcode):
     headers = {
-        'Authorization': f"Bearer:{ADS_TOKEN}",
+        "Authorization": f"Bearer:{ADS_TOKEN}",
     }
     params = (
-        ('q', f'bibcode:{bibcode}'),
-        ('fl', ['title', 'abstract']),
+        ("q", f"bibcode:{bibcode}"),
+        ("fl", ["title", "abstract"]),
     )
-    response = requests.get('https://api.adsabs.harvard.edu/v1/search/query',
-                            headers=headers, params=params)
-    c = json.loads(response.content)['response']['docs'][0]
+    response = requests.get(
+        "https://api.adsabs.harvard.edu/v1/search/query", headers=headers, params=params
+    )
+    c = json.loads(response.content)["response"]["docs"][0]
     return c
 
 
@@ -87,12 +88,12 @@ def load_kwd_ts_df(viz_data_loc):
 
 @app.before_first_request
 def init():
-    with open(app.config['PYLDAVIS_DATA_LOC'], 'r') as f0:
-        app.config['PYLDAVIS_DATA'] = json.loads(json.load(f0))
+    with open(app.config["PYLDAVIS_DATA_LOC"], "r") as f0:
+        app.config["PYLDAVIS_DATA"] = json.loads(json.load(f0))
     LOG.info(f'Reading derived time series measure from {app.config["SC_LOC"]}.')
     app.config["SC_DF"] = pd.read_csv(app.config["SC_LOC"], index_col=0)
     app.config["N_DF"] = pd.read_csv(app.config["N_LOC"], index_col=0)
-    app.config['KWD_N_DF'] = pd.read_csv(app.config['KWD_N_DF_LOC'], index_col=0)
+    app.config["KWD_N_DF"] = pd.read_csv(app.config["KWD_N_DF_LOC"], index_col=0)
 
     log_count = np.log(app.config["SC_DF"]["count"])
     log_count = log_count.replace([np.inf, -np.inf], 0)
@@ -113,48 +114,48 @@ def index():
 @app.route("/config")
 def get_config():
     LOG.info("Serving page.")
-    with open('templates/config.yaml', 'r') as f0:
+    with open("templates/config.yaml", "r") as f0:
         config_txt = f0.read()
-    return Response(config_txt, mimetype='text/yaml')
+    return Response(config_txt, mimetype="text/yaml")
 
 
 @app.route("/lda", methods=["GET"])
 def lda():
     LOG.info("Serving LDA viz.")
-    return jsonify(app.config['PYLDAVIS_DATA'])
+    return jsonify(app.config["PYLDAVIS_DATA"])
 
 
 def load_topic_distributions(loc: os.PathLike, t: int):
-    with h5py.File(loc, 'r') as f0:
-        mask = f0['topic_maxes'][:] == t
-        v = f0['embedding'][mask, :]
-        b = f0['bibcodes'][mask]
+    with h5py.File(loc, "r") as f0:
+        mask = f0["topic_maxes"][:] == t
+        v = f0["embedding"][mask, :]
+        b = f0["bibcodes"][mask]
 
     tmp_df = pd.DataFrame(v)
     tmp_df.index = b
     tmps = tmp_df.iloc[:, t]
     df = tmps.reset_index()
-    df.columns = ['bibcode', 'prob']
+    df.columns = ["bibcode", "prob"]
     return df
 
 
 @app.route("/topic_bibcodes", methods=["GET", "POST"])
 def topic_bibcodes():
     in_data = request.json
-    topic = int(in_data['topic'])  # Frontend index starts at 1, here starts at 0
-    limit = int(in_data['limit'])
+    topic = int(in_data["topic"])  # Frontend index starts at 1, here starts at 0
+    limit = int(in_data["limit"])
     topic_df = load_topic_distributions(app.config["VIZ_DATA_LOC"], topic)
     if limit == 0:
-        records = topic_df.to_dict(orient='records')
+        records = topic_df.to_dict(orient="records")
     else:
-        records = topic_df.to_dict(orient='records')[0:limit]
+        records = topic_df.to_dict(orient="records")[0:limit]
     return jsonify(records)
 
 
 @app.route("/keyword_distribs", methods=["GET"])
 def keyword_distribs():
-    df = pd.DataFrame(app.config['PYLDAVIS_DATA']['token.table'])
-    records = df.to_dict(orient='records')
+    df = pd.DataFrame(app.config["PYLDAVIS_DATA"]["token.table"])
+    records = df.to_dict(orient="records")
     return jsonify(records)
 
 
@@ -163,7 +164,7 @@ def get_scatter_data():
     in_data = request.json
     LOG.info(f"Getting scatter data for {in_data}.")
     cols = list(set(app.config["LOAD_COLS"] + [in_data["x"], in_data["y"]]))
-    not_in_cols = [c for c in cols if c not in app.config['SC_DF'].columns]
+    not_in_cols = [c for c in cols if c not in app.config["SC_DF"].columns]
     if len(not_in_cols) > 0:
         raise ValueError("All LOAD_COLS must be in SC_DF")
     chart_data = (
@@ -180,27 +181,27 @@ def get_scatter_data():
 @app.route("/doc_preview", methods=["GET", "POST"])
 def get_doc_preview():
     data = request.json
-    b = data['bibcode']
+    b = data["bibcode"]
     d = get_paper_from_bibcode(b)
     return jsonify(d)
 
 
-@app.route("/get-count-range", methods=['GET'])
+@app.route("/get-count-range", methods=["GET"])
 def get_count_range():
     d = {
-        'count_min': int(app.config['SC_DF']['count'].min()),
-        'count_max': int(app.config['SC_DF']['count'].max()),
-        'count_std': float(app.config['SC_DF']['count'].std()),
-        'count_mean': float(app.config['SC_DF']['count'].mean())
+        "count_min": int(app.config["SC_DF"]["count"].min()),
+        "count_max": int(app.config["SC_DF"]["count"].max()),
+        "count_std": float(app.config["SC_DF"]["count"].std()),
+        "count_mean": float(app.config["SC_DF"]["count"].mean()),
     }
     return jsonify(d)
 
 
-@app.route("/get-score-range", methods=['GET'])
+@app.route("/get-score-range", methods=["GET"])
 def get_score_range():
     d = {
-        'score_min': int(app.config['SC_DF']['score_mean'].min()),
-        'score_max': int(app.config['SC_DF']['score_mean'].max()),
+        "score_min": int(app.config["SC_DF"]["score_mean"].min()),
+        "score_max": int(app.config["SC_DF"]["score_mean"].max()),
     }
     return jsonify(d)
 
@@ -208,21 +209,27 @@ def get_score_range():
 @app.route("/get-time-data", methods=["GET", "POST"])
 def get_time_data():
     data = request.json
-    df = app.config['N_DF'].loc[int(data['stem'])].reset_index()
-    df.columns = ['year', 'count']
-    df['kmeans_cluster'] = app.config['SC_DF']['kmeans_cluster'].loc[int(data['stem'])]
-    df['stem'] = data['stem']
-    records = df.to_dict(orient='records')
+    df = app.config["N_DF"].loc[int(data["stem"])].reset_index()
+    df.columns = ["year", "count"]
+    df["kmeans_cluster"] = app.config["SC_DF"]["kmeans_cluster"].loc[int(data["stem"])]
+    df["stem"] = data["stem"]
+    df["norm_count"] = (
+        df.set_index("year")["count"] / app.config["N_DF"].sum()
+    ).tolist()
+    records = df.to_dict(orient="records")
     return jsonify(records)
 
 
 @app.route("/get-kwd-time-data", methods=["GET", "POST"])
 def get_kwd_time_data():
     data = request.json
-    df = app.config['KWD_N_DF'].loc[data['stem']].reset_index()
-    df.columns = ['year', 'count']
-    df['stem'] = data['stem']
-    records = df.to_dict(orient='records')
+    df = app.config["KWD_N_DF"].loc[data["stem"]].reset_index()
+    df.columns = ["year", "count"]
+    df["stem"] = data["stem"]
+    df["norm_count"] = (
+        df.set_index("year")["count"] / app.config["N_DF"].sum()
+    ).tolist()
+    records = df.to_dict(orient="records")
     return jsonify(records)
 
 
@@ -230,8 +237,11 @@ def get_kwd_time_data():
 def get_all_time_data():
     LOG.info(f"Getting total frequencies for each year.")
     df = app.config["N_DF"].sum().reset_index()
-    df.columns = ['year', 'count']
-    records = df.to_dict(orient='records')
+    df.columns = ["year", "count"]
+    df["norm_count"] = (
+        df.set_index("year")["count"] / app.config["N_DF"].sum()
+    ).tolist()
+    records = df.to_dict(orient="records")
     return jsonify(records)
 
 

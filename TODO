@@ -1,6 +1,8 @@
 - Fix both Dockerfiles for new alchemy build
-- Documentation for model.py
 - Small example data built in to the repo
-\ more document important functions and classes
+- Fix time series normalize
+- Fix keyword time series start date
 | api request for model inference
 | add double slider for min and max for counts and coherences
+| Filter by topics which a given keyword falls into over a threshold.
+    For examlpe, select all topics where dark matter is prominent. See only these topics in scatter plot.

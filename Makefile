@@ -27,7 +27,7 @@ PARAM_YAML=config/example_config.yaml
 PORT=5000
 INFO="This is an example experiment."
 
-BUCKET=s3://datasquad-low/home/DataSquad/topic-emergence-ADS/
+BUCKET=s3://datasquad-low/home/DataSquad/topic-emergence-ADS
 PROFILE=default
 
 # Experiment specific variables contained in CONFIG_FILE

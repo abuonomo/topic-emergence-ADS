@@ -164,11 +164,15 @@ endif
 ## sync all experiment data to s3
 sync-experiment-to-s3:
 ifeq (default,$(PROFILE))
+	aws s3 cp $(CONFIG_FILE) $(BUCKET)/$(CONFIG_FILE)
+	aws s3 cp $(PARAM_YAML) $(BUCKET)/$(PARAM_YAML)
 	aws s3 sync $(data_dir) $(BUCKET)/$(data_dir)
 	aws s3 sync $(model_dir) $(BUCKET)/$(model_dir)
 	aws s3 sync $(viz_dir) $(BUCKET)/$(viz_dir)
 	aws s3 sync $(reports_dir) $(BUCKET)/$(reports_dir)
 else
+	aws s3 cp $(CONFIG_FILE) $(BUCKET)/$(CONFIG_FILE) --profile $(PROFILE)
+	aws s3 cp $(PARAM_YAML) $(BUCKET)/$(PARAM_YAML) --profile $(PROFILE)
 	aws s3 sync $(data_dir) $(BUCKET)/$(data_dir)  --profile $(PROFILE)
 	aws s3 sync $(model_dir) $(BUCKET)/$(model_dir)  --profile $(PROFILE)
 	aws s3 sync $(viz_dir) $(BUCKET)/$(viz_dir)  --profile $(PROFILE)

@@ -547,12 +547,6 @@ def prepare_for_topic_model_viz(db_loc, prepared_data_dir, tmodel_loc, viz_data_
     LOG.info(pyldavis_data_loc)
 
 
-def limit_kwd_ts_df(kwd_ts_df, year_min, year_max):
-    keep_years = list(range(year_min, year_max + 1))
-    kwd_ts_df = kwd_ts_df.filter(keep_years)
-    return kwd_ts_df
-
-
 @cli.command()
 @click.option(
     "--viz_data_dir",
@@ -572,11 +566,10 @@ def get_time_chars(viz_data_dir, config_loc):
     vp.read_hdf(viz_data_loc)
 
     ts_df, chars_df = vp.get_time_characteristics(**config["time_series"])
-    kwd_ts_df = limit_kwd_ts_df(
-        vp.kwd_ts_df,
-        config["time_series"]["year_min"],
-        config["time_series"]["year_max"],
-    )
+    year_min = config["time_series"]["year_min"]
+    year_max = config["time_series"]["year_max"]
+    keep_years = list(range(year_min, year_max + 1))
+    kwd_ts_df = vp.kwd_ts_df.filter(keep_years)
 
     kmeans, dtw_man = vp.get_dynamic_time_warp_clusters(ts_df)
     chars_df["kmeans_cluster"] = kmeans.labels_

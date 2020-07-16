@@ -161,6 +161,34 @@ else
 	aws s3 sync $(BUCKET)/$(lda_model_viz_data_dir) $(lda_model_viz_data_dir) --profile $(PROFILE)
 endif
 
+## sync all experiment data to s3
+sync-experiment-to-s3:
+ifeq (default,$(PROFILE))
+	aws s3 sync $(data_dir) $(BUCKET)/$(data_dir)
+	aws s3 sync $(model_dir) $(BUCKET)/$(model_dir)
+	aws s3 sync $(viz_dir) $(BUCKET)/$(viz_dir)
+	aws s3 sync $(reports_dir) $(BUCKET)/$(reports_dir)
+else
+	aws s3 sync $(data_dir) $(BUCKET)/$(data_dir)  --profile $(PROFILE)
+	aws s3 sync $(model_dir) $(BUCKET)/$(model_dir)  --profile $(PROFILE)
+	aws s3 sync $(viz_dir) $(BUCKET)/$(viz_dir)  --profile $(PROFILE)
+	aws s3 sync $(reports_dir) $(BUCKET)/$(reports_dir)  --profile $(PROFILE)
+endif
+
+## sync all experiment data from s3
+sync-experiment-from-s3:
+ifeq (default,$(PROFILE))
+	aws s3 sync $(BUCKET)/$(data_dir) $(data_dir)
+	aws s3 sync $(BUCKET)/$(model_dir) $(model_dir)
+	aws s3 sync $(BUCKET)/$(viz_dir) $(viz_dir)
+	aws s3 sync $(BUCKET)/$(reports_dir) $(reports_dir)
+else
+	aws s3 sync $(BUCKET)/$(data_dir) $(data_dir)  --profile $(PROFILE)
+	aws s3 sync $(BUCKET)/$(model_dir) $(model_dir)  --profile $(PROFILE)
+	aws s3 sync $(BUCKET)/$(viz_dir) $(viz_dir)  --profile $(PROFILE)
+	aws s3 sync $(BUCKET)/$(reports_dir) $(reports_dir)  --profile $(PROFILE)
+endif
+
 ## Run app for visualize results in development mode
 app-dev:
 	export VERSION=$$(python version.py); \

@@ -175,6 +175,9 @@ def extract_keyword_from_doc(doc):
     kwds = [(k.lower(), v) for k, v in kwds if (not is_nu_like(k)) and (len(k) > 1)]
     text = " ".join([t.lemma_.lower() for t in doc])
     kwd_counts = [(k, v, text.count(k)) for k, v in kwds]
+    # TODO: "Black hole nos with xnosnosx" would count "nos" 3 times. Do we want this?
+    # If make match " nos ", need to keep in mind problems at beginning and end
+    # of a sentence, and around punctuation, parentheses, etc.
     return text, kwd_counts
 
 

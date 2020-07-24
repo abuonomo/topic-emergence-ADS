@@ -61,6 +61,25 @@ There are three configuration files:
 
 More details about these options are contained within the example configuration files.
 
+## Other Features
+
+### Running Topic Model Inference 
+
+You can use the topic models to create topic distributions for selections of documents using the script at `src/get_paper_topic_distribs.py`.
+
+For example, you can run inference on the astro2010 whitepapers. First place the papers in `data/astro2010_whitepapers`. You may be able to sync them from the s3 bucket with the command `make sync-astro2010-whitepapers-from-s3`.
+
+Once the papers are in place, you can use the make command ` make get-inference-from-dir CONFIG_FILE=config/example_experiment.mk N_TOPICS=30 --dry-run` where `CONFIG_FILE` refers to your experiment and `N_TOPICS` refers to your topic model number of topics.
+
+Alternatively, you can directly use the python script. For example, you could run:
+```bash
+python src/get_paper_topic_distribs.py \
+    --lda_model models/example_experiment/topic_models/topic_model30 \
+    --dir_of_txts data/astro2010_whitepapers \
+    --output_embedding_csv data/example_experiment/astro2010_topic_distributions.csv
+```
+You can see more information by running `python src/get_paper_topic_distribs.py --help` or inspecting [`src/get_paper_topic_distribs.py`](src/get_paper_topic_distribs.py) manually.
+
 ## Index
 
 ### make version

@@ -258,6 +258,16 @@ function scatterChart() {
       .attr("opacity", 0.5)
       .style("fill", function(d) { return color(cValue(d));});
 
+      scatter.selectAll(".dot") // Remove circles with missing values.
+      .style("display", function(d) {
+        if((d[xName] == null) || (d[yName] == null)) {
+          return "none";
+        }
+        else {
+          return null;
+        }
+      });
+
       xAxisEl
       .call(xAxis);
 

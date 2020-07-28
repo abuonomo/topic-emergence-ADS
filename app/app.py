@@ -175,6 +175,11 @@ def get_scatter_data():
         .loc[:, cols]
         .to_dict(orient="records")
     )
+    import ipdb; ipdb.set_trace()
+    for r in chart_data:  # Replace nans with None, nans are not written to json right
+        for k, v in r.items():
+            if np.isnan(v):
+                r[k] = None
     return jsonify(chart_data)
 
 

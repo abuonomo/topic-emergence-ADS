@@ -202,16 +202,15 @@ class VizPrepper:
         """
         x = x_row.values
         nz_inds = np.nonzero(x)[0]
-        if len(nz_inds) == 0:  # If all are 0, set CAGR to 0
-            return 0
+        if len(nz_inds) == 0:  # If all are 0, set CAGR to nan
+            return np.nan
         else:
             first_nonzero_index = nz_inds[0]
             x = x[first_nonzero_index:]  # Not valid if starts with 0. Becomes inf
-            x = x[
-                ~np.isnan(x)
-            ]  # For normalized time series, NaNs before any occurrence of kwd
-        if len(x) < 2:  # If no periods, set CAGR to 0
-            return 0
+            x = x[~np.isnan(x)]
+            # For normalized time series, NaNs before any occurrence of kwd
+        if len(x) < 2:  # If no periods, set CAGR to nan
+            return np.nan
         else:
             ys = x_row.index
             period = max(ys) - min(ys)

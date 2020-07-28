@@ -258,7 +258,7 @@ function scatterChart() {
       .attr("opacity", 0.5)
       .style("fill", function(d) { return color(cValue(d));});
 
-      scatter.selectAll(".dot") // Remove circles with missing values.
+      scatter.selectAll(".dot") // Remove circles with missing position values.
       .style("display", function(d) {
         if((d[xName] == null) || (d[yName] == null)) {
           return "none";

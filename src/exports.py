@@ -36,10 +36,13 @@ def keywords(
     session = Session()
     try:
         po = db.PaperOrganizer(**config['paper_organizer'])
-        q = po._get_filtered_keywords(session, db.Keyword.id, db.Keyword.keyword,
-                                      func.count(db.Keyword.id))
+        q = po.get_filtered_keywords(session, db.Keyword.id, db.Keyword.keyword,
+                                     func.count(db.Keyword.id))
         LOG.info("Reading keyword counts from database.")
         df = pd.read_sql(q.statement, con=engine)
+        drop_inds = df.index[df['keyword'].apply(lambda x: x in po.keyword_blacklist)]
+        df = df.drop(drop_inds)
+        import ipdb; ipdb.set_trace()
         df = df.sort_values('count_1', ascending=False)
         LOG.info(f"Writing keywords to {kwd_export_loc}")
         df.to_csv(kwd_export_loc)

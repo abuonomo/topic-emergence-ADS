@@ -430,21 +430,6 @@ class PaperOrganizer:
 
     def get_filtered_keywords(self, session, *args):
         """
-        From database, get tuple of keywords which pass filters
-
-        Args:
-            session: sqlalchemy session connected to database
-            *args: what objects to return from query, must contain Keyword or one of its
-                attributes (ex. Keyword.id, Keyword.keyword).
-
-        Returns:
-            Tuple of keywords which pass filters
-        """
-        kwd_query = self._get_filtered_keywords(session, *args)
-        return kwd_query.all()
-
-    def _get_filtered_keywords(self, session, *args):
-        """
         From database, get query result for keywords which pass filters
         (but don't execute the query)
 
@@ -454,7 +439,8 @@ class PaperOrganizer:
                 attributes (ex. Keyword.id, Keyword.keyword).
 
         Returns:
-            Query for keywords which pass filters.
+            Query for keywords which pass filters (exluding blacklist which must
+            be applied independently).
         """
         if len(args) == 0:
             args = [Keyword, func.count(Keyword.id), func.avg(PaperKeywords.score)]
@@ -466,7 +452,7 @@ class PaperOrganizer:
             session.query(*args)
             .join(PaperKeywords)
             .join(Paper)
-            .filter(~Keyword.keyword.in_(self.keyword_blacklist)) # May require batching if more than 999 vars
+            # .filter(~Keyword.keyword.in_(self.keyword_blacklist)) # May require batching if more than 999 vars
             .group_by(Keyword.id)
             .order_by(func.avg(PaperKeywords.score).desc())
             .having(func.count() >= self.no_below)
@@ -566,8 +552,8 @@ class PaperOrganizer:
                 f"greater than maximum number of SQLite variables"
             )
         LOG.info("Getting filtered keywords")
-        kwd_query = self._get_filtered_keywords(session, Keyword.id, Keyword.keyword)
-        all_ki = kwd_query.all()
+        kwd_query = self.get_filtered_keywords(session, Keyword.id, Keyword.keyword)
+        all_ki = [(i, k) for i, k in kwd_query.all() if k not in self.keyword_blacklist]
         all_kwd_ids = [i for i, k in all_ki]
         all_records = self.get_paper_keyword_records(
             session, all_kwd_ids, batch_size, in_memory=in_memory

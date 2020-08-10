@@ -91,7 +91,7 @@ function onTopicClick(d, i) {
   var spinner = new Spinner(opts).spin(target);
   var colorName = 'kmeans_cluster';
   var topic = (+d['topics']).toString();
-  postBibcode(topic, spinner, limit=100);
+  postBibcode(topic, spinner, limit=20);
   highlightTopic(+topic, 'stem', 'scaled_counts');
   postTopic(topic, d[colorName]);
 }
@@ -327,7 +327,7 @@ function scatterChart() {
     var spinner = new Spinner(opts).spin(target);
     var topic = d[labelName];
     postTopic(d[labelName], d[colorName]);
-    postBibcode(d[labelName], spinner, limit=100);
+    postBibcode(d[labelName], spinner, limit=20);
     d3.selectAll('#scatter-plot-container circle')
     .filter(function(d, i) { return d[labelName] === topic; })
     .style('stroke', 'black');

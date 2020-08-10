@@ -128,13 +128,12 @@ def lda():
 def load_topic_distributions(loc: os.PathLike, t: int):
     with h5py.File(loc, "r") as f0:
         mask = f0["topic_maxes"][:] == t
-        v = f0["embedding"][mask, :]
+        v = f0["embedding"][mask, t]
         b = f0["bibcodes"][mask]
 
     tmp_df = pd.DataFrame(v)
     tmp_df.index = b
-    tmps = tmp_df.iloc[:, t]
-    df = tmps.reset_index()
+    df = tmp_df.reset_index()
     df.columns = ["bibcode", "prob"]
     return df
 

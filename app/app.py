@@ -145,6 +145,7 @@ def topic_bibcodes():
     topic = int(in_data["topic"])  # Frontend index starts at 1, here starts at 0
     limit = int(in_data["limit"])
     topic_df = load_topic_distributions(app.config["VIZ_DATA_LOC"], topic)
+    topic_df = topic_df.sort_values('prob', ascending=False)
     if limit == 0:
         records = topic_df.to_dict(orient="records")
     else:

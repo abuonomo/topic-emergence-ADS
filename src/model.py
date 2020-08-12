@@ -238,7 +238,6 @@ class VizPrepper:
         return weighted_df
 
     def get_topic_weight_ts(self, weighted_df, year_min, year_max):
-
         def get_year_weights(year_df):
             paper_ids = year_df.paper_id
             year_weights = weighted_df.loc[paper_ids, :].values.copy()
@@ -262,38 +261,42 @@ class VizPrepper:
         total_nasa_affil_weights = weighted_df.loc[ninds].values.sum(axis=0)
         return total_nasa_affil_weights
 
-    def get_time_characteristics(self, year_min, year_max):
+    def get_time_characteristics(
+        self, year_min, year_max, count_strategy="argmax", threshold=0
+    ):
         """
         Calculate topics' time series and their characteristics within the given years.
 
         Args:
             year_min: the minimum year to include in the calculations
             year_max: the maximum year to include in the calculations
+            count_strategy: how to count a documents contribution to a topic
+            threshold: the threshold to use for the threshold count strategy
 
         Returns:
             ts_df: The time series for all of the topics
             features_df: The time series characteristics for all of the topics
         """
-        weighted_df = self.get_doc_topic_weights(threshold=0, count_strategy="argmax")
-        yearly_weighted_counts = self.get_topic_weight_ts(weighted_df, year_min, year_max)
-        nasa_affil_weights = self.get_nasa_affil_weights(weighted_df, year_min, year_max)
+        weighted_df = self.get_doc_topic_weights(threshold, count_strategy)
+        yearly_weighted_counts = self.get_topic_weight_ts(
+            weighted_df, year_min, year_max
+        )
+        nasa_affil_weights = self.get_nasa_affil_weights(
+            weighted_df, year_min, year_max
+        )
         ratio_nasa_affiliation = nasa_affil_weights / yearly_weighted_counts.sum(axis=0)
-        ts_df = weighted_df.T
+        ts_df = yearly_weighted_counts.T
         ywc_long = (
-            yearly_weighted_counts
-            .stack()
+            yearly_weighted_counts.stack()
             .reset_index()
             .rename(columns={"level_1": "topic", 0: "count"})
         )
-        features_df = extract_features(
-            ywc_long, column_id="topic", column_sort="year"
-        )
+        features_df = extract_features(ywc_long, column_id="topic", column_sort="year")
         cols = [c.split("count__")[1] for c in features_df.columns]
         features_df.columns = cols
         features_df["coherence_score"] = self.topic_coherences
         features_df["CAGR"] = ts_df.apply(self.cagr, axis=1)
         features_df["nasa_affiliation"] = ratio_nasa_affiliation
-        import ipdb; ipdb.set_trace()
 
         return ts_df, features_df
 
@@ -313,7 +316,6 @@ class VizPrepper:
         dtw_df = dtw_kwds(ts_df)
         visualizer = yellow_plot_kmd(dtw_df)
         n_clusters = visualizer.elbow_value_
-        import ipdb; ipdb.set_trace()
         kmeans = dtw_to_tboard(dtw_df, c=n_clusters)
         dtw_man = dtw_to_manifold(dtw_df)
         return kmeans, dtw_man

@@ -26,3 +26,5 @@ topic_model:
 time_series:
   year_min: 1997
   year_max: 2010
+  count_strategy: "weight"
+  threshold: 0 # This value only matters for count_strategy="threshold"

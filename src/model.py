@@ -221,9 +221,6 @@ class VizPrepper:
         # tf = self.embedding_df.loc[:, topic] >= min_topic_prob_thresh
         # function to include options with argmax as well?
         # tmp_paper_df.loc[tf, 'topic'] = topic
-        import ipdb
-
-        ipdb.set_trace()
         tmp_paper_df.loc[tmp_paper_df.index[tf], "topic"] = topic
         ids_in_topic = self.embedding_df.index[tf].tolist()
         year_counts = (
@@ -244,19 +241,51 @@ class VizPrepper:
         ]
         return tmp_paper_df, topic_time_series
 
-    def get_topic_weight_ts(self, year_min, year_max):
+    def get_doc_topic_weights(self, threshold=0, count_strategy="weight"):
+        valid_strats = ["weight", "threshold", "argmax"]
+        if count_strategy not in valid_strats:
+            raise ValueError(f"count_strategy must be on of {valid_strats}.")
+        if count_strategy == "weight":
+            yv = self.embedding_df.values.copy()
+        elif count_strategy == "threshold":
+            yv = self.embedding_df.values.copy()
+            yv[yv < threshold] = 0  # No contribution for anything under threshold
+            yv[yv >= threshold] = 1
+        elif count_strategy == "argmax":
+            yv = np.zeros(self.embedding_df.shape)
+            ix = np.arange(self.embedding_df.shape[0])
+            iy = self.embedding_df.values.argmax(axis=1)
+            yv[ix, iy] = 1
+        else:
+            raise ValueError(f"count_strategy must be on of {valid_strats}.")
+        weighted_df = pd.DataFrame(yv)
+        weighted_df.index = self.embedding_df.index
+        return weighted_df
 
-        def f(x):
-            xl = list(x)
-            yv = self.embedding_df.loc[xl, :].values
-            weight_count = yv.sum(axis=0)
-            return weight_count.tolist()
+    def get_topic_weight_ts(self, weighted_df, year_min, year_max):
 
-        topic_counts = self.paper_df.loc[
-            (self.paper_df["year"] >= year_min) & (self.paper_df["year"] <= year_max)
-        ].groupby("year").agg({"paper_id": f})
-        import ipdb; ipdb.set_trace()
+        def get_year_weights(year_df):
+            paper_ids = year_df.paper_id
+            year_weights = weighted_df.loc[paper_ids, :].values.copy()
+            count = year_weights.sum(axis=0)
+            return pd.Series(count)
+
+        min_filt = self.paper_df["year"] >= year_min
+        max_filt = self.paper_df["year"] <= year_max
+        topic_counts = (
+            self.paper_df.loc[min_filt & max_filt]
+            .groupby("year")
+            .apply(get_year_weights)
+        )
         return topic_counts
+
+    def get_nasa_affil_weights(self, weighted_df, year_min, year_max):
+        lpdf = self.paper_df.loc[
+            (self.paper_df["year"] >= year_min) & (self.paper_df["year"] <= year_max)
+        ]
+        ninds = lpdf.loc[lpdf["nasa_affiliation"]].paper_id.tolist()
+        total_nasa_affil_weights = weighted_df.loc[ninds].values.sum(axis=0)
+        return total_nasa_affil_weights
 
     def get_time_characteristics(self, year_min, year_max):
         """
@@ -270,34 +299,26 @@ class VizPrepper:
             ts_df: The time series for all of the topics
             features_df: The time series characteristics for all of the topics
         """
-        all_time_series = []
-        tmp_paper_df = self.paper_df.copy()
-        tmp_paper_df["topic"] = -1
-        self.get_topic_weight_ts(year_min, year_max)
-        for topic in tqdm(self.embedding_df.columns):
-            tmp_paper_df, topic_time_series = self.get_topic_ts(
-                tmp_paper_df, topic, year_min, year_max
-            )
-            all_time_series = all_time_series + topic_time_series
-        import ipdb
+        weighted_df = self.get_doc_topic_weights(threshold=0, count_strategy="argmax")
+        yearly_weighted_counts = self.get_topic_weight_ts(weighted_df, year_min, year_max)
+        nasa_affil_weights = self.get_nasa_affil_weights(weighted_df, year_min, year_max)
+        ratio_nasa_affiliation = nasa_affil_weights / yearly_weighted_counts.sum(axis=0)
 
-        ipdb.set_trace()
-        if tmp_paper_df.topic.min() == -1:
-            raise ValueError("All papers must have an associated topic.")
-        ratio_nasa_affiliation = tmp_paper_df.groupby("topic").agg(
-            {"nasa_affiliation": "mean"}
+        ywc_long = (
+            yearly_weighted_counts
+            .stack()
+            .reset_index()
+            .rename(columns={"level_1": "topic", 0: "count"})
         )
-        ts_df_long = pd.DataFrame(all_time_series)
-        ts_df = ts_df_long.pivot(index="topic", columns="year", values="count")
-
         features_df = extract_features(
-            ts_df_long, column_id="topic", column_sort="year"
+            ywc_long, column_id="topic", column_sort="year"
         )
         cols = [c.split("count__")[1] for c in features_df.columns]
         features_df.columns = cols
         features_df["coherence_score"] = self.topic_coherences
-        features_df["CAGR"] = ts_df.apply(self.cagr, axis=1)
+        features_df["CAGR"] = weighted_df.apply(self.cagr, axis=0)
         features_df["nasa_affiliation"] = ratio_nasa_affiliation
+        import ipdb; ipdb.set_trace()
 
         return ts_df, features_df
 

@@ -216,31 +216,6 @@ class VizPrepper:
             period = max(ys) - min(ys)
             return (x[-1] / x[0]) ** (1 / period) - 1
 
-    def get_topic_ts(self, tmp_paper_df, topic, year_min, year_max):
-        tf = self.embedding_df.values.argmax(axis=1) == topic
-        # tf = self.embedding_df.loc[:, topic] >= min_topic_prob_thresh
-        # function to include options with argmax as well?
-        # tmp_paper_df.loc[tf, 'topic'] = topic
-        tmp_paper_df.loc[tmp_paper_df.index[tf], "topic"] = topic
-        ids_in_topic = self.embedding_df.index[tf].tolist()
-        year_counts = (
-            self.paper_df.loc[
-                (self.paper_df["paper_id"].isin(ids_in_topic))
-                & (self.paper_df["year"] >= year_min)
-                & (self.paper_df["year"] <= year_max)
-            ]
-            .groupby("year")
-            .count()["paper_id"]
-        )
-        year_counts_df = year_counts.reset_index()
-        year_counts = year_counts_df.to_records()
-        ycd = defaultdict(int, {y: c for _, y, c in year_counts})
-        topic_time_series = [
-            {"topic": topic, "year": y, "count": ycd[y]}
-            for y in range(year_min, year_max + 1)
-        ]
-        return tmp_paper_df, topic_time_series
-
     def get_doc_topic_weights(self, threshold=0, count_strategy="weight"):
         valid_strats = ["weight", "threshold", "argmax"]
         if count_strategy not in valid_strats:
@@ -303,7 +278,7 @@ class VizPrepper:
         yearly_weighted_counts = self.get_topic_weight_ts(weighted_df, year_min, year_max)
         nasa_affil_weights = self.get_nasa_affil_weights(weighted_df, year_min, year_max)
         ratio_nasa_affiliation = nasa_affil_weights / yearly_weighted_counts.sum(axis=0)
-
+        ts_df = weighted_df.T
         ywc_long = (
             yearly_weighted_counts
             .stack()
@@ -316,7 +291,7 @@ class VizPrepper:
         cols = [c.split("count__")[1] for c in features_df.columns]
         features_df.columns = cols
         features_df["coherence_score"] = self.topic_coherences
-        features_df["CAGR"] = weighted_df.apply(self.cagr, axis=0)
+        features_df["CAGR"] = ts_df.apply(self.cagr, axis=1)
         features_df["nasa_affiliation"] = ratio_nasa_affiliation
         import ipdb; ipdb.set_trace()
 
@@ -338,6 +313,7 @@ class VizPrepper:
         dtw_df = dtw_kwds(ts_df)
         visualizer = yellow_plot_kmd(dtw_df)
         n_clusters = visualizer.elbow_value_
+        import ipdb; ipdb.set_trace()
         kmeans = dtw_to_tboard(dtw_df, c=n_clusters)
         dtw_man = dtw_to_manifold(dtw_df)
         return kmeans, dtw_man

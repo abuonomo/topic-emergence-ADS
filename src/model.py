@@ -216,6 +216,48 @@ class VizPrepper:
             period = max(ys) - min(ys)
             return (x[-1] / x[0]) ** (1 / period) - 1
 
+    def get_topic_ts(self, tmp_paper_df, topic, year_min, year_max):
+        tf = self.embedding_df.values.argmax(axis=1) == topic
+        # tf = self.embedding_df.loc[:, topic] >= min_topic_prob_thresh
+        # function to include options with argmax as well?
+        # tmp_paper_df.loc[tf, 'topic'] = topic
+        import ipdb
+
+        ipdb.set_trace()
+        tmp_paper_df.loc[tmp_paper_df.index[tf], "topic"] = topic
+        ids_in_topic = self.embedding_df.index[tf].tolist()
+        year_counts = (
+            self.paper_df.loc[
+                (self.paper_df["paper_id"].isin(ids_in_topic))
+                & (self.paper_df["year"] >= year_min)
+                & (self.paper_df["year"] <= year_max)
+            ]
+            .groupby("year")
+            .count()["paper_id"]
+        )
+        year_counts_df = year_counts.reset_index()
+        year_counts = year_counts_df.to_records()
+        ycd = defaultdict(int, {y: c for _, y, c in year_counts})
+        topic_time_series = [
+            {"topic": topic, "year": y, "count": ycd[y]}
+            for y in range(year_min, year_max + 1)
+        ]
+        return tmp_paper_df, topic_time_series
+
+    def get_topic_weight_ts(self, year_min, year_max):
+
+        def f(x):
+            xl = list(x)
+            yv = self.embedding_df.loc[xl, :].values
+            weight_count = yv.sum(axis=0)
+            return weight_count.tolist()
+
+        topic_counts = self.paper_df.loc[
+            (self.paper_df["year"] >= year_min) & (self.paper_df["year"] <= year_max)
+        ].groupby("year").agg({"paper_id": f})
+        import ipdb; ipdb.set_trace()
+        return topic_counts
+
     def get_time_characteristics(self, year_min, year_max):
         """
         Calculate topics' time series and their characteristics within the given years.
@@ -231,31 +273,15 @@ class VizPrepper:
         all_time_series = []
         tmp_paper_df = self.paper_df.copy()
         tmp_paper_df["topic"] = -1
+        self.get_topic_weight_ts(year_min, year_max)
         for topic in tqdm(self.embedding_df.columns):
-            tf = self.embedding_df.values.argmax(axis=1) == topic
-            # tf = self.embedding_df.loc[:, topic] >= min_topic_prob_thresh
-            # function to include options with argmax as well?
-            # tmp_paper_df.loc[tf, 'topic'] = topic
-            tmp_paper_df.loc[tmp_paper_df.index[tf], "topic"] = topic
-            ids_in_topic = self.embedding_df.index[tf].tolist()
-            year_counts = (
-                self.paper_df.loc[
-                    (self.paper_df["paper_id"].isin(ids_in_topic))
-                    & (self.paper_df["year"] >= year_min)
-                    & (self.paper_df["year"] <= year_max)
-                ]
-                .groupby("year")
-                .count()["paper_id"]
+            tmp_paper_df, topic_time_series = self.get_topic_ts(
+                tmp_paper_df, topic, year_min, year_max
             )
-            year_counts_df = year_counts.reset_index()
-            year_counts = year_counts_df.to_records()
-            ycd = defaultdict(int, {y: c for _, y, c in year_counts})
-            topic_time_series = [
-                {"topic": topic, "year": y, "count": ycd[y]}
-                for y in range(year_min, year_max + 1)
-            ]
             all_time_series = all_time_series + topic_time_series
+        import ipdb
 
+        ipdb.set_trace()
         if tmp_paper_df.topic.min() == -1:
             raise ValueError("All papers must have an associated topic.")
         ratio_nasa_affiliation = tmp_paper_df.groupby("topic").agg(

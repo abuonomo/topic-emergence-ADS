@@ -50,6 +50,7 @@ app.config.update(
     N_DF=None,
     KWD_N_DF=None,
     TOPIC_YEARS_DF=None,
+    TOPIC_TOP_DOCS=None,
     LOAD_COLS=[
         "stem",
         "count",
@@ -102,6 +103,11 @@ def init():
     app.config["SC_DF"]["scaled_counts"] = scaler.fit_transform(
         log_count.values.reshape(-1, 1)
     )
+
+    with h5py.File(app.config['VIZ_DATA_LOC'], 'r') as f0:
+        embedding = f0["embedding"][:]
+    app.config["TOPIC_TOP_DOCS"] = (-embedding).argsort(axis=0)[0:20, :]
+
     LOG.info(f"Ready")
 
 
@@ -125,11 +131,17 @@ def lda():
     return jsonify(app.config["PYLDAVIS_DATA"])
 
 
-def load_topic_distributions(loc: os.PathLike, t: int):
+def load_topic_distributions(loc: os.PathLike, t: int, limit=True):
     with h5py.File(loc, "r") as f0:
-        mask = f0["topic_maxes"][:] == t
-        v = f0["embedding"][mask, t]
-        b = f0["bibcodes"][mask]
+        if limit is True:
+            topic_top_inds = app.config['TOPIC_TOP_DOCS'][:, t]
+            topic_top_inds.sort()
+            v = f0["embedding"][topic_top_inds, t]
+            b = f0["bibcodes"][topic_top_inds]
+        else:
+            mask = f0["topic_maxes"][:] == t
+            v = f0["embedding"][mask, t]
+            b = f0["bibcodes"][mask]
 
     tmp_df = pd.DataFrame(v)
     tmp_df.index = b
@@ -143,12 +155,12 @@ def topic_bibcodes():
     in_data = request.json
     topic = int(in_data["topic"])  # Frontend index starts at 1, here starts at 0
     limit = int(in_data["limit"])
-    topic_df = load_topic_distributions(app.config["VIZ_DATA_LOC"], topic)
-    topic_df = topic_df.sort_values('prob', ascending=False)
     if limit == 0:
-        records = topic_df.to_dict(orient="records")
+        topic_df = load_topic_distributions(app.config["VIZ_DATA_LOC"], topic, limit=False)
     else:
-        records = topic_df.to_dict(orient="records")[0:limit]
+        topic_df = load_topic_distributions(app.config["VIZ_DATA_LOC"], topic, limit=True)
+    topic_df = topic_df.sort_values('prob', ascending=False)
+    records = topic_df.to_dict(orient="records")
     return jsonify(records)
 
 

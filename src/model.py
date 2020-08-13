@@ -595,6 +595,8 @@ def get_time_chars(viz_data_dir, config_loc):
     keep_years = list(range(year_min, year_max + 1))
     kwd_ts_df = vp.kwd_ts_df.filter(keep_years)
 
+    topic_top_docs = (-vp.embedding_df).values.argsort(axis=0)[0:20, :]
+
     kmeans, dtw_man = vp.get_dynamic_time_warp_clusters(ts_df)
     chars_df["kmeans_cluster"] = kmeans.labels_
     chars_df["manifold_x"] = dtw_man[:, 0]
@@ -611,6 +613,9 @@ def get_time_chars(viz_data_dir, config_loc):
 
     out_kwd_ts_loc = viz_data_dir / "kwd_years.csv"
     kwd_ts_df.to_csv(out_kwd_ts_loc)
+
+    out_topic_top_docs = viz_data_dir / "topic_top_docs.csv"
+    np.savetxt(out_topic_top_docs, topic_top_docs)
 
 
 if __name__ == "__main__":

@@ -36,8 +36,7 @@ except KeyError:
 ADS_TOKEN = os.environ["ADS_TOKEN"]
 
 app.config.update(
-    # PARAM_CONFIG_LOC=DATA_DIR / "config.yaml",
-    # PARAM_CONFIG_LOC=DATA_DIR / "config.yaml",
+    # TODO: link these paths to model.py paths so that I only name them once
     VIZ_DATA_LOC=DATA_DIR / "viz_data.hdf5",
     VP=None,
     SC_LOC=DATA_DIR / f"time_series_characteristics.csv",
@@ -45,6 +44,7 @@ app.config.update(
     KWD_N_DF_LOC=DATA_DIR / "kwd_years.csv",
     TOPIC_YEARS_LOC=DATA_DIR / "topic_years.csv",
     PYLDAVIS_DATA_LOC=DATA_DIR / "pyLDAvis_data.json",
+    TOPIC_TOP_DOCS_LOC=DATA_DIR / "topic_top_docs.csv",
     PYLDAVIS_DATA=None,
     SC_DF=None,
     N_DF=None,
@@ -104,9 +104,7 @@ def init():
         log_count.values.reshape(-1, 1)
     )
 
-    with h5py.File(app.config['VIZ_DATA_LOC'], 'r') as f0:
-        embedding = f0["embedding"][:]
-    app.config["TOPIC_TOP_DOCS"] = (-embedding).argsort(axis=0)[0:20, :]
+    app.config['TOPIC_TOP_DOCS'] = np.loadtxt(app.config['TOPIC_TOP_DOCS_LOC'])
 
     LOG.info(f"Ready")
 

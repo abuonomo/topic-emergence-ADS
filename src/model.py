@@ -248,12 +248,13 @@ class VizPrepper:
 
         min_filt = self.paper_df["year"] >= year_min
         max_filt = self.paper_df["year"] <= year_max
+        lim_paper_df = self.paper_df.loc[min_filt & max_filt]
         topic_counts = (
-            self.paper_df.loc[min_filt & max_filt]
+            lim_paper_df
             .groupby("year")
             .apply(get_year_weights)
         )
-        return topic_counts
+        return topic_counts, lim_paper_df.paper_id.values
 
     def get_nasa_affil_weights(self, weighted_df, year_min, year_max):
         lpdf = self.paper_df.loc[
@@ -280,7 +281,8 @@ class VizPrepper:
             features_df: The time series characteristics for all of the topics
         """
         weighted_df = self.get_doc_topic_weights(threshold, count_strategy)
-        yearly_weighted_counts = self.get_topic_weight_ts(
+        import ipdb; ipdb.set_trace()
+        yearly_weighted_counts, in_year_index = self.get_topic_weight_ts(
             weighted_df, year_min, year_max
         )
         nasa_affil_weights = self.get_nasa_affil_weights(
@@ -299,6 +301,8 @@ class VizPrepper:
         features_df["coherence_score"] = self.topic_coherences
         features_df["CAGR"] = ts_df.apply(self.cagr, axis=1)
         features_df["nasa_affiliation"] = ratio_nasa_affiliation
+        contributing_docs = weighted_df.reindex(in_year_index) > 0
+        features_df["contributing_papers_count"] = contributing_docs.sum(axis=0).values
 
         return ts_df, features_df
 

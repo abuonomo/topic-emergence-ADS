@@ -217,7 +217,7 @@ class VizPrepper:
             return (x[-1] / x[0]) ** (1 / period) - 1
 
     def get_doc_topic_weights(self, threshold=0, count_strategy="weight"):
-        valid_strats = ["weight", "threshold", "argmax"]
+        valid_strats = ["weight", "threshold", "weight+threshold", "argmax"]
         if count_strategy not in valid_strats:
             raise ValueError(f"count_strategy must be on of {valid_strats}.")
         if count_strategy == "weight":
@@ -226,6 +226,9 @@ class VizPrepper:
             yv = self.embedding_df.values.copy()
             yv[yv < threshold] = 0  # No contribution for anything under threshold
             yv[yv >= threshold] = 1
+        elif count_strategy == "weight+threshold":
+            yv = self.embedding_df.values.copy()
+            yv[yv < threshold] = 0  # No contribution for anything under threshold
         elif count_strategy == "argmax":
             yv = np.zeros(self.embedding_df.shape)
             ix = np.arange(self.embedding_df.shape[0])

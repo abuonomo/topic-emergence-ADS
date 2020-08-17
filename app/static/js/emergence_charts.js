@@ -162,6 +162,7 @@ function scatterChart() {
 
   var xScale = d3.scaleLinear();
   var yScale = d3.scaleLinear();
+  var sizeScale = d3.scaleSymlog();
   var xAxis;
   var yAxis;
 
@@ -172,6 +173,7 @@ function scatterChart() {
   var scatter;
   var xExtent;
   var yExtent;
+  var sizeExtent;
   var idleTimeout;
   var idleDelay = 350;
   var timeSvg;
@@ -234,15 +236,18 @@ function scatterChart() {
 
       xScale.range([0, width]);
       yScale.range([height, 0]);
+      sizeScale.range([3, 10]);
       xAxis = d3.axisBottom(xScale).ticks(12);
       yAxis = d3.axisLeft(yScale).ticks(12 * height / width);
 
       // data dependent
       xExtent = d3.extent(data, function (d) { return d[xName]; });
       yExtent = d3.extent(data, function (d) { return d[yName]; });
+      sizeExtent = d3.extent(data, function (d) { return d[sizeName]; });
 
       xScale.domain(xExtent).nice();
       yScale.domain(yExtent).nice();
+      sizeScale.domain(sizeExtent);
 
       scatter.selectAll(".dot")
       .data(data)
@@ -252,7 +257,7 @@ function scatterChart() {
       .attr("clip-path", "url(#clip)")
       .call(tooltip())
       .on("click", onClick)
-      .attr("r", function (d) { return d[sizeVal]; })
+      .attr("r", function (d) { return sizeScale(d[sizeName]); })
       .attr("cx", function (d) { return xScale(d[xName]); })
       .attr("cy", function (d) { return yScale(d[yName]); })
       .attr("opacity", 0.5)
@@ -362,7 +367,8 @@ function scatterChart() {
         var line1 = '<p><strong>' + kwd + '</strong></p>';
         var line2 = `<p>${xName}: ` + pD[xName].toFixed(2) + '</p>';
         var line3 = `<p>${yName}: ` + pD[yName].toFixed(2) + '</p>';
-        var line4 = `<p>count: ` + pD[sizeName] + '</p>';
+        var line3 = `<p>${sizeName}: ` + pD[sizeName].toFixed(2) + '</p>';
+        var line4 = `<p>count: ` + pD[sizeName].toFixed(2) + '</p>';
         var line5 = `<p>cluster: ` + pD[colorName] + '</p>';
 
 

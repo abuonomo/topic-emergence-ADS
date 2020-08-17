@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+from math import ceil, floor
 from pathlib import Path
 
 import h5py
@@ -173,7 +174,7 @@ def keyword_distribs():
 def get_scatter_data():
     in_data = request.json
     LOG.info(f"Getting scatter data for {in_data}.")
-    cols = list(set(app.config["LOAD_COLS"] + [in_data["x"], in_data["y"]]))
+    cols = list(set(app.config["LOAD_COLS"] + [in_data["x"], in_data["y"], in_data['size']]))
     not_in_cols = [c for c in cols if c not in app.config["SC_DF"].columns]
     if len(not_in_cols) > 0:
         raise ValueError("All LOAD_COLS must be in SC_DF")
@@ -214,8 +215,8 @@ def get_count_range():
 @app.route("/get-score-range", methods=["GET"])
 def get_score_range():
     d = {
-        "score_min": int(app.config["SC_DF"]["score_mean"].min()),
-        "score_max": int(app.config["SC_DF"]["score_mean"].max()),
+        "score_min": floor(app.config["SC_DF"]["score_mean"].min()),
+        "score_max": ceil(app.config["SC_DF"]["score_mean"].max()),
     }
     return jsonify(d)
 

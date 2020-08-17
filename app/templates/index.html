@@ -61,9 +61,13 @@
                   <td><select id="selectButtonY" class="selector"></select></td>
               </tr>
               <tr>
-                  <td>x scale</td>
-                  <td><select id="selectButtonXScale" class="selector"></select></td>
+                  <td>size</td>
+                  <td><select id="selectButtonSize" class="selector"></select></td>
               </tr>
+{#              <tr>#}
+{#                  <td>x scale</td>#}
+{#                  <td><select id="selectButtonXScale" class="selector"></select></td>#}
+{#              </tr>#}
               <tr>
                   <td>min count</td>
                   <td>
@@ -234,7 +238,7 @@
       d3.json(window.location.pathname + "get-scatter-data", {
             method:"POST",
             body: JSON.stringify({
-              x: 'nasa_affiliation', y: 'CAGR', min_count: min_count, minRake: minRake
+              x: 'nasa_affiliation', y: 'CAGR', size: "count", min_count: min_count, minRake: minRake
             }),
             headers: {
               "Content-type": "application/json; charset=UTF-8"
@@ -269,6 +273,16 @@
 
             d3.select('#selectButtonY').property('value', 'CAGR');
 
+            d3.select("#selectButtonSize")
+            .selectAll('myOptions')
+            .data(options)
+            .enter()
+            .append('option')
+            .text(function (d) { return d; }) // text showed in the menu
+            .attr("value", function (d) { return d; }); // corresponding value returned by the button
+
+            d3.select('#selectButtonSize').property('value', 'count');
+
             d3.select("#selectButtonXScale")
             .selectAll('myOptions')
             .data(['linear', '^0.1'])
@@ -281,16 +295,18 @@
               // recover the option that has been chosen
               var selectedX = d3.select("#selectButtonX").property("value");
               var selectedY = d3.select("#selectButtonY").property("value");
+              var selectedSize = d3.select("#selectButtonSize").property("value");
               var min_count = sliderSimple.value();
               var minRake = sliderScore.value();
-              var selectedXScale = d3.select("#selectButtonXScale").property("value");
+              {#var selectedXScale = d3.select("#selectButtonXScale").property("value");#}
+              var selectedXScale = "linear"
               if (selectedXScale === '^0.1') {
                 var xScale = d3.scalePow().exponent(0.1)
               }
               else {
                 var xScale = d3.scaleLinear()
               }
-              return scatterRequestPlot(d, selectedX, selectedY, min_count, minRake, xScale);
+              return scatterRequestPlot(d, selectedX, selectedY, selectedSize, min_count, minRake, xScale);
               }
             )}
         );
@@ -312,12 +328,12 @@
         }
       });
 
-      function scatterRequestPlot(d, selectedX, selectedY, min_count=-999, minRake=-999, xScale=d3.scaleLinear()) {
+      function scatterRequestPlot(d, selectedX, selectedY, selectedSize="count", min_count=-999, minRake=-999, xScale=d3.scaleLinear()) {
         scatterSvg.selectAll('*').remove();
         d3.json(window.location.pathname + "get-scatter-data", {
           method:"POST",
           body: JSON.stringify({
-            x: selectedX, y: selectedY, min_count: min_count, minRake: minRake
+            x: selectedX, y: selectedY, size: selectedSize, min_count: min_count, minRake: minRake
           }),
           headers: {
             "Content-type": "application/json; charset=UTF-8"
@@ -326,7 +342,11 @@
         .then(function(data) {
           scatterSvg
           .datum(data)
-          .call(chart0.xName(selectedX).yName(selectedY).xScale(xScale));
+          .call(chart0.xName(selectedX)
+                .yName(selectedY)
+                .xScale(xScale)
+                .sizeName(selectedSize)
+          );
         });
       }
 

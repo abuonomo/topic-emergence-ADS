@@ -281,7 +281,6 @@ class VizPrepper:
             features_df: The time series characteristics for all of the topics
         """
         weighted_df = self.get_doc_topic_weights(threshold, count_strategy)
-        import ipdb; ipdb.set_trace()
         yearly_weighted_counts, in_year_index = self.get_topic_weight_ts(
             weighted_df, year_min, year_max
         )

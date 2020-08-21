@@ -108,7 +108,6 @@ def init():
 
     app.config['TOPIC_TOP_DOCS'] = np.loadtxt(app.config['TOPIC_TOP_DOCS_LOC'])
     for p in app.config['INF_DIR'].iterdir():
-        import ipdb; ipdb.set_trace()
         try:
             app.config['SC_DF'][p.stem] = pd.read_csv(p, index_col=0)
         except Exception as e:

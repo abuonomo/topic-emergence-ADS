@@ -2,4 +2,5 @@ venv/*
 .idea/*
 data/*
 !data/.gitkeep
+!data/inferences/.gitkeep
 __pycache__/*

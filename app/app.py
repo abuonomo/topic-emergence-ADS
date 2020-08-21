@@ -38,6 +38,7 @@ ADS_TOKEN = os.environ["ADS_TOKEN"]
 
 app.config.update(
     # TODO: link these paths to model.py paths so that I only name them once
+    INF_DIR=DATA_DIR / "inferences",
     VIZ_DATA_LOC=DATA_DIR / "viz_data.hdf5",
     VP=None,
     SC_LOC=DATA_DIR / f"time_series_characteristics.csv",
@@ -106,12 +107,12 @@ def init():
     )
 
     app.config['TOPIC_TOP_DOCS'] = np.loadtxt(app.config['TOPIC_TOP_DOCS_LOC'])
-    for p in DATA_DIR.iterdir():
-        if p.stem[0:5] == "extra":
-            try:
-                app.config['SC_DF'][p.stem] = pd.read_csv(p, index_col=0)
-            except Exception as e:
-                LOG.warning(f'Did not load {p} because of {e}.')
+    for p in app.config['INF_DIR'].iterdir():
+        import ipdb; ipdb.set_trace()
+        try:
+            app.config['SC_DF'][p.stem] = pd.read_csv(p, index_col=0)
+        except Exception as e:
+            LOG.warning(f'Did not load {p} because of {e}.')
 
     LOG.info(f"Ready")
 

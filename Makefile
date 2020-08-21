@@ -40,6 +40,7 @@ data_dir=data/$(EXPERIMENT_NAME)
 model_dir=models/$(EXPERIMENT_NAME)
 reports_dir=reports/$(EXPERIMENT_NAME)
 viz_dir=reports/viz/$(EXPERIMENT_NAME)
+inf_dir=models/$(EXPERIMENT_NAME)/inferences
 
 records_loc=$(data_dir)/kwds.jsonl
 db_loc=$(data_dir)/ads_metadata.sqlite
@@ -229,10 +230,11 @@ sync-astro2010-whitepapers-from-s3:
 	aws s3 sync "s3://datasquad-low/home/DataSquad/topic-emergence-ADS/Astro 2010 Whitepapers/" data/astro2010_whitepapers
 
 get-inference-from-dir:
+	mkdir $(inf_dir); \
 	python src/get_paper_topic_distribs.py \
 		--lda_model $(lda_models_dir)/topic_model$(N_TOPICS) \
 		--dir_of_txts data/astro2010_whitepapers \
-		--output_embedding_csv $(data_dir)/astro2010_topic_distributions.csv
+		--output_embedding_csv $(inf_dir)/astro2010_topic_distributions.csv
 
 export-keywords:
 	python src/exports.py keywords \

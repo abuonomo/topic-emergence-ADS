@@ -236,7 +236,7 @@ get-inference-from-dir:
 	mkdir $(tinf_dir); \
 	python src/get_paper_topic_distribs.py \
 		--lda_model $(lda_models_dir)/topic_model$(N_TOPICS) \
-		--dir_of_txts data/astro2010_whitepapers \
+		--dir_of_txts data/astro2010_whitepapers/text \
 		--output_embedding_csv $(tinf_dir)/astro2010_topic_distributions.csv
 
 export-keywords:

@@ -138,7 +138,7 @@ $(records_loc): $(raw_files)
 ## Link experiment data to app directory
 link-data-to-app:
 	ln -f $(lda_model_viz_data_dir)/* app/data
-	ln -f $(inf_dir)/* app/data/inferences
+	ln -f $(tinf_dir)/* app/data/inferences
 	ln -f $(PARAM_YAML) app/templates/config.yaml
 
 ## sync experiment viz data to s3

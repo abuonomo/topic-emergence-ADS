@@ -107,11 +107,12 @@ def init():
     )
 
     app.config['TOPIC_TOP_DOCS'] = np.loadtxt(app.config['TOPIC_TOP_DOCS_LOC'])
-    for p in app.config['INF_DIR'].iterdir():
-        try:
-            app.config['SC_DF'][p.stem] = pd.read_csv(p, index_col=0)
-        except Exception as e:
-            LOG.warning(f'Did not load {p} because of {e}.')
+    if app.config['INF_DIR'].exists():
+        for p in app.config['INF_DIR'].iterdir():
+            try:
+                app.config['SC_DF'][p.stem] = pd.read_csv(p, index_col=0)
+            except Exception as e:
+                LOG.warning(f'Did not load {p} because of {e}.')
 
     LOG.info(f"Ready")
 

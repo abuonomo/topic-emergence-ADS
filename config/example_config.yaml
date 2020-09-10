@@ -24,7 +24,7 @@ topic_model:
     chunksize: 5000
     eval_every: 1
 time_series:
-  year_min: 1997
-  year_max: 2010
+  year_min: 2010
+  year_max: 2019
   count_strategy: "threshold"
   threshold: 0.05 # This value only matters when count_strategy is "threshold" or "weight+threshold"

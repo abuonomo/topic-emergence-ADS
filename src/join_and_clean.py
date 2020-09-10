@@ -61,6 +61,13 @@ def load_records_to_dataframe(
     return df
 
 
+def has_intersect(x, y):
+    if type(y) is not float:
+        return len(set(x).intersection(set(y))) > 0
+    else:
+        return False
+
+
 def main(
     in_records_dir,
     out_records,
@@ -78,8 +85,7 @@ def main(
         subset=["abstract", "year", "nasa_afil", "title", "bibcode", "bibstem"]
     )
     if database_whitelist is not None:
-        f = lambda x, y: len(set(x).intersection(set(y))) > 0
-        df = df[df["database"].apply(lambda x: f(database_whitelist, x))]
+        df = df[df["database"].apply(lambda x: has_intersect(database_whitelist, x))]
         LOG.info(f"Limited to documents in databases: {database_whitelist}. {df.shape}")
     df = df[df["abstract"].apply(lambda x: len(x) >= min_text_len)]
     LOG.info(f"Limited to documents with length >= {min_text_len}. {df.shape}")

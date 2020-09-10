@@ -9,6 +9,8 @@ from pprint import pformat
 from pandarallel import pandarallel
 from tqdm import tqdm
 
+from lib import get_paper_nasa_status
+
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
@@ -71,7 +73,7 @@ def main(
     df = load_records_to_dataframe(
         in_records_dir, limit=record_limit, first_year=first_year
     )
-    import ipdb; ipdb.set_trace()
+    df['nasa_afil'] = df.apply(get_paper_nasa_status, axis=1)
     df = df.dropna(
         subset=["abstract", "year", "nasa_afil", "title", "bibcode", "bibstem"]
     )

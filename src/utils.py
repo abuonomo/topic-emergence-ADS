@@ -23,8 +23,8 @@ def load_topic_bibcode_h5py(infile: os.PathLike) -> pd.DataFrame:
     """
     with h5py.File(infile, "r") as f0:
         bibs = f0["bibcodes"][:]
-        vals = f0["topic_distribution"][:]
-        dind = f0["dist_to_doc_index"][:]
+        vals = f0["embedding"][:]
+        dind = f0["paper_ids"][:]
     df = pd.DataFrame(vals)
     df.insert(0, 'bibcode', bibs)
     df.index = dind

@@ -211,7 +211,7 @@ class PaperKeywordExtractor:
 
         norm_kwds_to_now = {}
         for doc, p in pbar:
-            lemma_text, kwds = self.extract_keyword_from_doc(doc)
+            lemma_text, kwds = extract_keyword_from_doc(doc)
             p.lemma_text = lemma_text
             for kwd, score, count in kwds:
                 if kwd not in norm_kwds_to_now:

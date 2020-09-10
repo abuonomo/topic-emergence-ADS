@@ -3,6 +3,7 @@
 
 import json
 import re
+from pandas import isnull
 
 NASA_grant_pattern = re.compile(r"NASA grant", re.IGNORECASE)
 
@@ -31,7 +32,7 @@ def is_nasa_pub(doc: dict) -> bool:
     # other afilliated NASA funded institutions?
 
     # get the afiliation list and see if ANY of the listed afilliations matches a NASA institution
-    if "afil_id" in doc:
+    if ("afil_id" in doc) and (not isnull(doc["afil_id"])):
         for afil in doc["aff_id"]:
             if afil in NASA_Afiliations:
                 return True
@@ -41,7 +42,7 @@ def is_nasa_pub(doc: dict) -> bool:
 
 def is_nasa_grant_acknowledgement(doc: dict) -> bool:
     # get the afiliation list and see if ANY of the listed afilliations matches a NASA institution
-    if "ack" in doc and NASA_grant_pattern.search(doc["ack"]):
+    if ("ack" in doc) and (not isnull(doc["ack"])) and (NASA_grant_pattern.search(doc["ack"])):
         return True
 
     return False

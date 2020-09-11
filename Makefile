@@ -23,6 +23,7 @@ EXPERIMENT_NAME=example_experiment
 
 N_TOPICS=500
 BATCH_SIZE=1000
+N_PROCESS=-1
 PARAM_YAML=config/example_config.yaml
 PORT=5000
 INFO="This is an example experiment."
@@ -100,7 +101,8 @@ $(records_loc): $(raw_files)
 2-get-keywords-from-texts:
 	python src/db.py get-keywords-from-texts --db_loc $(db_loc) \
 		--config_loc $(PARAM_YAML) \
-		--batch_size $(BATCH_SIZE)
+		--batch_size $(BATCH_SIZE) \
+		--n_process $(N_PROCESS)
 
 ## 3. Find missed keyword locations
 3-add-missed-locations:

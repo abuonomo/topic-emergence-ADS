@@ -714,6 +714,7 @@ def get_keywords_from_texts(db_loc, config_loc, batch_size=1000, n_process=-1):
         nlp = get_spacy_nlp(spacy_model_name)
         pm = PaperKeywordExtractor(nlp)
         pm.extract_all_keywords(session, batch_size=batch_size, n_process=n_process)
+        LOG.info("Commiting keywords to database.")
         session.commit()
         LOG.info(f"Added extracted keywords to papers.")
     except:

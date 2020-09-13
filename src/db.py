@@ -203,14 +203,15 @@ class PaperKeywordExtractor:
             batch_size: batch_size for spacy model pipe
             n_process: number of processes for spacy model pipe
         """
-        papers = session.query(Paper).all()
-        LOG.info(f"Extracting keywords from {len(papers)} documents.")
-        texts = (p.get_feature_text() for p in papers)
-        pipe = self.nlp.pipe(texts, batch_size=batch_size, n_process=n_process)
-        pbar = tqdm(zip(pipe, papers), total=len(papers))
+        paper_query = session.query(Paper)
+        nu_papers = paper_query.count()
+        LOG.info(f"Extracting keywords from {nu_papers} documents.")
+        texts = (p.get_feature_text() for p in paper_query)
+        pbar = tqdm(zip(texts, paper_query), total=nu_papers)
 
         norm_kwds_to_now = {}
-        for doc, p in pbar:
+        for i, (txt, p) in enumerate(pbar):
+            doc = self.nlp(txt)
             lemma_text, kwds = extract_keyword_from_doc(doc)
             p.lemma_text = lemma_text
             for kwd, score, count in kwds:
@@ -224,6 +225,10 @@ class PaperKeywordExtractor:
                     assoc = PaperKeywords(raw_keyword=kwd, score=score, count=count)
                     assoc.keyword = db_kwd
                     p.keywords.append(assoc)
+            if i % batch_size == 0:
+                pbar.set_description(f'Committing up to {i}...')
+                session.commit()
+                pbar.set_description(f'Committed up to {i}.')
 
     def get_new_paper_records(self, paper_dict, paper_kwds, pbar):
         """

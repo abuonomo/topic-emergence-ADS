@@ -367,12 +367,12 @@ function scatterChart() {
         var line1 = '<p><strong>' + kwd + '</strong></p>';
         var line2 = `<p>${xName}: ` + pD[xName].toFixed(2) + '</p>';
         var line3 = `<p>${yName}: ` + pD[yName].toFixed(2) + '</p>';
-        var line3 = `<p>${sizeName}: ` + pD[sizeName].toFixed(2) + '</p>';
-        var line4 = `<p>count: ` + pD[sizeName].toFixed(2) + '</p>';
-        var line5 = `<p>cluster: ` + pD[colorName] + '</p>';
+        var line4 = `<p>${sizeName}: ` + pD[sizeName].toFixed(2) + '</p>';
+        var line5 = `<p>count: ` + pD[sizeName].toFixed(2) + '</p>';
+        var line6 = `<p>cluster: ` + pD[colorName] + '</p>';
 
 
-        tooltipDiv.html(line1 + line2 + line3 + line4 + line5)
+        tooltipDiv.html(line1 + line2 + line3 + line4 + line5 + line6)
       })
       .on('mousemove.tooltip', function(pD, pI){
         // Move tooltip

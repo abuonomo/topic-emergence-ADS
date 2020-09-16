@@ -191,8 +191,8 @@ class VizPrepper:
     @staticmethod
     def cagr(x_row: pd.Series) -> float:
         """
-        Calculate Compound Annualized Interest Rate (CAGR). In cases of invalid CAGR
-        calulations, CAGR is set to 0 instead of nan or inf.
+        Calculate Compound Annualized Interest Rate (CAGR). First year is taken as the
+        first nonzero year.
 
         Args:
             x_row: a pandas series
@@ -200,7 +200,10 @@ class VizPrepper:
         Returns:
             the CAGR score
         """
-        x = x_row.values
+        if type(x_row) == pd.Series:
+            x = x_row.values
+        else:
+            x = x_row
         nz_inds = np.nonzero(x)[0]
         if len(nz_inds) == 0:  # If all are 0, set CAGR to nan
             return np.nan
@@ -212,9 +215,9 @@ class VizPrepper:
         if len(x) < 2:  # If no periods, set CAGR to nan
             return np.nan
         else:
-            ys = x_row.index
-            period = max(ys) - min(ys)
-            return (x[-1] / x[0]) ** (1 / period) - 1
+            # ys = x_row.index
+            # period = max(ys) - min(ys)
+            return (x[-1] / x[0]) ** (1 / len(x)) - 1
 
     def get_doc_topic_weights(self, threshold=0, count_strategy="weight"):
         valid_strats = ["weight", "threshold", "weight+threshold", "argmax"]
@@ -249,11 +252,7 @@ class VizPrepper:
         min_filt = self.paper_df["year"] >= year_min
         max_filt = self.paper_df["year"] <= year_max
         lim_paper_df = self.paper_df.loc[min_filt & max_filt]
-        topic_counts = (
-            lim_paper_df
-            .groupby("year")
-            .apply(get_year_weights)
-        )
+        topic_counts = lim_paper_df.groupby("year").apply(get_year_weights)
         return topic_counts, lim_paper_df.paper_id.values
 
     def get_nasa_affil_weights(self, weighted_df, year_min, year_max):
@@ -294,14 +293,22 @@ class VizPrepper:
             .reset_index()
             .rename(columns={"level_1": "topic", 0: "count"})
         )
+        roll2_df = ts_df.rolling(window=2, axis=1).mean()
         features_df = extract_features(ywc_long, column_id="topic", column_sort="year")
         cols = [c.split("count__")[1] for c in features_df.columns]
         features_df.columns = cols
         features_df["coherence_score"] = self.topic_coherences
         features_df["CAGR"] = ts_df.apply(self.cagr, axis=1)
+        features_df["CAGR_2_year_rolling_mean"] = roll2_df.apply(self.cagr, axis=1)
         features_df["nasa_affiliation"] = ratio_nasa_affiliation
         contributing_docs = weighted_df.reindex(in_year_index) > 0
         features_df["contributing_papers_count"] = contributing_docs.sum(axis=0).values
+        (
+            features_df["model_best_fit"],
+            _,
+            features_df["CAGR_model_best_fit"],
+            features_df["model_redchi"],
+        ) = self.get_best_fit_cagr(ts_df)
 
         return ts_df, features_df
 
@@ -324,6 +331,39 @@ class VizPrepper:
         kmeans = dtw_to_tboard(dtw_df, c=n_clusters)
         dtw_man = dtw_to_manifold(dtw_df)
         return kmeans, dtw_man
+
+    def get_best_fit_cagr(self, data):
+        from fitting_util import fit_leastsq, functions
+
+        best_fit = [["--", -1.0, -1.0, -1.0] for i in range(0, len(data))]
+        for topic in range(0, len(data)):
+
+            # data for topic
+            topic_data = data.loc[topic]
+            x = [int(i) - topic_data.index.min() for i in topic_data.index]
+            y = topic_data.values
+            y_err = [0.0 for i in range(0, len(y))]
+
+            # fit it with our functions
+            best_redchi = 10000.0
+            best_func = "--"
+            for func in functions.keys():
+                pfit, perr, redchisq = fit_leastsq(
+                    functions[func]["pinit"], x, y, functions[func]["func"]
+                )
+                if redchisq < best_redchi and redchisq > 0.1:
+                    best_redchi = redchisq
+                    best_func = func
+                    best_model = functions[func]["func"](pfit, x)
+
+            best_fit[topic] = [
+                best_func,
+                self.cagr(y),
+                self.cagr(best_model),
+                best_redchi,
+            ]
+
+        return list(zip(*best_fit))
 
 
 def get_coherence_plot(df: pd.DataFrame) -> plt.figure:

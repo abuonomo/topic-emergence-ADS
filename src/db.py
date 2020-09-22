@@ -337,6 +337,8 @@ class PaperOrganizer:
         no_below=5,
         no_above=0.5,
         min_mean_score=0,
+        year_min=None,
+        year_max=None,
         journal_blacklist=None,
         keyword_blacklist=None,
         use_keyword_count=True,
@@ -361,6 +363,8 @@ class PaperOrganizer:
         self.no_below = no_below
         self.no_above = no_above
         self.min_mean_score = min_mean_score
+        self.year_min = year_min
+        self.year_max = year_max
         self.journal_blacklist = journal_blacklist
         self.keyword_blacklist = keyword_blacklist
         self.use_keyword_count = use_keyword_count
@@ -457,7 +461,13 @@ class PaperOrganizer:
             session.query(*args)
             .join(PaperKeywords)
             .join(Paper)
-            # .filter(~Keyword.keyword.in_(self.keyword_blacklist)) # May require batching if more than 999 vars
+        )
+        if self.year_min is not None:
+            kwd_query = kwd_query.filter(Paper.year >= self.year_min)
+        if self.year_max is not None:
+            kwd_query = kwd_query.filter(Paper.year <= self.year_max)
+        kwd_query = (
+            kwd_query
             .group_by(Keyword.id)
             .order_by(func.avg(PaperKeywords.score).desc())
             .having(func.count() >= self.no_below)
@@ -487,6 +497,10 @@ class PaperOrganizer:
             .filter(PaperKeywords.keyword_id.in_(kwds_batch))
             .join(Paper)  # for the journal blacklist removal
         )
+        if self.year_max is not None:
+            q = q.filter(Paper.year <= self.year_max)
+        if self.year_min is not None:
+            q = q.filter(Paper.year >= self.year_min)
         q = self.add_journal_blacklist_to_query(q)
         if pbar is not None:
             pbar.update(1)
@@ -507,29 +521,19 @@ class PaperOrganizer:
                 apply filtering. If False, apply filtering as the keywords are queried.
 
         Returns:
-            all_records: papers and their keyword occurence counts as a list of tuples
+            all_records: papers and their keyword occurrence counts as a list of tuples
                 each tuple ~ (paper id, keyword id, count of keyword in given paper).
         """
         if in_memory is True:
-            LOG.info("Loading all paper_keywords into memory, then filtering.")
-            all_paper_keywords = session.query(
-                PaperKeywords.paper_id, PaperKeywords.keyword_id, PaperKeywords.count,
-            ).all()
-            all_records = [
-                (b, k, c)
-                for b, k, c in all_paper_keywords
-                if (k in all_kwd_ids)
-                and not any([j in b for j in self.journal_blacklist])
-            ]
-        else:
-            num_kwds = len(all_kwd_ids)
-            all_records = []
-            kwd_batches = range(0, num_kwds, batch_size)
-            pbar = tqdm(kwd_batches)
-            for i in pbar:
-                kwds_batch = all_kwd_ids[i: i + batch_size]
-                records = self.get_keyword_batch_records(session, kwds_batch)
-                all_records = all_records + records
+            LOG.warning("\"in_memory\" option is deprecated. Only use batches now.")
+        num_kwds = len(all_kwd_ids)
+        all_records = []
+        kwd_batches = range(0, num_kwds, batch_size)
+        pbar = tqdm(kwd_batches)
+        for i in pbar:
+            kwds_batch = all_kwd_ids[i: i + batch_size]
+            records = self.get_keyword_batch_records(session, kwds_batch)
+            all_records = all_records + records
         return all_records
 
     def get_corpus_and_dictionary(self, session, batch_size=990, in_memory=False):

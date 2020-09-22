@@ -8,14 +8,16 @@ keyword_extraction:
   spacy_model_name: "en_core_sci_sm" # spacy models: https://spacy.io/models
   # scispacy models: https://allenai.github.io/scispacy/
 paper_organizer:
-  no_below: 100 # below this frequency, keywords not included for topic modeling
-  no_above: 0.25 # above this percent of corpus, keywords not included for topic modeling
-  min_mean_score: 0.015 # keywords with mean singlerank score less than this not included in topic modeling
+  no_below: 25 # below this frequency, keywords not included for topic modeling
+  no_above: 0.7 # above this percent of corpus, keywords not included for topic modeling
+  min_mean_score: 0.010 # keywords with mean singlerank score less than this not included in topic modeling
+  year_min: 1997 # minimum year to use for creating topic models
+  year_max: 2010 # maximum year to use for creating topic models
   journal_blacklist: ["arXiv"] # These journals not included in topic modeling
   keyword_blacklist: "config/drop_features.txt" # Path assuming working dir is root of project
   use_keyword_count: True
 topic_model:
-  topic_range: [20, 30, 50]
+  topic_range: [20, 30, 50, 100, 200]
   lda_params: # More info: https://radimrehurek.com/gensim/models/ldamodel.html
     alpha: "auto"
     eta: "auto"
@@ -24,7 +26,10 @@ topic_model:
     chunksize: 5000
     eval_every: 1
 time_series:
-  year_min: 2010
-  year_max: 2019
-  count_strategy: "threshold"
+  # Year range defined with these year_min and year_max values must be a subset of the
+  # range defined in paper_organizer. We cannot analyze the time series for years
+  # which were not included in the topic models.
+  year_min: 1997
+  year_max: 2010
+  count_strategy: "weight+threshold"
   threshold: 0.05 # This value only matters when count_strategy is "threshold" or "weight+threshold"

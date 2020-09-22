@@ -351,7 +351,7 @@ class VizPrepper:
                 pfit, perr, redchisq = fit_leastsq(
                     functions[func]["pinit"], x, y, functions[func]["func"]
                 )
-                if redchisq < best_redchi and redchisq > 0.1:
+                if redchisq < best_redchi: #and redchisq > 0.1:
                     best_redchi = redchisq
                     best_func = func
                     best_model = functions[func]["func"](pfit, x)
@@ -573,7 +573,7 @@ def prepare_for_topic_model_viz(db_loc, prepared_data_dir, tmodel_loc, viz_data_
         tm.dictionary,
         doc_topic_dist=np.matrix(embedding),
         sort_topics=False,
-        mds="mmds",
+        mds="tsne",
         start_index=0,
     )
     corpus_inds, paper_ids = zip(*corp2paper)
@@ -641,7 +641,6 @@ def get_time_chars(viz_data_dir, config_loc):
     kwd_ts_df = vp.kwd_ts_df.filter(keep_years)
 
     topic_top_docs = (-vp.embedding_df).values.argsort(axis=0)[0:20, :]
-
     kmeans, dtw_man = vp.get_dynamic_time_warp_clusters(ts_df)
     chars_df["kmeans_cluster"] = kmeans.labels_
     chars_df["manifold_x"] = dtw_man[:, 0]

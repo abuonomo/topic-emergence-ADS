@@ -215,6 +215,7 @@ def get_count_range():
         "count_max": int(app.config["SC_DF"]["count"].max()),
         "count_std": float(app.config["SC_DF"]["count"].std()),
         "count_mean": float(app.config["SC_DF"]["count"].mean()),
+        "n_topics": int(app.config['SC_DF'].shape[0]),
     }
     return jsonify(d)
 

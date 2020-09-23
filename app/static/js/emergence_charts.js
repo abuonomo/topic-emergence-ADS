@@ -130,7 +130,7 @@ function postTopic(t, c) {
   d3.json(window.location.pathname + 'get-time-data', {
     method:"POST",
     body: JSON.stringify({
-      stem: t, kmeans_cluster: c
+      stem: t
     }),
     headers: {
       "Content-type": "application/json; charset=UTF-8"

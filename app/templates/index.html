@@ -64,10 +64,6 @@
                   <td>size</td>
                   <td><select id="selectButtonSize" class="selector"></select></td>
               </tr>
-{#              <tr>#}
-{#                  <td>x scale</td>#}
-{#                  <td><select id="selectButtonXScale" class="selector"></select></td>#}
-{#              </tr>#}
               <tr>
                   <td>min count</td>
                   <td>
@@ -82,7 +78,6 @@
                       <div class="row align-items-center">
                           <div class="col-sm"><div id="minRakeInput"></div></div>
                       </div>
-<!--                      <input id="minRakeInput" type="range" min="-100" max="100" value="-99" type="number"></input>-->
                   </td>
               </tr>
           </table>
@@ -94,6 +89,8 @@
           <button id="maxSkew">First max location vs skewness</button>
           <button id="changeComplex">mean change vs complexity</button>
         </div>
+          <br><br>
+          <input type="text" id="topic-search" name="topic-search" placeholder="Search by Topic Number" style="font-size: 18px">
       </div>
     </div>
     <div id='doc_preview' style="width: 40%; overflow: hidden; margin-left: 0%; margin-right: 2%; float: right;">
@@ -182,11 +179,16 @@
 
       var sliderSimple;
       var sliderScore;
+      var nTopics;
+      var maxTopic;
 
       d3.json(window.location.pathname + "get-count-range")
       .then(function (data){
         console.log(data['count_min']);
         console.log(data['count_max']);
+        console.log(data['n_topics'])
+        nTopics = data['n_topics'];
+        maxTopic = nTopics - 1;
 
         let third_stand = Math.trunc(data['count_mean'] + 3 * data['count_std']);
 
@@ -234,6 +236,47 @@
 
         gSimple.call(sliderScore);
       });
+
+
+      $("#topic-search").on('keyup', function (e) {
+        if (e.key === 'Enter' || e.keyCode === 13) {
+          var topic = +d3.select("#topic-search").node().value;
+
+          console.log(maxTopic);
+          if (topic > maxTopic) {
+            topic = maxTopic;
+            d3.select("#topic-search").node().value = (+topic).toString();
+          }
+          if (topic < 0) {
+            topic = 0;
+            d3.select("#topic-search").node().value = (+topic).toString();
+          }
+
+
+          d3.select("#table_container").selectAll("*").remove();
+          var opts = {
+            lines: 9, // The number of lines to draw
+            length: 9, // The length of each line
+            width: 5, // The line thickness
+            radius: 14, // The radius of the inner circle
+            color: "gainsboro", // #rgb or #rrggbb or array of colors
+            speed: 1.9, // Rounds per second
+            trail: 40, // Afterglow percentage
+            className: 'spinner', // The CSS class to assign to the spinner
+            top: '100px', // Top position relative to parent in px
+            left: '50%' // Left position relative to parent in px
+          };
+          var target = document.getElementById('table_container');
+          var spinner = new Spinner(opts).spin(target);
+          postBibcode(topic, spinner, limit=20);
+          highlightTopic(+topic, 'stem', 'scaled_counts');
+          postTopic(topic);
+          var topicID = '#ldavis_el1-topic';
+          d3.select(topicID).node().value = (+topic).toString();
+          d3.select(topicID).on('keyup')();
+        }
+      });
+
 
       d3.json(window.location.pathname + "get-scatter-data", {
             method:"POST",

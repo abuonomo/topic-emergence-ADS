@@ -573,7 +573,7 @@ def prepare_for_topic_model_viz(db_loc, prepared_data_dir, tmodel_loc, viz_data_
         tm.dictionary,
         doc_topic_dist=np.matrix(embedding),
         sort_topics=False,
-        mds="tsne",
+        mds="mmds",
         start_index=0,
     )
     corpus_inds, paper_ids = zip(*corp2paper)

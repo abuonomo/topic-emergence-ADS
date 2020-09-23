@@ -23,7 +23,6 @@ def yellow_plot_kmd(X, out_plot=None, c_min=2, c_max=20):
     LOG.info(f"Trying kmeans n_clusters from {c_min} to {c_max}")
     model = KMeans()
     visualizer = KElbowVisualizer(model, k=(c_min, c_max))
-    import ipdb; ipdb.set_trace()
     visualizer.fit(X)  # Fit the data to the visualizer
     LOG.info(f"Writing elbow to {out_plot}.")
     if out_plot is None:

@@ -37,7 +37,7 @@ function getKeywordTable() {
     var header =  Object.keys(data[0]);
     var table = kwd_tabulate(data, header, "kwd_table");
     $('#kwd_table').DataTable({
-      pageLength: 10,
+      pageLength: 5,
       order: [[ 1, "desc" ]],
       columnDefs: [
         {render: $.fn.dataTable.render.number(',', '.', 3),

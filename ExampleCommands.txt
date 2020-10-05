@@ -1,0 +1,8 @@
+
+#(remove '--dry-run' to do it for real) 
+
+# run LDA
+make lda --dry-run CONFIG_FILE=config/arb-1997to2010.mk 
+
+# sync
+make sync-viz-to-s3 --dry-run CONFIG_FILE=config/arb-1997to2010.mk N_TOPICS=425

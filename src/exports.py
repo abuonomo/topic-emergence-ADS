@@ -42,10 +42,10 @@ def keywords(
         df = pd.read_sql(q.statement, con=engine)
         drop_inds = df.index[df['keyword'].apply(lambda x: x in po.keyword_blacklist)]
         df = df.drop(drop_inds)
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         df = df.sort_values('count_1', ascending=False)
         LOG.info(f"Writing keywords to {kwd_export_loc}")
-        df.to_csv(kwd_export_loc)
+        df.to_csv(kwd_export_loc, index=False)
     except:
         LOG.warning(f"Aborted getting keywords from database.")
         session.rollback()

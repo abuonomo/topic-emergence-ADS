@@ -1,6 +1,9 @@
 
 #(remove '--dry-run' to do it for real) 
 
+# build db, clean papers
+make db CONFIG_FILE=config/arb-1997to2010.mk --dry-run 
+
 # run LDA
 make lda CONFIG_FILE=config/arb-1997to2010.mk --dry-run 
 

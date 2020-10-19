@@ -11,10 +11,11 @@ paper_organizer:
   year_min: 1997
   year_max: 2010
   journal_blacklist: ["arXiv"]
-  keyword_blacklist: "config/drop_features_08_03_2020.txt"
+  keyword_blacklist: "config/drop_features_10_13_2020.txt"
   use_keyword_count: False
 topic_model:
-  topic_range: [100, 200, 300, 375, 400, 425, 500, 600, 800]
+  topic_range: [200, 300, 350, 375, 400, 425, 450, 500, 600]
+  #topic_range: [425, 450, 475]
   lda_params:
     alpha: "auto"
     eta: "auto"

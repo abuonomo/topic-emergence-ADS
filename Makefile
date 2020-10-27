@@ -203,7 +203,7 @@ app-dev:
 	export VERSION=$$(python version.py); \
 	cd app; \
 	export PYTHONPATH=$${PYTHONPATH}:../src/; \
-	flask run
+	flask run -p $(PORT)
 
 ## Run app for visualize results in production mode
 app-prod: | $(APP_DATA_FILES)

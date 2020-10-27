@@ -25,6 +25,7 @@ topic_model:
     passes: 10
     chunksize: 5000
     eval_every: 1
+    random_state: 42
 time_series:
   # Year range defined with these year_min and year_max values must be a subset of the
   # range defined in paper_organizer. We cannot analyze the time series for years

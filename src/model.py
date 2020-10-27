@@ -203,7 +203,7 @@ class VizPrepper:
         if type(x_row) == pd.Series:
             x = x_row.values
         else:
-            x = x_row
+            raise ValueError("Input must be pandas series.")
         nz_inds = np.nonzero(x)[0]
         if len(nz_inds) == 0:  # If all are 0, set CAGR to nan
             return np.nan
@@ -215,9 +215,10 @@ class VizPrepper:
         if len(x) < 2:  # If no periods, set CAGR to nan
             return np.nan
         else:
-            # ys = x_row.index
-            # period = max(ys) - min(ys)
-            return (x[-1] / x[0]) ** (1 / len(x)) - 1
+            ys = x_row.index
+            period = max(ys) - min(ys)
+            # return (x[-1] / x[0]) ** (1 / len(x)) - 1
+            return (x[-1] / x[0]) ** (1 / period) - 1
 
     def get_doc_topic_weights(self, threshold=0, count_strategy="weight"):
         valid_strats = ["weight", "threshold", "weight+threshold", "argmax"]
@@ -303,12 +304,12 @@ class VizPrepper:
         features_df["nasa_affiliation"] = ratio_nasa_affiliation
         contributing_docs = weighted_df.reindex(in_year_index) > 0
         features_df["contributing_papers_count"] = contributing_docs.sum(axis=0).values
-        (
-            features_df["model_best_fit"],
-            _,
-            features_df["CAGR_model_best_fit"],
-            features_df["model_redchi"],
-        ) = self.get_best_fit_cagr(ts_df)
+        # (
+        #     features_df["model_best_fit"],
+        #     _,
+        #     features_df["CAGR_model_best_fit"],
+        #     features_df["model_redchi"],
+        # ) = self.get_best_fit_cagr(ts_df)
 
         return ts_df, features_df
 

@@ -140,8 +140,8 @@ $(records_loc): $(raw_files)
 ## Link experiment data to app directory
 link-data-to-app:
 	ln -f $(lda_model_viz_data_dir)/* app/data
-	ln -f $(tinf_dir)/* app/data/inferences
 	ln -f $(PARAM_YAML) app/templates/config.yaml
+	ln -s $(tinf_dir) app/data/inferences
 
 ## sync experiment viz data to s3
 sync-viz-to-s3:
@@ -235,7 +235,7 @@ sync-astro2010-whitepapers-from-s3:
 	aws s3 sync "s3://datasquad-low/home/DataSquad/topic-emergence-ADS/Astro 2010 Whitepapers/" data/astro2010_whitepapers
 
 get-inference-from-dir:
-	mkdir $(tinf_dir); \
+	mkdir -p $(tinf_dir); \
 	python src/get_paper_topic_distribs.py \
 		--lda_model $(lda_models_dir)/topic_model$(N_TOPICS) \
 		--dir_of_txts data/astro2010_whitepapers/text \

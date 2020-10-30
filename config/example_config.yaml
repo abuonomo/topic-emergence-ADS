@@ -5,7 +5,7 @@ join_and_clean:
 keyword_extraction:
   no_below: 50 # Keywords which occur less than this will NOT be checked for missed locations
   no_above: 0.5 # Keywords which occur more than this will NOT be checked for missed locations
-  spacy_model_name: "en_core_sci_sm" # spacy models: https://spacy.io/models
+  spacy_model_name: "en_core_web_sm" # spacy models: https://spacy.io/models
   # scispacy models: https://allenai.github.io/scispacy/
 paper_organizer:
   no_below: 25 # below this frequency, keywords not included for topic modeling

@@ -37,8 +37,8 @@ class TopicModeler:
         and performing inference
 
         Args:
-            corpus: Gensim bag of words corpus
             dictionary: Gensim dictionary mapping keywords to index
+            corpus: Gensim bag of words corpus
         """
         self.dictionary = dictionary
         self.corpus = corpus

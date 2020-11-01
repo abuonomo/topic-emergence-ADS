@@ -17,7 +17,7 @@ paper_organizer:
   keyword_blacklist: "config/drop_features.txt" # Path assuming working dir is root of project
   use_keyword_count: True
 topic_model:
-  topic_range: [20, 30, 50, 100, 200, 250, 300, 350]
+  topic_range: [100]
   lda_params: # More info: https://radimrehurek.com/gensim/models/ldamodel.html
     alpha: "auto"
     eta: "auto"
@@ -32,5 +32,5 @@ time_series:
   # which were not included in the topic models.
   year_min: 1997
   year_max: 2010
-  count_strategy: "weight+threshold"
-  threshold: 0.05 # This value only matters when count_strategy is "threshold" or "weight+threshold"
+#  count_strategy: "weight+threshold"
+#  threshold: 0.05 # This value only matters when count_strategy is "threshold" or "weight+threshold"

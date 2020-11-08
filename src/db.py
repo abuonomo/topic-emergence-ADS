@@ -83,6 +83,12 @@ class PaperKeywords(BASE):
         }
 
 
+def clean_text(text):
+    text = unescape(text)
+    text = strip_tags(text)
+    return text
+
+
 class Paper(BASE):
     __tablename__ = "papers"
 
@@ -101,8 +107,7 @@ class Paper(BASE):
 
     def get_feature_text(self):
         text = f"{self.title}. {self.abstract}"
-        text = unescape(text)
-        text = strip_tags(text)
+        text = clean_text(text)
         return text
 
     def to_dict(self):

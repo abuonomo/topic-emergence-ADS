@@ -186,6 +186,17 @@ def extract_keyword_from_doc(doc):
     return text, kwd_counts
 
 
+def extract_tokens_from_doc(doc):
+    tokens = set(
+        w.lemma_.lower()
+        for w in doc
+        if (not w.is_stop) and (not w.is_punct) and (not w.lemma_ == "-PRON-")
+    )
+    text = " ".join([t.lemma_.lower() for t in doc])
+    token_counts = [(k, 1, text.count(k)) for k in tokens]
+    return text, token_counts
+
+
 class PaperKeywordExtractor:
     def __init__(self, nlp):
         """
@@ -197,7 +208,7 @@ class PaperKeywordExtractor:
         self.nlp = nlp
 
     def extract_all_keywords(
-        self, session, batch_size=100, n_process=-1,
+        self, session, strategy="singlerank", batch_size=100, n_process=-1,
     ):
         """
         Extract keywords from all papers using SingleRank. Then insert these keywords
@@ -208,6 +219,16 @@ class PaperKeywordExtractor:
             batch_size: batch_size for spacy model pipe
             n_process: number of processes for spacy model pipe
         """
+        valid_strats = ["singlerank", "tokenize"]
+        if strategy == "singlerank":
+            extract_features_from_doc = extract_keyword_from_doc
+        elif strategy == "tokenize":
+            extract_features_from_doc = extract_tokens_from_doc
+        else:
+            raise ValueError(
+                f"{strategy} is invalid value for strategy. "
+                f"Choose from {valid_strats}."
+            )
         paper_query = session.query(Paper)
         nu_papers = paper_query.count()
         LOG.info(f"Extracting keywords from {nu_papers} documents.")
@@ -217,7 +238,7 @@ class PaperKeywordExtractor:
         norm_kwds_to_now = {}
         for i, (txt, p) in enumerate(pbar):
             doc = self.nlp(txt)
-            lemma_text, kwds = extract_keyword_from_doc(doc)
+            lemma_text, kwds = extract_features_from_doc(doc)
             p.lemma_text = lemma_text
             for kwd, score, count in kwds:
                 if kwd not in norm_kwds_to_now:
@@ -231,9 +252,9 @@ class PaperKeywordExtractor:
                     assoc.keyword = db_kwd
                     p.keywords.append(assoc)
             if i % batch_size == 0:
-                pbar.set_description(f'Committing up to {i}...')
+                pbar.set_description(f"Committing up to {i}...")
                 session.commit()
-                pbar.set_description(f'Committed up to {i}.')
+                pbar.set_description(f"Committed up to {i}.")
 
     def get_new_paper_records(self, paper_dict, paper_kwds, pbar):
         """
@@ -303,7 +324,7 @@ class PaperKeywordExtractor:
         pbar = tqdm(papers)
         batch_size = ceil(len(papers) / npartitions)
         for i in range(0, len(papers), batch_size):
-            sub_papers = papers[i: i + batch_size]
+            sub_papers = papers[i : i + batch_size]
             result_batch = dask.delayed(make_batch)(sub_papers, pks, pbar)
             batches.append(result_batch)
 
@@ -335,8 +356,13 @@ class PaperKeywordExtractor:
         return record
 
 
-class PaperOrganizer:
+# class PaperTokenExtractor(PaperKeywordExtractor):
+#
+#     def __init__(self, nlp):
+#         super().__init__(nlp)
 
+
+class PaperOrganizer:
     def __init__(
         self,
         no_below=5,
@@ -462,18 +488,13 @@ class PaperOrganizer:
         # TODO: decide whether to count with limiting by journal blacklist
         no_above_abs = int(self.no_above * corpus_size)
 
-        kwd_query = (
-            session.query(*args)
-            .join(PaperKeywords)
-            .join(Paper)
-        )
+        kwd_query = session.query(*args).join(PaperKeywords).join(Paper)
         if self.year_min is not None:
             kwd_query = kwd_query.filter(Paper.year >= self.year_min)
         if self.year_max is not None:
             kwd_query = kwd_query.filter(Paper.year <= self.year_max)
         kwd_query = (
-            kwd_query
-            .group_by(Keyword.id)
+            kwd_query.group_by(Keyword.id)
             .order_by(func.avg(PaperKeywords.score).desc())
             .having(func.count() >= self.no_below)
             .having(func.count() <= no_above_abs)
@@ -530,13 +551,13 @@ class PaperOrganizer:
                 each tuple ~ (paper id, keyword id, count of keyword in given paper).
         """
         if in_memory is True:
-            LOG.warning("\"in_memory\" option is deprecated. Only use batches now.")
+            LOG.warning('"in_memory" option is deprecated. Only use batches now.')
         num_kwds = len(all_kwd_ids)
         all_records = []
         kwd_batches = range(0, num_kwds, batch_size)
         pbar = tqdm(kwd_batches)
         for i in pbar:
-            kwds_batch = all_kwd_ids[i: i + batch_size]
+            kwds_batch = all_kwd_ids[i : i + batch_size]
             records = self.get_keyword_batch_records(session, kwds_batch)
             all_records = all_records + records
         return all_records
@@ -708,7 +729,9 @@ def write_ads_to_db(infile, db_loc=":memory:"):
 @click.option(
     "--n_process", type=int, default=-1, help="Number of process for spacy pipeline"
 )
-def get_keywords_from_texts(db_loc, config_loc, batch_size=1000, n_process=-1):
+def get_keywords_from_texts(
+    db_loc, config_loc, strategy="singlerank", batch_size=1000, n_process=-1
+):
     """
     Use SingleRank to extract keywords from titles and abstracts in database.
     """
@@ -718,6 +741,10 @@ def get_keywords_from_texts(db_loc, config_loc, batch_size=1000, n_process=-1):
         spacy_model_name = config["keyword_extraction"]["spacy_model_name"]
     except KeyError:
         spacy_model_name = "en_core_web_sm"
+    try:
+        strategy = config["keyword_extraction"]["strategy"]
+    except KeyError:
+        strategy = "singlerank"
 
     engine = create_engine(f"sqlite:///{db_loc}")
 
@@ -727,7 +754,9 @@ def get_keywords_from_texts(db_loc, config_loc, batch_size=1000, n_process=-1):
     try:
         nlp = get_spacy_nlp(spacy_model_name)
         pm = PaperKeywordExtractor(nlp)
-        pm.extract_all_keywords(session, batch_size=batch_size, n_process=n_process)
+        pm.extract_all_keywords(
+            session, strategy=strategy, batch_size=batch_size, n_process=n_process
+        )
         LOG.info("Commiting keywords to database.")
         session.commit()
         LOG.info(f"Added extracted keywords to papers.")

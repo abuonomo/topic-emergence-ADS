@@ -56,6 +56,12 @@ def strip_tags(html):
     return s.get_data()
 
 
+def clean_text(text):
+    text = unescape(text)
+    text = strip_tags(text)
+    return text
+
+
 class PaperKeywords(BASE):
     __tablename__ = "paper_keywords"
 
@@ -71,6 +77,7 @@ class PaperKeywords(BASE):
     count = Column(Integer)
     paper = relationship("Paper", back_populates="keywords")
     keyword = relationship("Keyword", back_populates="papers")
+    positions = Column(String, nullable=True, unique=False, index=False)
 
     def __repr__(self):
         return f'<PaperKeywords(paper_id="{self.paper_id}", keyword.keyword="{self.keyword.keyword}")>'
@@ -82,11 +89,13 @@ class PaperKeywords(BASE):
             if k not in ["_sa_instance_state", "keyword"]
         }
 
+    @property
+    def positions(self):
+        return [int(x) for x in self._positions.split(";")]
 
-def clean_text(text):
-    text = unescape(text)
-    text = strip_tags(text)
-    return text
+    @positions.setter
+    def positions(self, value):
+        self._positions += f";{value}"
 
 
 class Paper(BASE):
@@ -179,7 +188,7 @@ def extract_keyword_from_doc(doc):
     # Remove keywords which are 1 character long or are numbers
     kwds = [(k.lower(), v) for k, v in kwds if (not is_nu_like(k)) and (len(k) > 1)]
     text = " ".join([t.lemma_.lower() for t in doc])
-    kwd_counts = [(k, v, text.count(k)) for k, v in kwds]
+    kwd_counts = [(k, v, text.count(k), None) for k, v in kwds]
     # TODO: "Black hole nos with xnosnosx" would count "nos" 3 times. Do we want this?
     # If make match " nos ", need to keep in mind problems at beginning and end
     # of a sentence, and around punctuation, parentheses, etc.
@@ -187,13 +196,22 @@ def extract_keyword_from_doc(doc):
 
 
 def extract_tokens_from_doc(doc):
-    tokens = set(
+    tokens_list = [
         w.lemma_.lower()
         for w in doc
         if (not w.is_stop) and (not w.is_punct) and (not w.lemma_ == "-PRON-")
-    )
+    ]
+    tokens = set(tokens_list)
     text = " ".join([t.lemma_.lower() for t in doc])
-    token_counts = [(k, 1, text.count(k)) for k in tokens]
+    token_counts = [
+        (
+            k,
+            1,
+            text.count(k),
+            ";".join([str(i) for i, t in enumerate(tokens_list) if t == k]),
+        )
+        for k in tokens
+    ]
     return text, token_counts
 
 
@@ -240,7 +258,7 @@ class PaperKeywordExtractor:
             doc = self.nlp(txt)
             lemma_text, kwds = extract_features_from_doc(doc)
             p.lemma_text = lemma_text
-            for kwd, score, count in kwds:
+            for kwd, score, count, positions in kwds:
                 if kwd not in norm_kwds_to_now:
                     db_kwd = Keyword(kwd)
                     norm_kwds_to_now[kwd] = db_kwd
@@ -248,7 +266,9 @@ class PaperKeywordExtractor:
                     db_kwd = norm_kwds_to_now[kwd]
                 with session.no_autoflush:
                     # Make sure not to flush when PaperKeywords has no primary keys
-                    assoc = PaperKeywords(raw_keyword=kwd, score=score, count=count)
+                    assoc = PaperKeywords(
+                        raw_keyword=kwd, score=score, count=count, positions=positions
+                    )
                     assoc.keyword = db_kwd
                     p.keywords.append(assoc)
             if i % batch_size == 0:

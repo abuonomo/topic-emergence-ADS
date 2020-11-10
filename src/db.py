@@ -77,7 +77,7 @@ class PaperKeywords(BASE):
     count = Column(Integer)
     paper = relationship("Paper", back_populates="keywords")
     keyword = relationship("Keyword", back_populates="papers")
-    positions = Column(String, nullable=True, unique=False, index=False)
+    _positions = Column(String, nullable=True, unique=False, index=False)
 
     def __repr__(self):
         return f'<PaperKeywords(paper_id="{self.paper_id}", keyword.keyword="{self.keyword.keyword}")>'
@@ -267,7 +267,7 @@ class PaperKeywordExtractor:
                 with session.no_autoflush:
                     # Make sure not to flush when PaperKeywords has no primary keys
                     assoc = PaperKeywords(
-                        raw_keyword=kwd, score=score, count=count, positions=positions
+                        raw_keyword=kwd, score=score, count=count, _positions=positions
                     )
                     assoc.keyword = db_kwd
                     p.keywords.append(assoc)

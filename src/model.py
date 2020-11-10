@@ -439,7 +439,7 @@ def get_pby(session, paper_ids: List, batch_size=990):
     pbar = tqdm(batches)
     all_records = []
     for i in pbar:
-        paper_id_batch = paper_ids[i : i + batch_size]
+        paper_id_batch = paper_ids[i: i + batch_size]
         q = session.query(
             Paper.id, Paper.bibcode, Paper.year, Paper.nasa_affiliation
         ).filter(Paper.id.in_(paper_id_batch))

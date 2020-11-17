@@ -8,6 +8,7 @@ from math import ceil
 from pathlib import Path
 from pprint import pformat
 from typing import Dict, Union
+from collections import Counter
 
 import click
 import dask
@@ -538,7 +539,10 @@ class PaperOrganizer:
         """
         q = (
             session.query(
-                PaperKeywords.paper_id, PaperKeywords.keyword_id, PaperKeywords.count,
+                PaperKeywords.paper_id,
+                PaperKeywords.keyword_id,
+                PaperKeywords.count,
+                Paper.year,
             )
             .filter(PaperKeywords.keyword_id.in_(kwds_batch))
             .join(Paper)  # for the journal blacklist removal
@@ -580,7 +584,8 @@ class PaperOrganizer:
             kwds_batch = all_kwd_ids[i : i + batch_size]
             records = self.get_keyword_batch_records(session, kwds_batch)
             all_records = all_records + records
-        return all_records
+        sorted_all_records = sorted(all_records, key=lambda x: x[3])  # sort asc by year
+        return sorted_all_records
 
     def get_corpus_and_dictionary(self, session, batch_size=990, in_memory=False):
         """
@@ -615,7 +620,7 @@ class PaperOrganizer:
         )
 
         LOG.info("Getting paper_ids, keyword_ids, counts")
-        paper_ids, keyword_ids, counts = zip(*all_records)
+        paper_ids, keyword_ids, counts, years = zip(*all_records)
         if self.use_keyword_count is False:
             counts = [1] * len(counts)
 
@@ -643,7 +648,11 @@ class PaperOrganizer:
         corp2paper = [(c, p) for c, p in ind2sql["corp2paper"].items()]
         dct2kwd = [(d, k) for d, k in ind2sql["dct2kwd"].items()]
 
-        return corpus, dct, corp2paper, dct2kwd
+        year_counts = Counter(years)
+        year_count_sort = sorted(year_counts.items(), key=lambda x: x[0])
+        slices = [count for year, count in year_count_sort]
+
+        return corpus, dct, corp2paper, dct2kwd, slices
 
 
 def get_spacy_nlp(model_name="en_core_web_sm"):
@@ -872,7 +881,7 @@ def prepare_for_lda(
 
     try:
         po = PaperOrganizer(**config["paper_organizer"])
-        corpus, dct, corp2paper, dct2kwd = po.get_corpus_and_dictionary(
+        corpus, dct, corp2paper, dct2kwd, slices = po.get_corpus_and_dictionary(
             session, in_memory=in_memory
         )
     except:
@@ -887,6 +896,7 @@ def prepare_for_lda(
     out_dct = prepared_data_dir / "dct.mm"
     out_corp2paper = prepared_data_dir / "corp2paper.json"
     out_dct2kwd = prepared_data_dir / "dct2kwd.json"
+    out_slices = prepared_data_dir / "year_slices.txt"
 
     LOG.info(f"Writing corpus, dct, ind2sql, sql2ind to {prepared_data_dir}")
     prepared_data_dir.mkdir(exist_ok=True)
@@ -896,6 +906,10 @@ def prepare_for_lda(
         json.dump(corp2paper, f0)
     with open(out_dct2kwd, "w") as f0:
         json.dump(dct2kwd, f0)
+    with open(out_slices, 'w') as f0:
+        for s in slices:
+            f0.write(str(s))
+            f0.write("\n")
 
 
 if __name__ == "__main__":

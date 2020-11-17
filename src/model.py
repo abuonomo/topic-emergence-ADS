@@ -15,7 +15,7 @@ import pyLDAvis
 import pyLDAvis.gensim
 import yaml
 from gensim.corpora import MmCorpus, Dictionary
-from gensim.models import LdaModel, CoherenceModel
+from gensim.models import LdaModel, CoherenceModel, LdaSeqModel
 from matplotlib import pyplot as plt
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -43,7 +43,9 @@ class TopicModeler:
         self.dictionary = dictionary
         self.corpus = corpus
 
-    def make_all_topic_models(self, topic_range, **kwargs) -> List[LdaModel]:
+    def make_all_topic_models(
+        self, topic_range, model=LdaModel, time_slice=None, **kwargs
+    ) -> List[LdaModel]:
         """
         Create topic models for various numbers of topics
 
@@ -62,7 +64,14 @@ class TopicModeler:
         @dask.delayed
         def make_topic_model(n_topics, c, d, **kwargs):
             LOG.warning(f"Making topic model with {n_topics} topics.")
-            lda = LdaModel(c, id2word=d, num_topics=n_topics, **kwargs)
+            if model == LdaModel:
+                lda = model(c, id2word=d, num_topics=n_topics, **kwargs)
+            elif model == LdaSeqModel:
+                if time_slice is None:
+                    raise ValueError("time_slice cannot be None for LdaSeq model")
+                lda = model(
+                    c, id2word=d, num_topics=n_topics, time_slice=time_slice, **kwargs
+                )
             return lda
 
         jobs = []
@@ -352,7 +361,7 @@ class VizPrepper:
                 pfit, perr, redchisq = fit_leastsq(
                     functions[func]["pinit"], x, y, functions[func]["func"]
                 )
-                if redchisq < best_redchi: #and redchisq > 0.1:
+                if redchisq < best_redchi:  # and redchisq > 0.1:
                     best_redchi = redchisq
                     best_func = func
                     best_model = functions[func]["func"](pfit, x)
@@ -408,6 +417,7 @@ def read_from_prepared_data(prepared_data_dir: Path):
     in_dct = prepared_data_dir / "dct.mm"
     in_corp2paper = prepared_data_dir / "corp2paper.json"
     in_dct2kwd = prepared_data_dir / "dct2kwd.json"
+    in_slices = prepared_data_dir / "year_slices.txt"
 
     corpus = MmCorpus(str(in_corp))
     dictionary = Dictionary.load(str(in_dct))
@@ -415,8 +425,10 @@ def read_from_prepared_data(prepared_data_dir: Path):
         corp2paper = json.load(f0)
     with open(in_dct2kwd, "r") as f0:
         dct2kwd = json.load(f0)
+    with open(in_slices, "r") as f0:
+        slices = [int(c) for c in f0.read().splitlines()]
 
-    return corpus, dictionary, corp2paper, dct2kwd
+    return corpus, dictionary, corp2paper, dct2kwd, slices
 
 
 def get_pby(session, paper_ids: List, batch_size=990):
@@ -439,7 +451,7 @@ def get_pby(session, paper_ids: List, batch_size=990):
     pbar = tqdm(batches)
     all_records = []
     for i in pbar:
-        paper_id_batch = paper_ids[i: i + batch_size]
+        paper_id_batch = paper_ids[i : i + batch_size]
         q = session.query(
             Paper.id, Paper.bibcode, Paper.year, Paper.nasa_affiliation
         ).filter(Paper.id.in_(paper_id_batch))
@@ -509,14 +521,29 @@ def make_topic_models(prepared_data_dir, config_loc, out_models_dir, reports_dir
     """
     Create several topic models with differing numbers of topics.
     """
-    corpus, dictionary, _, _ = read_from_prepared_data(prepared_data_dir)
+    corpus, dictionary, _, _, time_slice = read_from_prepared_data(prepared_data_dir)
+    import ipdb; ipdb.set_trace()
     with open(config_loc, "r") as f0:
         config = yaml.safe_load(f0)
+
+    if "model_type" in config["topic_model"]:
+        model_type = config["topic_model"]["model_type"]
+        if model_type == "dynamic":
+            Lda = LdaSeqModel
+            LOG.info("Using Dynamic Topic Models.")
+        elif model_type == "lda":
+            Lda = LdaModel
+            LOG.info("Using standard LDA model.")
+    else:
+        Lda = LdaModel
 
     LOG.info(f"Running with config: \n {pformat(config)}")
     tm = TopicModeler(dictionary, corpus)
     models = tm.make_all_topic_models(
-        config["topic_model"]["topic_range"], **config["topic_model"]["lda_params"]
+        config["topic_model"]["topic_range"],
+        model=Lda,
+        time_slice=time_slice,
+        **config["topic_model"]["lda_params"],
     )
 
     out_models_dir.mkdir(exist_ok=True)
@@ -557,7 +584,9 @@ def prepare_for_topic_model_viz(db_loc, prepared_data_dir, tmodel_loc, viz_data_
      and keyword time series.
     """
     LOG.info(f"Loading from {prepared_data_dir} and {tmodel_loc}")
-    corpus, dictionary, corp2paper, dct2kwd = read_from_prepared_data(prepared_data_dir)
+    corpus, dictionary, corp2paper, dct2kwd, slices = read_from_prepared_data(
+        prepared_data_dir
+    )
 
     lda_model = LdaModel.load(str(tmodel_loc))
     tm = TopicModeler(dictionary, corpus)

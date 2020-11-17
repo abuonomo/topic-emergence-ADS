@@ -27,6 +27,15 @@ class TestVizPrepper(TestCase):
         true_val2 = 0.18920711500272103
         self.assertAlmostEqual(true_val2, val2)
 
+    def test_cagr3(self):
+        val1 = self.viz_prepper.cagr(self.time_series1, n_mean=3)
+        true_val1 = 0.18920711500272103
+        self.assertAlmostEqual(true_val1, val1)
+
+        val2 = self.viz_prepper.cagr(self.time_series2, n_mean=3)
+        true_val2 = -0.27734311885439467
+        self.assertAlmostEqual(true_val2, val2)
+
 
 if __name__ == "__main__":
     unittest.main()

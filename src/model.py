@@ -189,13 +189,16 @@ class VizPrepper:
             self.pyLDAvis_data = json.load(f0)
 
     @staticmethod
-    def cagr(x_row: pd.Series) -> float:
+    def cagr(x_row: pd.Series, n_mean: int = 1) -> float:
         """
         Calculate Compound Annualized Interest Rate (CAGR). First year is taken as the
         first nonzero year.
 
         Args:
             x_row: a pandas series
+            n_mean: Take the mean of the first n_mean years' values and the
+            last n_mean years' values, and treat those as the endpoints in
+            the CAGR calculation.
 
         Returns:
             the CAGR score
@@ -218,8 +221,13 @@ class VizPrepper:
             ys = x_row.index
             ys_nz = ys[first_nonzero_index:]
             period = max(ys_nz) - min(ys_nz)
-            # return (x[-1] / x[0]) ** (1 / len(x)) - 1
-            return (x[-1] / x[0]) ** (1 / period) - 1
+            if n_mean >= 1:  # Become the actual endpoints when n_mean == 1
+                end_val = np.mean(x[-n_mean:])
+                begin_val = np.mean(x[:n_mean])
+                val = (end_val / begin_val) ** (1 / period) - 1
+            else:
+                raise ValueError("n_mean must be 1 or more.")
+            return val
 
     def get_doc_topic_weights(self, threshold=0, count_strategy="weight"):
         valid_strats = ["weight", "threshold", "weight+threshold", "argmax"]
@@ -353,7 +361,7 @@ class VizPrepper:
                 pfit, perr, redchisq = fit_leastsq(
                     functions[func]["pinit"], x, y, functions[func]["func"]
                 )
-                if redchisq < best_redchi: #and redchisq > 0.1:
+                if redchisq < best_redchi:  # and redchisq > 0.1:
                     best_redchi = redchisq
                     best_func = func
                     best_model = functions[func]["func"](pfit, x)

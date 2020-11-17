@@ -5,19 +5,19 @@ join_and_clean:
 keyword_extraction:
   no_below: 50 # Keywords which occur less than this will NOT be checked for missed locations
   no_above: 0.5 # Keywords which occur more than this will NOT be checked for missed locations
-  spacy_model_name: "en_core_sci_sm" # spacy models: https://spacy.io/models
+  spacy_model_name: "en_core_web_sm" # spacy models: https://spacy.io/models
   # scispacy models: https://allenai.github.io/scispacy/
 paper_organizer:
   no_below: 25 # below this frequency, keywords not included for topic modeling
   no_above: 0.7 # above this percent of corpus, keywords not included for topic modeling
   min_mean_score: 0.010 # keywords with mean singlerank score less than this not included in topic modeling
-  year_min: 1997 # minimum year to use for creating topic models
-  year_max: 2010 # maximum year to use for creating topic models
+#  year_min: 1997 # minimum year to use for creating topic models
+#  year_max: 2010 # maximum year to use for creating topic models
   journal_blacklist: ["arXiv"] # These journals not included in topic modeling
   keyword_blacklist: "config/drop_features.txt" # Path assuming working dir is root of project
   use_keyword_count: True
 topic_model:
-  topic_range: [20, 30, 50, 100, 200]
+  topic_range: [20, 30, 50, 100, 200, 250, 300, 350]
   lda_params: # More info: https://radimrehurek.com/gensim/models/ldamodel.html
     alpha: "auto"
     eta: "auto"

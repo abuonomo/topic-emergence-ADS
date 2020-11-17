@@ -37,8 +37,8 @@ class TopicModeler:
         and performing inference
 
         Args:
-            corpus: Gensim bag of words corpus
             dictionary: Gensim dictionary mapping keywords to index
+            corpus: Gensim bag of words corpus
         """
         self.dictionary = dictionary
         self.corpus = corpus
@@ -189,13 +189,16 @@ class VizPrepper:
             self.pyLDAvis_data = json.load(f0)
 
     @staticmethod
-    def cagr(x_row: pd.Series) -> float:
+    def cagr(x_row: pd.Series, n_mean: int = 1) -> float:
         """
         Calculate Compound Annualized Interest Rate (CAGR). First year is taken as the
         first nonzero year.
 
         Args:
             x_row: a pandas series
+            n_mean: Take the mean of the first n_mean years' values (starting from the
+            first non-zero year) and the last n_mean years' values, and treat those as
+            the endpoints in the CAGR calculation.
 
         Returns:
             the CAGR score
@@ -216,9 +219,15 @@ class VizPrepper:
             return np.nan
         else:
             ys = x_row.index
-            period = max(ys) - min(ys)
-            # return (x[-1] / x[0]) ** (1 / len(x)) - 1
-            return (x[-1] / x[0]) ** (1 / period) - 1
+            ys_nz = ys[first_nonzero_index:]
+            period = max(ys_nz) - min(ys_nz)
+            if n_mean >= 1:  # Become the actual endpoints when n_mean == 1
+                end_val = np.mean(x[-n_mean:])
+                begin_val = np.mean(x[:n_mean])
+                val = (end_val / begin_val) ** (1 / period) - 1
+            else:
+                raise ValueError("n_mean must be 1 or more.")
+            return val
 
     def get_doc_topic_weights(self, threshold=0, count_strategy="weight"):
         valid_strats = ["weight", "threshold", "weight+threshold", "argmax"]
@@ -300,6 +309,7 @@ class VizPrepper:
         features_df.columns = cols
         features_df["coherence_score"] = self.topic_coherences
         features_df["CAGR"] = ts_df.apply(self.cagr, axis=1)
+        features_df["CAGR-3"] = ts_df.apply(lambda x: self.cagr(x, n_mean=3), axis=1)
         features_df["CAGR_2_year_rolling_mean"] = roll2_df.apply(self.cagr, axis=1)
         features_df["nasa_affiliation"] = ratio_nasa_affiliation
         contributing_docs = weighted_df.reindex(in_year_index) > 0
@@ -352,7 +362,7 @@ class VizPrepper:
                 pfit, perr, redchisq = fit_leastsq(
                     functions[func]["pinit"], x, y, functions[func]["func"]
                 )
-                if redchisq < best_redchi: #and redchisq > 0.1:
+                if redchisq < best_redchi:  # and redchisq > 0.1:
                     best_redchi = redchisq
                     best_func = func
                     best_model = functions[func]["func"](pfit, x)

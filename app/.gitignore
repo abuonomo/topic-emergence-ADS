@@ -1,6 +1,7 @@
 venv/*
 .idea/*
 data/*
+templates/config.yaml
 !data/.gitkeep
 !data/inferences/.gitkeep
 __pycache__/*

@@ -309,6 +309,7 @@ class VizPrepper:
         features_df.columns = cols
         features_df["coherence_score"] = self.topic_coherences
         features_df["CAGR"] = ts_df.apply(self.cagr, axis=1)
+        features_df["CAGR-3"] = ts_df.apply(lambda x: self.cagr(x, n_mean=3), axis=1)
         features_df["CAGR_2_year_rolling_mean"] = roll2_df.apply(self.cagr, axis=1)
         features_df["nasa_affiliation"] = ratio_nasa_affiliation
         contributing_docs = weighted_df.reindex(in_year_index) > 0

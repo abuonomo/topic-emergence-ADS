@@ -196,9 +196,9 @@ class VizPrepper:
 
         Args:
             x_row: a pandas series
-            n_mean: Take the mean of the first n_mean years' values and the
-            last n_mean years' values, and treat those as the endpoints in
-            the CAGR calculation.
+            n_mean: Take the mean of the first n_mean years' values (starting from the
+            first non-zero year) and the last n_mean years' values, and treat those as
+            the endpoints in the CAGR calculation.
 
         Returns:
             the CAGR score

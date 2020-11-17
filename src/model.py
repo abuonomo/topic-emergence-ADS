@@ -216,7 +216,8 @@ class VizPrepper:
             return np.nan
         else:
             ys = x_row.index
-            period = max(ys) - min(ys)
+            ys_nz = ys[first_nonzero_index:]
+            period = max(ys_nz) - min(ys_nz)
             # return (x[-1] / x[0]) ** (1 / len(x)) - 1
             return (x[-1] / x[0]) ** (1 / period) - 1
 

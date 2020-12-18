@@ -253,7 +253,11 @@ class PaperKeywordExtractor:
                 k["keyword_id"] in paper_dict["keyword_ids"]
             ):  # Don't add keyword if its already there.
                 continue
-            elif k["raw_keyword"].lower() in paper_dict["lemma_text"]:
+            elif f' {k["raw_keyword"].strip().lower()} ' in paper_dict["lemma_text"]:
+                # ras (Royal Astronomical Socieity) will show up when its "contRASt"
+                # mil (Acronym for a meteor) with show up with "siMILar"
+                # But want "black hole" to show up when "massive black hole" is there.
+                # Don't count as containing when it is within a word (needs spaces on sides).
                 r = self.get_pk_dict(paper_dict, k)
                 records.append(r)
             else:

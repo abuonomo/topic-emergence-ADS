@@ -16,7 +16,8 @@ def main(
     lda_model,
     dir_of_txts,
     output_embedding_csv,
-    spacy_nlp_name="en_core_web_sm",
+    #spacy_nlp_name="en_core_web_sm",
+    spacy_nlp_name="en_core_sci_lg",
     batch_size=1000,
     n_process=-1,
 ):

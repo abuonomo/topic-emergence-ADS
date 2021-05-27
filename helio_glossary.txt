@@ -1,0 +1,56 @@
+aurora
+chromosphere
+corona
+coronal mass ejection
+cme
+m class flare
+x class flare
+flux rope
+coronal hole
+geospace
+geomagnetic storm
+current geomagnetically
+gic
+heliosphere
+interplanetary magnetic field
+imf
+ionosphere
+micrometeor
+magnetic reconnection
+magnetosphere
+magnetotail
+mesosphere
+thermosphere
+itm
+prominence
+radiation belt
+radiative zone
+solar
+solar cycle
+solar energetic particle
+sep
+flare
+solar
+solar activity
+solar flare
+solar maximum
+solar minimum
+solar wind
+space weather
+substrom
+sun
+sun spot
+parker solar probe
+stereo
+ulysses
+solar dynamics observatory
+sdo
+heliospheric observatory solar
+soho
+lasco
+wind
+aeronomy
+advanced composition explorer
+ace
+magnetospheric multiscale mission
+mms

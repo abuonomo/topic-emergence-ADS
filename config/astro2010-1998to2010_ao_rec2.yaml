@@ -1,0 +1,31 @@
+join_and_clean:
+  min_abstract_length: 100
+  database_whitelist: ["astronomy"]
+keyword_extraction:
+  no_below: 100
+  no_above: 0.25
+  spacy_model_name: "en_core_sci_lg" 
+paper_organizer:
+  no_below: 300
+  no_above: 0.2
+  min_mean_score: 0.015
+  year_min: 1998
+  year_max: 2010
+  journal_blacklist: ["arXiv", "GCN"]
+  keyword_blacklist: "config/drop_features_12_11_2020.txt"
+  use_keyword_count: False
+topic_model:
+  topic_range: [50, 75, 100, 125, 150, 200]
+  lda_params:
+    alpha: "auto"
+    eta: "auto"
+    iterations: 1000
+    passes: 10
+    chunksize: 1000000
+    eval_every: 20
+    random_state: 42
+time_series:
+  year_min: 1998
+  year_max: 2010
+  count_strategy: "weight+threshold"
+  threshold: 0.05

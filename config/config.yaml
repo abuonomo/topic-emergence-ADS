@@ -1,0 +1,22 @@
+topic_range: [200, 250, 300, 350, 400, 450, 500, 550, 600, 650]
+extraction:
+  no_below: 100
+  no_above: 0.25
+paper_organizer:
+  no_below: 300
+  no_above: 0.2
+  min_mean_score: 0.015
+  year_min: 1997
+  year_max: 2010
+  journal_blacklist: ["arXiv"]
+  keyword_blacklist: "config/drop_features.txt"
+lda:
+  alpha: "auto"
+  eta: "auto"
+  iterations: 1000
+  passes: 10
+  chunksize: 1000000
+  eval_every: 20
+time_series:
+  year_min: 1997
+  year_max: 2010

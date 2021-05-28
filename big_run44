@@ -1,0 +1,32 @@
+
+make -f Makefile.ao lda CONFIG_FILE=config/astro2010-1998to2010_ao_lrg_rec6.mk >& scratch/run_lda_19_rec6.log 
+make -f Makefile.ao lda CONFIG_FILE=config/astro2010-1998to2010_ao_lrg_rec7.mk >& scratch/run_lda_19_rec7.log 
+make -f Makefile.ao lda CONFIG_FILE=config/astro2010-1998to2010_ao_lrg_rec8.mk >& scratch/run_lda_19_rec8.log
+make -f Makefile.ao lda CONFIG_FILE=config/astro2010-1998to2010_ao_lrg_rec9.mk >& scratch/run_lda_19_rec9.log 
+make -f Makefile.ao lda CONFIG_FILE=config/astro2010-1998to2010_ao_lrg_rec10.mk >& scratch/run_lda_19_rec10.log
+
+make -f Makefile.ao_2020 lda CONFIG_FILE=config/astro2020-2007to2019_ao_rec6.mk >& scratch/run_lda_20_rec6.log 
+make -f Makefile.ao_2020 lda CONFIG_FILE=config/astro2020-2007to2019_ao_rec7.mk >& scratch/run_lda_20_rec7.log 
+make -f Makefile.ao_2020 lda CONFIG_FILE=config/astro2020-2007to2019_ao_rec8.mk >& scratch/run_lda_20_rec8.log
+make -f Makefile.ao_2020 lda CONFIG_FILE=config/astro2020-2007to2019_ao_rec9.mk >& scratch/run_lda_20_rec9.log 
+make -f Makefile.ao_2020 lda CONFIG_FILE=config/astro2020-2007to2019_ao_rec10.mk >& scratch/run_lda_20_rec10.log
+
+make -f Makefile.ao viz CONFIG_FILE=config/astro2010-1998to2010_ao_lrg_rec6.mk N_TOPICS=125 >& scratch/run_viz_19_rec6.log & 
+make -f Makefile.ao viz CONFIG_FILE=config/astro2010-1998to2010_ao_lrg_rec7.mk N_TOPICS=125 >& scratch/run_viz_19_rec7.log & 
+make -f Makefile.ao viz CONFIG_FILE=config/astro2010-1998to2010_ao_lrg_rec8.mk N_TOPICS=125 >& scratch/run_viz_19_rec8.log & 
+make -f Makefile.ao viz CONFIG_FILE=config/astro2010-1998to2010_ao_lrg_rec9.mk N_TOPICS=125 >& scratch/run_viz_19_rec9.log & 
+make -f Makefile.ao viz CONFIG_FILE=config/astro2010-1998to2010_ao_lrg_rec10.mk N_TOPICS=125 >& scratch/run_viz_19_rec10.log &
+
+make -f Makefile.ao_2020 viz CONFIG_FILE=config/astro2020-2007to2019_ao_rec6.mk N_TOPICS=175 >& scratch/run_viz_20_rec6.log & 
+make -f Makefile.ao_2020 viz CONFIG_FILE=config/astro2020-2007to2019_ao_rec7.mk N_TOPICS=175 >& scratch/run_viz_20_rec7.log & 
+make -f Makefile.ao_2020 viz CONFIG_FILE=config/astro2020-2007to2019_ao_rec8.mk N_TOPICS=175 >& scratch/run_viz_20_rec8.log & 
+make -f Makefile.ao_2020 viz CONFIG_FILE=config/astro2020-2007to2019_ao_rec9.mk N_TOPICS=175 >& scratch/run_viz_20_rec9.log & 
+make -f Makefile.ao_2020 viz CONFIG_FILE=config/astro2020-2007to2019_ao_rec10.mk N_TOPICS=175 >& scratch/run_viz_20_rec10.log &
+
+make -f Makefile.ao_2020 viz CONFIG_FILE=config/astro2020-2007to2019_ao_rec1.mk N_TOPICS=175 >& scratch/run_viz_20_rec1.log & 
+make -f Makefile.ao_2020 viz CONFIG_FILE=config/astro2020-2007to2019_ao_rec2.mk N_TOPICS=175 >& scratch/run_viz_20_rec2.log & 
+make -f Makefile.ao_2020 viz CONFIG_FILE=config/astro2020-2007to2019_ao_rec3.mk N_TOPICS=175 >& scratch/run_viz_20_rec3.log & 
+make -f Makefile.ao_2020 viz CONFIG_FILE=config/astro2020-2007to2019_ao_rec4.mk N_TOPICS=175 >& scratch/run_viz_20_rec4.log & 
+make -f Makefile.ao_2020 viz CONFIG_FILE=config/astro2020-2007to2019_ao_rec5.mk N_TOPICS=175 >& scratch/run_viz_20_rec5.log &
+
+sudo shutdown -h +210

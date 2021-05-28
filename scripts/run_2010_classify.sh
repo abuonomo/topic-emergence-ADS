@@ -56,7 +56,7 @@ echo `which python`
 #echo $cmd; $cmd
 
 #cmd="python src/get_paper_topic_distribs.py --dir_of_txts data/decadal_panel_reports/ --lda_model models/astro2010-1998to2010_ao_lrg_rec1/topic_models/topic_model125 --output_embedding_csv data/example_experiment/topic_distributions_decadal2010_panel_reports_19_125_rec1.csv"
-echo $cmd; $cmd
+#echo $cmd; $cmd
 #cmd="python src/get_paper_topic_distribs.py --dir_of_txts data/decadal_panel_reports/ --lda_model models/astro2010-1998to2010_ao_lrg_rec2/topic_models/topic_model125 --output_embedding_csv data/example_experiment/topic_distributions_decadal2010_panel_reports_19_125_rec2.csv"
 #echo $cmd; $cmd
 #cmd="python src/get_paper_topic_distribs.py --dir_of_txts data/decadal_panel_reports/ --lda_model models/astro2010-1998to2010_ao_lrg_rec3/topic_models/topic_model125 --output_embedding_csv data/example_experiment/topic_distributions_decadal2010_panel_reports_19_125_rec3.csv"
@@ -66,5 +66,17 @@ echo $cmd; $cmd
 #cmd="python src/get_paper_topic_distribs.py --dir_of_txts data/decadal_panel_reports/ --lda_model models/astro2010-1998to2010_ao_lrg_rec5/topic_models/topic_model125 --output_embedding_csv data/example_experiment/topic_distributions_decadal2010_panel_reports_19_125_rec5.csv"
 #echo $cmd; $cmd
 
-cmd="python src/get_paper_topic_distribs.py --dir_of_txts data/decadal_panel_reports/ --lda_model models/astro2020-2007to2019_ao/topic_models/topic_model150 --output_embedding_csv data/example_experiment/topic_distributions_decadal2010_panel_reports_20_150.csv"
+#cmd="python src/get_paper_topic_distribs.py --dir_of_txts data/decadal_panel_reports/ --lda_model models/astro2020-2007to2019_ao/topic_models/topic_model150 --output_embedding_csv data/example_experiment/topic_distributions_decadal2010_panel_reports_20_150.csv"
+#echo $cmd; $cmd
+
+cmd="python src/get_paper_topic_distribs.py --dir_of_txts data/decadal_panel_reports/ --lda_model models/astro2020-2007to2019_ao_rec1/topic_models/topic_model175 --output_embedding_csv data/example_experiment/topic_distributions_decadal2010_panel_reports_20_175_rec1.csv"
 echo $cmd; $cmd
+cmd="python src/get_paper_topic_distribs.py --dir_of_txts data/decadal_panel_reports/ --lda_model models/astro2020-2007to2019_ao_rec2/topic_models/topic_model175 --output_embedding_csv data/example_experiment/topic_distributions_decadal2010_panel_reports_20_175_rec2.csv"
+echo $cmd; $cmd
+cmd="python src/get_paper_topic_distribs.py --dir_of_txts data/decadal_panel_reports/ --lda_model models/astro2020-2007to2019_ao_rec3/topic_models/topic_model175 --output_embedding_csv data/example_experiment/topic_distributions_decadal2010_panel_reports_20_175_rec3.csv"
+echo $cmd; $cmd
+cmd="python src/get_paper_topic_distribs.py --dir_of_txts data/decadal_panel_reports/ --lda_model models/astro2020-2007to2019_ao_rec4/topic_models/topic_model175 --output_embedding_csv data/example_experiment/topic_distributions_decadal2010_panel_reports_20_175_rec4.csv"
+echo $cmd; $cmd
+cmd="python src/get_paper_topic_distribs.py --dir_of_txts data/decadal_panel_reports/ --lda_model models/astro2020-2007to2019_ao_rec5/topic_models/topic_model175 --output_embedding_csv data/example_experiment/topic_distributions_decadal2010_panel_reports_20_175_rec5.csv"
+echo $cmd; $cmd
+
